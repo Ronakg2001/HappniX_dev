@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ event.title }} Guest Invite | HappniX</title>
+    <style>
+      :root {
+        --bg: #050816;
+        --panel: rgba(15, 23, 42, 0.78);
+        --panel-strong: rgba(15, 23, 42, 0.92);
+        --border: rgba(148, 163, 184, 0.16);
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --cyan: #67e8f9;
+        --cyan-deep: #0891b2;
+        --pink: #ec4899;
+        --emerald: #34d399;
+        --amber: #fbbf24;
+        --rose: #fb7185;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(236, 72, 153, 0.24), transparent 28%),
+          radial-gradient(circle at top right, rgba(103, 232, 249, 0.2), transparent 26%),
+          linear-gradient(160deg, #020617 0%, #0b1120 48%, #111827 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 14px;
+      }
+      .shell {
+        width: 100%;
+        max-width: 540px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(22px);
+        border-radius: 32px;
+        overflow: hidden;
+        box-shadow: 0 28px 80px rgba(2, 6, 23, 0.58);
+      }
+      .hero {
+        padding: 28px 26px 20px;
+        background:
+          linear-gradient(135deg, rgba(8, 145, 178, 0.24), rgba(236, 72, 153, 0.2)),
+          linear-gradient(180deg, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.08));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(103, 232, 249, 0.12);
+        color: var(--cyan);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(28px, 5vw, 38px);
+        line-height: 1.02;
+      }
+      .hero p {
+        margin: 0;
+        color: #cbd5e1;
+        line-height: 1.6;
+      }
+      .content {
+        padding: 24px;
+        display: grid;
+        gap: 18px;
+      }
+      .panel {
+        background: var(--panel-strong);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 18px;
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+      .panel p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .field-grid {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .field label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #cbd5e1;
+        text-transform: uppercase;
+      }
+      .field input {
+        width: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(2, 6, 23, 0.8);
+        color: var(--text);
+        border-radius: 18px;
+        padding: 14px 16px;
+        font-size: 15px;
+        outline: none;
+      }
+      .field input:focus {
+        border-color: rgba(103, 232, 249, 0.6);
+        box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.12);
+      }
+      .otp-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: end;
+      }
+      .otp-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .btn {
+        border: none;
+        border-radius: 18px;
+        padding: 14px 16px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+      }
+      .btn:hover { transform: translateY(-1px); }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--pink), var(--cyan-deep));
+        color: white;
+      }
+      .btn-secondary {
+        background: rgba(103, 232, 249, 0.14);
+        color: var(--cyan);
+        border: 1px solid rgba(103, 232, 249, 0.18);
+      }
+      .btn-muted {
+        background: rgba(148, 163, 184, 0.12);
+        color: #e2e8f0;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+      .status {
+        display: none;
+        border-radius: 18px;
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .status.show { display: block; }
+      .status.info { background: rgba(103, 232, 249, 0.12); color: var(--cyan); }
+      .status.success { background: rgba(52, 211, 153, 0.14); color: #a7f3d0; }
+      .status.error { background: rgba(251, 113, 133, 0.14); color: #fecdd3; }
+      .mini-note {
+        margin-top: 10px;
+        color: var(--amber);
+        font-size: 12px;
+      }
+      .footer-note {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+        padding: 0 24px 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="eyebrow">Guest Invite</div>
+        <h1>{{ host.username }} invited you to {{ event.title }}</h1>
+        <p>Finish your details, verify your mobile number, and unlock your guest pass in one smooth flow.</p>
+      </section>
+
+      <section class="content">
+        <div class="panel">
+          <h2>Your details</h2>
+          <p>All fields are required. Aadhaar is collected now, while Aadhaar OTP verification is intentionally skipped for this version.</p>
+
+          <form id="guest-onboarding-form" class="field-grid">
+            {% csrf_token %}
+            <div class="field">
+              <label for="guest-full-name">Full Name</label>
+              <input id="guest-full-name" type="text" required />
+            </div>
+            <div class="field">
+              <label for="guest-mobile-number">Mobile Number</label>
+              <div class="otp-row">
+                <input id="guest-mobile-number" type="tel" inputmode="numeric" maxlength="10" required />
+                <button type="button" id="send-mobile-otp-btn" class="btn btn-secondary">Send OTP</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="guest-mobile-otp">Mobile OTP</label>
+              <div class="otp-row">
+                <input id="guest-mobile-otp" type="tel" inputmode="numeric" maxlength="6" required />
+                <button type="button" id="verify-mobile-otp-btn" class="btn btn-muted">Verify OTP</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="guest-email">Email</label>
+              <input id="guest-email" type="email" required />
+            </div>
+            <div class="field">
+              <label for="guest-aadhaar-number">Aadhaar Number</label>
+              <input id="guest-aadhaar-number" type="text" inputmode="numeric" maxlength="12" required />
+              <div class="mini-note">Aadhaar OTP verification is skipped for now, but the number is still required.</div>
+            </div>
+
+            <div id="guest-status" class="status info"></div>
+
+            <div class="otp-actions">
+              <button type="submit" id="guest-submit-btn" class="btn btn-primary">Continue To Guest Ticket</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <div class="footer-note">Invite token: {{ guest.invite_token }}</div>
+    </main>
+
+    <script>
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+          const cookies = document.cookie.split(";");
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === name + "=") {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      function getCsrfToken() {
+        return (
+          getCookie("csrftoken") ||
+          document.querySelector('[name="csrfmiddlewaretoken"]')?.value ||
+          ""
+        );
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken(),
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || "Request failed.");
+        return data;
+      }
+
+      const inviteToken = "{{ guest.invite_token }}";
+      const statusEl = document.getElementById("guest-status");
+      const fullNameInput = document.getElementById("guest-full-name");
+      const mobileInput = document.getElementById("guest-mobile-number");
+      const otpInput = document.getElementById("guest-mobile-otp");
+      const emailInput = document.getElementById("guest-email");
+      const aadhaarInput = document.getElementById("guest-aadhaar-number");
+      const sendOtpBtn = document.getElementById("send-mobile-otp-btn");
+      const verifyOtpBtn = document.getElementById("verify-mobile-otp-btn");
+      const submitBtn = document.getElementById("guest-submit-btn");
+      let mobileVerified = {{ guest.mobile_otp_verified|yesno:"true,false" }};
+
+      function setStatus(message, tone) {
+        statusEl.textContent = message || "";
+        statusEl.className = `status show ${tone || "info"}`;
+      }
+
+      function clearStatus() {
+        statusEl.className = "status info";
+        statusEl.textContent = "";
+      }
+
+      if (mobileVerified) {
+        setStatus("Mobile number already verified for this invite.", "success");
+      }
+
+      sendOtpBtn.addEventListener("click", async () => {
+        const mobileNumber = (mobileInput.value || "").trim();
+        try {
+          clearStatus();
+          sendOtpBtn.disabled = true;
+          const data = await postJson(`/api/guest-invites/${inviteToken}/send-mobile-otp`, {
+            mobile_number: mobileNumber,
+          });
+          setStatus(`${data.message} Demo OTP: ${data.debugOtp}`, "info");
+        } catch (error) {
+          setStatus(error.message || "Failed to send OTP.", "error");
+        } finally {
+          sendOtpBtn.disabled = false;
+        }
+      });
+
+      verifyOtpBtn.addEventListener("click", async () => {
+        try {
+          clearStatus();
+          verifyOtpBtn.disabled = true;
+          await postJson(`/api/guest-invites/${inviteToken}/verify-mobile-otp`, {
+            otp: (otpInput.value || "").trim(),
+          });
+          mobileVerified = true;
+          setStatus("Mobile OTP verified. You can continue now.", "success");
+        } catch (error) {
+          setStatus(error.message || "OTP verification failed.", "error");
+        } finally {
+          verifyOtpBtn.disabled = false;
+        }
+      });
+
+      document.getElementById("guest-onboarding-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          clearStatus();
+          submitBtn.disabled = true;
+          const data = await postJson(`/api/guest-invites/${inviteToken}/onboarding`, {
+            full_name: (fullNameInput.value || "").trim(),
+            mobile_number: (mobileInput.value || "").trim(),
+            email: (emailInput.value || "").trim(),
+            aadhaar: (aadhaarInput.value || "").trim(),
+          });
+          window.location.href = data.guestInvite.ticketUrl;
+        } catch (error) {
+          setStatus(error.message || "Could not complete onboarding.", "error");
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

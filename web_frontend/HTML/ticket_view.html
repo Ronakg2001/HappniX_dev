@@ -1,0 +1,71 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ ticket.event.title }} - Happnix Ticket</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="{% static 'css/ticket_view.css' %}" />
+
+    <script
+      type="text/javascript"
+      src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"
+    ></script>
+    <script src="{% static 'js/qr_generator.js' %}?v=20260401a"></script>
+  </head>
+  <body
+    class="bg-[#0b1121] text-white min-h-screen flex flex-col items-center justify-center p-4"
+  >
+    <div
+      class="bg-slate-900 border border-white/10 p-8 rounded-3xl text-center w-full max-w-sm ticket-card-glow relative overflow-hidden"
+    >
+      <h2 class="text-3xl font-black text-white mb-2 leading-tight">
+        {{ ticket.event.title }}
+      </h2>
+
+      <div class="flex items-center justify-center gap-2 text-gray-400 mb-6">
+        <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+        <span class="text-sm font-medium"
+          >{{ ticket.event.start_at|date:"M d, Y - h:i A" }}</span
+        >
+      </div>
+
+      <div
+        class="inline-block px-4 py-1.5 rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-400 font-bold text-sm mb-8 tracking-widest uppercase"
+      >
+        {{ ticket.tier_name|default:"General Admission" }}
+      </div>
+
+      <div class="qr-bg-layer mb-6 flex items-center justify-center">
+        <div
+          id="ticket-qr-container"
+          class="w-[220px] h-[220px]"
+          data-width="220"
+          data-height="220"
+          data-ticket-id="{{ ticket.id }}"
+        ></div>
+      </div>
+
+      <div class="space-y-1">
+        <p
+          class="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-bold"
+        >
+          Ticket ID
+        </p>
+        <p class="text-sm text-gray-300 font-mono tracking-wider">
+          {{ ticket.id }}
+        </p>
+      </div>
+
+      <p class="mt-8 text-xs text-cyan-500/80 animate-pulse">
+        Present this code at the entrance
+      </p>
+    </div>
+
+    <script src="{% static 'js/ticket_view.js' %}?v=20260401a"></script>
+  </body>
+</html>
