@@ -1,4 +1,4 @@
 {
-  "name": "Worker-dev",
+  "name": "worker1",
   "assets": { "directory": "./dist" }
 }
