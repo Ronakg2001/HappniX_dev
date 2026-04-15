@@ -1,4 +1,4 @@
 {
   "name": "worker1",
-  "assets": { "directory": "./dist" }
+  "assets": { "directory": "./" }
 }
