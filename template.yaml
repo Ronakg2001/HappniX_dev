@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: HappniX backend deployment skeleton for the dev environment.
 
@@ -11,10 +11,10 @@ Parameters:
     Default: dev
   R2BucketName:
     Type: String
-    Default: ''
+    Default: ""
   R2Endpoint:
     Type: String
-    Default: ''
+    Default: ""
 
 Globals:
   Function:
@@ -28,7 +28,7 @@ Globals:
         R2_ENDPOINT: !Ref R2Endpoint
 
 Resources:
-  HappnixApiFunction:
+  SignupSignin:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/
@@ -37,28 +37,28 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:
-        HealthEndpoint:
+        SignInEndpoint:
           Type: Api
           Properties:
-            Path: /health
+            Path: /signin
             Method: get
-            RestApiId: !Ref HappnixApiGateway
+            RestApiId: !Ref HappnixDevApi
 
-  HappnixApiGateway:
+  HappnixDevApi:
     Type: AWS::Serverless::Api
     Properties:
       Name: happnix-dev-api
       StageName: !Ref ApiStageName
       EndpointConfiguration: REGIONAL
       Cors:
-        AllowMethods: "'GET,OPTIONS'"
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Requested-With'"
         AllowOrigin: "'*'"
 
 Outputs:
   HappnixApiUrl:
     Description: Invoke URL for the HappniX deployment skeleton API.
-    Value: !Sub "https://${HappnixApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}"
-  HappnixHealthUrl:
+    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}"
+  SignupSigninUrl:
     Description: Health endpoint for deployment verification.
-    Value: !Sub "https://${HappnixApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/health"
+    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/signin"
