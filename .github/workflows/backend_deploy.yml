@@ -39,7 +39,7 @@ jobs:
         uses: aws-actions/setup-sam@v2
 
       - name: Run backend unit tests
-        run: python -m unittest backend.test_app -v
+        run: python -m unittest backend.SignupSignin -v
 
       - name: Build SAM application
         run: sam build --template-file template.yaml
