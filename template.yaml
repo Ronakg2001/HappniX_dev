@@ -32,16 +32,16 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/
-      Handler: app.lambda_handler
-      Description: Minimal HappniX API for deployment verification.
+      Handler: SignupSignin.lambda_handler
+      Description: HappniX signup and signin Lambda function.
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:
-        SignInEndpoint:
+        SignupEndpoint:
           Type: Api
           Properties:
-            Path: /signin
-            Method: get
+            Path: /signup
+            Method: post
             RestApiId: !Ref HappnixDevApi
 
   HappnixDevApi:
@@ -60,5 +60,5 @@ Outputs:
     Description: Invoke URL for the HappniX deployment skeleton API.
     Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}"
   SignupSigninUrl:
-    Description: Health endpoint for deployment verification.
-    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/signin"
+    Description: Signup endpoint for the HappniX API.
+    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/signup"
