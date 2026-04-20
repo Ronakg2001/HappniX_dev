@@ -37,10 +37,58 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
       Events:
-        SignupEndpoint:
+        SendMobileOtp:
           Type: Api
           Properties:
-            Path: /signup
+            Path: /api/auth/mobile/send-otp
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        ResendMobileOtp:
+          Type: Api
+          Properties:
+            Path: /api/auth/mobile/resend-otp
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        VerifyMobileOtp:
+          Type: Api
+          Properties:
+            Path: /api/auth/mobile/verify-otp
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        ForgotPassword:
+          Type: Api
+          Properties:
+            Path: /api/auth/password/forgot
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        LoginWithPassword:
+          Type: Api
+          Properties:
+            Path: /api/auth/username/login
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        SignupDetails:
+          Type: Api
+          Properties:
+            Path: /api/signup/details
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        SignupProfile:
+          Type: Api
+          Properties:
+            Path: /api/signup/profile
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        SendAadhaarOtp:
+          Type: Api
+          Properties:
+            Path: /api/auth/aadhaar/send-otp
+            Method: post
+            RestApiId: !Ref HappnixDevApi
+        VerifyAadhaarOtp:
+          Type: Api
+          Properties:
+            Path: /api/auth/aadhaar/verify-otp
             Method: post
             RestApiId: !Ref HappnixDevApi
 
@@ -60,5 +108,5 @@ Outputs:
     Description: Invoke URL for the HappniX deployment skeleton API.
     Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}"
   SignupSigninUrl:
-    Description: Signup endpoint for the HappniX API.
-    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/signup"
+    Description: Auth entry endpoint for the HappniX API.
+    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/api/auth/mobile/send-otp"

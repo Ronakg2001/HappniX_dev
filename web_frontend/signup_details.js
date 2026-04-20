@@ -31,20 +31,29 @@ const form = document.getElementById("detailsForm");
       dobInput.max = today.toISOString().split("T")[0];
     }
 
-    function isStrongPassword(value) {
-      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(value);
-    }
+	    function isStrongPassword(value) {
+	      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(value);
+	    }
 
-    async function postJson(url, payload) {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
-        credentials: "same-origin",
-        body: JSON.stringify(payload)
-      });
+	    function buildApiUrl(path) {
+	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+	      if (typeof runtimeConfig.buildApiUrl === "function") {
+	        return runtimeConfig.buildApiUrl(path);
+	      }
+	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+	      return base ? `${base}${path}` : path;
+	    }
+
+	    async function postJson(url, payload) {
+	      const response = await fetch(buildApiUrl(url), {
+	        method: "POST",
+	        headers: {
+	          "Content-Type": "application/json",
+	          "X-CSRFToken": getCsrfToken()
+	        },
+	        credentials: "include",
+	        body: JSON.stringify(payload)
+	      });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {

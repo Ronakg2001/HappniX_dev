@@ -14,28 +14,37 @@ const profileForm = document.getElementById("profileForm");
     const success = document.getElementById("success");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-    function getCsrfToken() {
-      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
-        return csrfTokenTemplate;
-      }
+	    function getCsrfToken() {
+	      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
+	        return csrfTokenTemplate;
+	      }
       const value = `; ${document.cookie}`;
       const parts = value.split(`; csrftoken=`);
       if (parts.length === 2) {
         return parts.pop().split(";").shift();
-      }
-      return "";
-    }
+	      }
+	      return "";
+	    }
 
-    async function postJson(payload) {
-      const response = await fetch("/api/signup/profile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
-        credentials: "same-origin",
-        body: JSON.stringify(payload)
-      });
+	    function buildApiUrl(path) {
+	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+	      if (typeof runtimeConfig.buildApiUrl === "function") {
+	        return runtimeConfig.buildApiUrl(path);
+	      }
+	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+	      return base ? `${base}${path}` : path;
+	    }
+
+	    async function postJson(payload) {
+	      const response = await fetch(buildApiUrl("/api/signup/profile"), {
+	        method: "POST",
+	        headers: {
+	          "Content-Type": "application/json",
+	          "X-CSRFToken": getCsrfToken()
+	        },
+	        credentials: "include",
+	        body: JSON.stringify(payload)
+	      });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
