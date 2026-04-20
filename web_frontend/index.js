@@ -27,7 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (_error) {
       backendHealthState = "pending";
       statusText.style.color = "#fda4af";
-      statusText.textContent = "Frontend ready. Backend deployment check pending.";
+      statusText.textContent =
+        "Frontend ready. Backend deployment check pending.";
     }
   }
 
