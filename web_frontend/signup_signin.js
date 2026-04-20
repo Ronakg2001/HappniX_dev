@@ -44,32 +44,41 @@ const views = {
 
     let mobileContext = { mobile: "" };
 
-    const API_ENDPOINTS = {
-      sendMobileOtp: "/api/auth/mobile/send-otp",
-      verifyMobileOtp: "/api/auth/mobile/verify-otp",
-      resendMobileOtp: "/api/auth/mobile/resend-otp",
-      loginWithPassword: "/api/auth/username/login"
-    };
-    
-    function normalizeMobile(value) {
-      return value.replace(/\D/g, "");
-    }
+	    const API_ENDPOINTS = {
+	      sendMobileOtp: "/api/auth/mobile/send-otp",
+	      verifyMobileOtp: "/api/auth/mobile/verify-otp",
+	      resendMobileOtp: "/api/auth/mobile/resend-otp",
+	      loginWithPassword: "/api/auth/username/login"
+	    };
+
+	    function buildApiUrl(path) {
+	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+	      if (typeof runtimeConfig.buildApiUrl === "function") {
+	        return runtimeConfig.buildApiUrl(path);
+	      }
+	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+	      return base ? `${base}${path}` : path;
+	    }
+	    
+	    function normalizeMobile(value) {
+	      return value.replace(/\D/g, "");
+	    }
 
     function isValidMobile(value) {
       return /^\d{10}$/.test(normalizeMobile(value));
     }
 
-    async function postJson(url, payload) {
-      const csrfToken = getCsrfToken();
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrfToken
-        },
-        credentials: "same-origin",
-        body: JSON.stringify(payload)
-      });
+	    async function postJson(url, payload) {
+	      const csrfToken = getCsrfToken();
+	      const response = await fetch(buildApiUrl(url), {
+	        method: "POST",
+	        headers: {
+	          "Content-Type": "application/json",
+	          "X-CSRFToken": csrfToken
+	        },
+	        credentials: "include",
+	        body: JSON.stringify(payload)
+	      });
 
       let body = {};
       try {

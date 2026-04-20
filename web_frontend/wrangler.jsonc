@@ -1,5 +1,8 @@
 {
-  "name": "worker1",
-  "compatibility_date":"2026-04-15",
-  "assets": { "directory": "./" }
+  "name": "happnix-dev",
+  "compatibility_date": "2026-04-15",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./"
+  }
 }

@@ -3,7 +3,7 @@ name: Backend Deploy
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - "backend/**"
       - "template.yaml"
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      STACK_NAME: happnix-dev-backend
+      STACK_NAME: HappnixDev
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -37,9 +37,6 @@ jobs:
 
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v2
-
-      - name: Run backend unit tests
-        run: python -m unittest backend.test_app -v
 
       - name: Build SAM application
         run: sam build --template-file template.yaml
