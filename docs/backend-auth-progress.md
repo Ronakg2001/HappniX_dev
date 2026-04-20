@@ -35,6 +35,10 @@
   - `/api/signup/details`
 - `web_frontend/signup_profile_optional.js`
   - `/api/signup/profile`
+- Runtime config dependency:
+  - `web_frontend/runtime-config.js`
+  - Loaded by `index.html`, `signup_signin.html`, `signup_details.html`, `signup_profile_optional.html`, and `forgot_password.html`
+  - Current configured AWS API base: `https://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev`
 
 ## Response And Exception Flow
 

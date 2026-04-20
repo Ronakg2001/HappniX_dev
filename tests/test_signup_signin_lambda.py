@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import unittest
 import uuid
 from unittest.mock import patch
@@ -278,3 +279,33 @@ class SignupSigninLambdaTests(unittest.TestCase):
             cookie=signup_cookie,
         )
         return register_response["headers"]["Set-Cookie"]
+
+
+class FrontendRuntimeConfigTests(unittest.TestCase):
+    def test_auth_pages_load_runtime_config_before_page_script(self):
+        page_expectations = [
+            ("web_frontend/signup_signin.html", "signup_signin.js"),
+            ("web_frontend/signup_details.html", "signup_details.js"),
+            ("web_frontend/signup_profile_optional.html", "signup_profile_optional.js"),
+            ("web_frontend/forgot_password.html", "forgot_password.js"),
+        ]
+
+        for relative_path, page_script in page_expectations:
+            content = Path(relative_path).read_text(encoding="utf-8")
+            runtime_index = content.find("runtime-config.js")
+            script_index = content.find(page_script)
+
+            self.assertNotEqual(runtime_index, -1, f"{relative_path} should load runtime-config.js")
+            self.assertNotEqual(script_index, -1, f"{relative_path} should load {page_script}")
+            self.assertLess(
+                runtime_index,
+                script_index,
+                f"{relative_path} should load runtime-config.js before {page_script}",
+            )
+
+    def test_runtime_config_has_non_empty_api_base_url(self):
+        content = Path("web_frontend/runtime-config.js").read_text(encoding="utf-8")
+        match = re.search(r'apiBaseUrl:\s*"([^"]+)"', content)
+
+        self.assertIsNotNone(match, "runtime-config.js should define apiBaseUrl")
+        self.assertTrue(match.group(1).startswith("https://"), "apiBaseUrl should point at the deployed AWS API")

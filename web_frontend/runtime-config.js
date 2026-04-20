@@ -1,5 +1,5 @@
 window.HAPPNIX_RUNTIME_CONFIG = {
-  apiBaseUrl: "",
+  apiBaseUrl: "https://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev",
   getApiBaseUrl() {
     return String(this.apiBaseUrl || "").replace(/\/$/, "");
   },
