@@ -67,6 +67,12 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("- !Ref HappnixBackendSubnetB", content)
         self.assertIn("DBSubnetGroupName: !Ref HappnixDbSubnetGroup", content)
 
+    def test_template_uses_subnet_cidrs_within_happnix_vpc_range(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("CidrBlock: 10.0.0.0/26", content)
+        self.assertIn("CidrBlock: 10.0.0.64/26", content)
+
 
 class BackendDeployWorkflowTests(unittest.TestCase):
     def test_backend_deploy_workflow_is_pinned_to_ap_south_1(self):
