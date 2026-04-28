@@ -9,6 +9,34 @@ Parameters:
   AppEnvironment:
     Type: String
     Default: dev
+  AppVpcId:
+    Type: String
+    Default: "vpc-010824d98891a054f"
+  AppSubnetA:
+    Type: String
+    Default: "subnet-0bf6a30e0d784a8bd"
+  AppSubnetB:
+    Type: String
+    Default: "subnet-0e20cb82546c2f672"
+  AuthDbName:
+    Type: String
+    Default: ""
+  AuthDbUser:
+    Type: String
+    Default: ""
+  AuthDbPassword:
+    Type: String
+    NoEcho: true
+    Default: ""
+  AuthDbConnectTimeout:
+    Type: String
+    Default: "5"
+  TestOtpMode:
+    Type: String
+    Default: "false"
+  AllowFixedTestOtp:
+    Type: String
+    Default: "false"
   R2BucketName:
     Type: String
     Default: ""
@@ -24,19 +52,73 @@ Globals:
     Environment:
       Variables:
         APP_ENVIRONMENT: !Ref AppEnvironment
-        TEST_OTP_MODE: "false"
-        ALLOW_FIXED_TEST_OTP: "false"
+        TEST_OTP_MODE: !Ref TestOtpMode
+        ALLOW_FIXED_TEST_OTP: !Ref AllowFixedTestOtp
         ALLOW_MISSING_CLAIMS_FALLBACK: "false"
-        AUTH_DB_HOST: ""
-        AUTH_DB_PORT: "5432"
-        AUTH_DB_NAME: ""
-        AUTH_DB_USER: ""
-        AUTH_DB_PASSWORD: ""
-        AUTH_DB_CONNECT_TIMEOUT: "5"
+        AUTH_DB_HOST: !GetAtt HappnixPostgresDatabase.Endpoint.Address
+        AUTH_DB_PORT: !GetAtt HappnixPostgresDatabase.Endpoint.Port
+        AUTH_DB_NAME: !Ref AuthDbName
+        AUTH_DB_USER: !Ref AuthDbUser
+        AUTH_DB_PASSWORD: !Ref AuthDbPassword
+        AUTH_DB_CONNECT_TIMEOUT: !Ref AuthDbConnectTimeout
         R2_BUCKET_NAME: !Ref R2BucketName
         R2_ENDPOINT: !Ref R2Endpoint
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref HappnixLambdaSecurityGroup
+      SubnetIds:
+        - !Ref AppSubnetA
+        - !Ref AppSubnetB
 
 Resources:
+  HappnixLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for HappniX Lambda functions.
+      VpcId: !Ref AppVpcId
+
+  HappnixDatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for HappniX PostgreSQL database.
+      VpcId: !Ref AppVpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref HappnixLambdaSecurityGroup
+
+  HappnixDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets for HappniX PostgreSQL database.
+      SubnetIds:
+        - !Ref AppSubnetA
+        - !Ref AppSubnetB
+
+  HappnixPostgresDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: happnix-postgres-dev
+      Engine: postgres
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: "20"
+      StorageType: gp2
+      PubliclyAccessible: false
+      MultiAZ: false
+      DBName: !Ref AuthDbName
+      MasterUsername: !Ref AuthDbUser
+      MasterUserPassword: !Ref AuthDbPassword
+      Port: 5432
+      BackupRetentionPeriod: 1
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: false
+      DBSubnetGroupName: !Ref HappnixDbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref HappnixDatabaseSecurityGroup
+
   HappnixUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -155,6 +237,7 @@ Resources:
       Description: Sync confirmed Cognito users into HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
 
   CognitoPreToken:
     Type: AWS::Serverless::Function
@@ -164,6 +247,7 @@ Resources:
       Description: Inject userID and userType claims from HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
 
   CognitoPostConfirmationInvokePermission:
     Type: AWS::Lambda::Permission
@@ -189,6 +273,7 @@ Resources:
       Description: HappniX signup and signin Lambda function.
       Policies:
         - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
       Events:
         SendMobileOtp:
           Type: Api
@@ -272,3 +357,12 @@ Outputs:
   HappnixUserPoolArn:
     Description: Cognito User Pool ARN for HappniX authentication.
     Value: !GetAtt HappnixUserPool.Arn
+  HappnixCognitoRegion:
+    Description: Cognito region for HappniX authentication.
+    Value: !Ref AWS::Region
+  HappnixDatabaseEndpoint:
+    Description: PostgreSQL endpoint for HappniX backend.
+    Value: !GetAtt HappnixPostgresDatabase.Endpoint.Address
+  HappnixDatabasePort:
+    Description: PostgreSQL port for HappniX backend.
+    Value: !GetAtt HappnixPostgresDatabase.Endpoint.Port

@@ -54,5 +54,11 @@ jobs:
           --parameter-overrides
           ApiStageName=dev
           AppEnvironment=dev
+          AuthDbName=${{ secrets.AUTH_DB_NAME }}
+          AuthDbUser=${{ secrets.AUTH_DB_USER }}
+          AuthDbPassword=${{ secrets.AUTH_DB_PASSWORD }}
+          AuthDbConnectTimeout=5
+          TestOtpMode=false
+          AllowFixedTestOtp=false
           R2BucketName=${{ secrets.R2_BUCKET_NAME }}
           R2Endpoint=${{ secrets.R2_ENDPOINT }}

@@ -363,3 +363,19 @@ class FrontendRuntimeConfigTests(unittest.TestCase):
 
         self.assertIsNotNone(match, "runtime-config.js should define apiBaseUrl")
         self.assertTrue(match.group(1).startswith("https://"), "apiBaseUrl should point at the deployed AWS API")
+
+    def test_runtime_config_exposes_cognito_placeholders(self):
+        content = Path("web_frontend/runtime-config.js").read_text(encoding="utf-8")
+
+        self.assertIn('cognitoRegion: "ap-south-1"', content)
+        self.assertIn('cognitoUserPoolId:', content)
+        self.assertIn('cognitoUserPoolClientId:', content)
+
+
+class MobileCognitoConfigTests(unittest.TestCase):
+    def test_mobile_cognito_constants_exist(self):
+        content = Path("mobile_frontend/constants/cognito.ts").read_text(encoding="utf-8")
+
+        self.assertIn("export const COGNITO_REGION = 'ap-south-1';", content)
+        self.assertIn("export const COGNITO_USER_POOL_ID =", content)
+        self.assertIn("export const COGNITO_USER_POOL_CLIENT_ID =", content)

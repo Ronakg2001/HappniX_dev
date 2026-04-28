@@ -19,6 +19,21 @@
    - `CognitoPostConfirmation` as the `Post confirmation` trigger
    - `CognitoPreToken` as the `Pre token generation` trigger
 
+## Required Deployment Secrets
+
+Add these GitHub Actions secrets before the backend deploy can fully wire Cognito to PostgreSQL:
+
+- `AUTH_DB_HOST`
+- `AUTH_DB_PORT`
+- `AUTH_DB_NAME`
+- `AUTH_DB_USER`
+- `AUTH_DB_PASSWORD`
+- `R2_BUCKET_NAME`
+- `R2_ENDPOINT`
+- `AWS_ROLE_ARN`
+
+These are passed into the SAM stack as CloudFormation parameters and become Lambda environment variables for the Cognito trigger functions.
+
 ## App Client Security
 
 1. Open `User Pool > App integration > App clients`.
@@ -41,6 +56,14 @@
 4. In `dev` and `qa`, testers can use:
    - `debugOtp` returned by the API response
    - fixed OTP `123456` when `ALLOW_FIXED_TEST_OTP=true`
+
+## App Config Values To Populate
+
+After deployment, copy these stack outputs into the frontend/mobile Cognito config placeholders:
+
+- `HappnixUserPoolId`
+- `HappnixUserPoolClientId`
+- `HappnixCognitoRegion`
 
 ## Recommended Sign-In Model
 
