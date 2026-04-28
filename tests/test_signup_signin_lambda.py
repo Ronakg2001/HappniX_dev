@@ -310,6 +310,37 @@ class SignupSigninLambdaTests(unittest.TestCase):
         self.assertTrue(body["isVerified"])
         self.assertTrue(body["canCreateOrJoinParties"])
 
+    def test_dev_status_returns_schema_readiness_payload_in_dev(self):
+        os.environ["APP_ENVIRONMENT"] = "dev"
+        with patch("backend.SignupSignin.get_dev_auth_status") as mock_status:
+            mock_status.return_value = {
+                "apiStatus": "ok",
+                "environment": "dev",
+                "schemaReady": True,
+                "tables": {"users": True, "user_devices": True},
+            }
+            response = lambda_handler(
+                {"httpMethod": "GET", "path": "/api/auth/dev/status", "headers": {}},
+                None,
+            )
+
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertTrue(body["schemaReady"])
+        self.assertEqual(body["tables"]["users"], True)
+
+    def test_dev_status_returns_not_found_outside_dev(self):
+        os.environ["APP_ENVIRONMENT"] = "prod"
+        response = lambda_handler(
+            {"httpMethod": "GET", "path": "/api/auth/dev/status", "headers": {}},
+            None,
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 404)
+        self.assertEqual(body["message"], "Route not found.")
+
     def _create_authenticated_profile_setup_session(self):
         send_response = self._post("/api/auth/mobile/send-otp", {"mobile": "9876543210"})
         send_body = json.loads(send_response["body"])
@@ -370,6 +401,22 @@ class FrontendRuntimeConfigTests(unittest.TestCase):
         self.assertIn('cognitoRegion: "ap-south-1"', content)
         self.assertIn('cognitoUserPoolId:', content)
         self.assertIn('cognitoUserPoolClientId:', content)
+
+
+class SignupSigninFrontendTests(unittest.TestCase):
+    def test_signup_signin_page_contains_dev_test_panel(self):
+        content = Path("web_frontend/signup_signin.html").read_text(encoding="utf-8")
+
+        self.assertIn('id="authDevPanel"', content)
+        self.assertIn('id="fetchAuthDevStatusBtn"', content)
+        self.assertIn('id="authApiResponse"', content)
+
+    def test_signup_signin_script_wires_dev_status_endpoint(self):
+        content = Path("web_frontend/signup_signin.js").read_text(encoding="utf-8")
+
+        self.assertIn('authDevStatus: "/api/auth/dev/status"', content)
+        self.assertIn("fetchAuthDevStatusBtn", content)
+        self.assertIn("authApiResponse", content)
 
 
 class MobileCognitoConfigTests(unittest.TestCase):

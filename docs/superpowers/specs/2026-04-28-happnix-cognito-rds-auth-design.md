@@ -411,6 +411,99 @@ Deploy the backend networking and database resources inside the existing HappniX
 
 The earlier deployment attempt failed because the provided subnet IDs and the selected VPC ID did not belong to the same VPC. Creating stack-owned subnets inside the approved VPC removes that mismatch and makes the backend network reproducible.
 
+## Deployment-Time Schema Initialization
+
+### Goal
+
+Create the PostgreSQL schema automatically during deployment so the backend can start using RDS immediately after the stack succeeds.
+
+### Recommended approach
+
+- Add a new Lambda function, for example `AuthSchemaInit`, inside the same VPC and subnets as the existing backend Lambdas.
+- The Lambda should read and execute [backend/sql/happnix_auth_schema.sql](/e:/project/HappniX_dev/backend/sql/happnix_auth_schema.sql) against the deployed PostgreSQL instance.
+- Invoke this Lambda through a CloudFormation custom resource so schema creation is part of stack create and update behavior.
+- The custom resource must report success or failure back to CloudFormation, so the stack does not appear healthy until the schema is ready.
+
+### Idempotency requirements
+
+- The SQL must remain safe to run more than once.
+- Table creation should use idempotent PostgreSQL patterns such as `CREATE TYPE ... IF NOT EXISTS` alternatives where needed and guarded `CREATE TABLE IF NOT EXISTS`.
+- Indexes, constraints, and comments must not fail on repeat deploys.
+- The custom resource should avoid destructive behavior on stack delete. It should acknowledge delete events without dropping application tables.
+
+### Security and networking
+
+- `AuthSchemaInit` uses the same database credentials and VPC access path already configured for the trigger Lambdas.
+- The function should have only the permissions needed for logging and VPC networking; database access stays controlled through the RDS credentials.
+- The SQL file remains versioned in the repo so schema changes are reviewable.
+
+## Dev Diagnostics Endpoint
+
+### Goal
+
+Provide a frontend-visible API route that confirms whether the deployed authentication stack is healthy and ready for interactive testing.
+
+### Endpoint behavior
+
+- Add a backend route such as `/api/auth/dev/status`.
+- Enable it only in `dev`.
+- In `prod`, the route should be disabled or return `404`.
+
+### Response contents
+
+The response may include safe development-time diagnostics such as:
+
+- API health status
+- current application environment
+- Cognito region
+- Cognito user pool ID
+- Cognito app client ID
+- database endpoint and port for dev visibility
+- schema readiness checks:
+  - whether `users` exists
+  - whether `user_devices` exists
+- optional timestamp of the check
+
+### Safety constraints
+
+- Do not expose secrets such as database username or password.
+- Keep the route read-only.
+- Log failures so missing schema or connectivity issues are visible during debugging.
+
+## Frontend-Led End-To-End Verification
+
+### Goal
+
+Let the team validate the full auth pipeline from the frontend using the deployed API responses rather than relying on separate one-off scripts.
+
+### Frontend testing panel
+
+- Extend the existing frontend auth/testing experience with a small dev-only panel.
+- The panel should support:
+  - fetching `/api/auth/dev/status`
+  - entering a phone number
+  - calling the send OTP endpoint
+  - displaying the raw response, including `debugOtp` in dev
+  - entering and verifying the OTP
+  - continuing into signup details when the backend says the user is new
+  - displaying warning-verification or redirect states when returned
+
+### Expected verification outcomes
+
+The frontend should make it easy to confirm:
+
+- the backend is reachable
+- the schema-init custom resource ran successfully
+- the OTP endpoints behave correctly in dev
+- the user lifecycle progresses through the expected response states
+- Cognito-backed paths eventually surface `userID`, `userType`, redirect targets, or warning verification signals where appropriate
+
+### Why frontend-led verification
+
+- It validates the same user-facing path the team will actually use.
+- It makes backend readiness visible without opening the AWS console for every check.
+- It shortens the feedback loop when debugging Cognito, Lambda, and RDS interactions together.
+
 ## SQL And Lambda Deliverables To Produce In Implementation
 
 Implementation should produce:
@@ -420,6 +513,9 @@ Implementation should produce:
 - a Python Post Confirmation Lambda using `psycopg2` and `INSERT ... ON CONFLICT`
 - a Python Pre Token Generation Lambda using `psycopg2`
 - a Cognito setup guide aligned with the testing OTP bypass design
+- a Lambda-backed CloudFormation custom resource for schema initialization
+- a dev-only diagnostics endpoint for frontend readiness checks
+- frontend dev verification UI wired to the real auth APIs
 
 ## Open Decisions Already Resolved
 

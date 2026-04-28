@@ -58,6 +58,9 @@ Globals:
         AUTH_DB_USER: !Ref AuthDbUser
         AUTH_DB_PASSWORD: !Ref AuthDbPassword
         AUTH_DB_CONNECT_TIMEOUT: !Ref AuthDbConnectTimeout
+        COGNITO_REGION: !Ref AWS::Region
+        COGNITO_USER_POOL_ID: !Ref HappnixUserPool
+        COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient
         R2_BUCKET_NAME: !Ref R2BucketName
         R2_ENDPOINT: !Ref R2Endpoint
     VpcConfig:
@@ -280,6 +283,17 @@ Resources:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
 
+  AuthSchemaInit:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: AuthSchemaInit.lambda_handler
+      Description: Initialize HappniX auth schema in PostgreSQL during deploy.
+      Timeout: 60
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+
   CognitoPostConfirmationInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -295,6 +309,12 @@ Resources:
       FunctionName: !Ref CognitoPreToken
       Principal: cognito-idp.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
+
+  HappnixAuthSchemaInitializer:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt AuthSchemaInit.Arn
+      SchemaVersion: "2026-04-28-auth-schema-v1"
 
   SignupSignin:
     Type: AWS::Serverless::Function
@@ -359,6 +379,12 @@ Resources:
           Properties:
             Path: /api/auth/aadhaar/verify-otp
             Method: post
+            RestApiId: !Ref HappnixDevApi
+        AuthDevStatus:
+          Type: Api
+          Properties:
+            Path: /api/auth/dev/status
+            Method: get
             RestApiId: !Ref HappnixDevApi
 
   HappnixDevApi:

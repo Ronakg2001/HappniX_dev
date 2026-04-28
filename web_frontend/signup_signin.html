@@ -236,6 +236,18 @@
             </button>
           </div>
         </form>
+
+        <section id="authDevPanel" class="form-card active dev-panel">
+          <h2>Developer Verification</h2>
+          <p class="sub">Check backend readiness and inspect real auth API responses.</p>
+          <div class="dev-actions">
+            <button id="fetchAuthDevStatusBtn" class="btn btn-secondary" type="button">
+              Check Backend Status
+            </button>
+          </div>
+          <pre id="authDevStatusOutput" class="dev-output" aria-live="polite"></pre>
+          <pre id="authApiResponse" class="dev-output" aria-live="polite"></pre>
+        </section>
       </section>
     </main>
 

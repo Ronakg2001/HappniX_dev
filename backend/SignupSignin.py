@@ -8,8 +8,10 @@ from email.utils import parseaddr
 
 try:
     from . import dev_store
+    from .auth_db import table_exists
 except ImportError:  # pragma: no cover
     import dev_store
+    from auth_db import table_exists
 
 
 def _json_response(status_code, payload, trace_id=None):
@@ -87,6 +89,25 @@ def _fixed_test_otp_allowed():
 
 def _include_debug_otp():
     return _test_otp_mode_enabled() and _app_environment() in {"dev", "qa"}
+
+
+def get_dev_auth_status():
+    users_ready = table_exists("users")
+    devices_ready = table_exists("user_devices")
+    return {
+        "apiStatus": "ok",
+        "environment": _app_environment(),
+        "cognitoRegion": os.environ.get("COGNITO_REGION", ""),
+        "cognitoUserPoolId": os.environ.get("COGNITO_USER_POOL_ID", ""),
+        "cognitoUserPoolClientId": os.environ.get("COGNITO_USER_POOL_CLIENT_ID", ""),
+        "databaseEndpoint": os.environ.get("AUTH_DB_HOST", ""),
+        "databasePort": os.environ.get("AUTH_DB_PORT", ""),
+        "schemaReady": users_ready and devices_ready,
+        "tables": {
+            "users": users_ready,
+            "user_devices": devices_ready,
+        },
+    }
 
 
 def _set_session_cookie(response, session_token):
@@ -181,6 +202,13 @@ def send_mobile_otp(event):
         response_payload,
         token,
     )
+
+
+def auth_dev_status(event):
+    del event
+    if _app_environment() != "dev":
+        return _json_response(404, {"message": "Route not found."})
+    return _json_response(200, get_dev_auth_status())
 
 
 def resend_mobile_otp(event):
@@ -421,6 +449,7 @@ def verify_aadhaar_otp_api(event):
 
 
 ROUTES = {
+    ("GET", "/api/auth/dev/status"): auth_dev_status,
     ("POST", "/api/auth/mobile/send-otp"): send_mobile_otp,
     ("POST", "/api/auth/mobile/resend-otp"): resend_mobile_otp,
     ("POST", "/api/auth/mobile/verify-otp"): verify_mobile_otp,

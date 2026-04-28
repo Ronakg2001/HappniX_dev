@@ -32,6 +32,9 @@ const views = {
     const userPassError = document.getElementById("userPassError");
     const userPassSuccess = document.getElementById("userPassSuccess");
     const newUserPrompt = document.getElementById("newUserPrompt");
+    const fetchAuthDevStatusBtn = document.getElementById("fetchAuthDevStatusBtn");
+    const authDevStatusOutput = document.getElementById("authDevStatusOutput");
+    const authApiResponse = document.getElementById("authApiResponse");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
     document.addEventListener('click', (event) => {
@@ -45,6 +48,7 @@ const views = {
     let mobileContext = { mobile: "" };
 
 	    const API_ENDPOINTS = {
+          authDevStatus: "/api/auth/dev/status",
 	      sendMobileOtp: "/api/auth/mobile/send-otp",
 	      verifyMobileOtp: "/api/auth/mobile/verify-otp",
 	      resendMobileOtp: "/api/auth/mobile/resend-otp",
@@ -91,8 +95,36 @@ const views = {
         throw new Error(body.message || "Request failed. Please try again.");
       }
 
-      return body;
-    }
+	      return body;
+	    }
+
+        async function getJson(url) {
+          const response = await fetch(buildApiUrl(url), {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            credentials: "include"
+          });
+
+          let body = {};
+          try {
+            body = await response.json();
+          } catch (_error) {
+            body = {};
+          }
+
+          if (!response.ok) {
+            throw new Error(body.message || "Request failed. Please try again.");
+          }
+
+          return body;
+        }
+
+        function renderDevJson(target, payload) {
+          if (!target) return;
+          target.textContent = JSON.stringify(payload, null, 2);
+        }
 
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
@@ -190,13 +222,15 @@ const views = {
       setButtonLoading(mobileSendBtn, true, "Send OTP", "Sending...");
 
       try {
-        await postJson(API_ENDPOINTS.sendMobileOtp, {
+        const result = await postJson(API_ENDPOINTS.sendMobileOtp, {
           mobile: normalizeMobile(mobile)
         });
+        renderDevJson(authApiResponse, result);
         openMobileOtpView(mobile);
         mobileOtpSuccess.textContent = "OTP sent successfully.";
       } catch (error) {
         mobileError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileSendBtn, false, "Send OTP", "Sending...");
       }
@@ -224,9 +258,11 @@ const views = {
           mobile: mobileContext.mobile,
           otp
         });
+        renderDevJson(authApiResponse, result);
         handleAuthResult(result, mobileOtpSuccess);
       } catch (error) {
         mobileOtpError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileVerifyBtn, false, "Verify OTP", "Verifying...");
       }
@@ -242,12 +278,14 @@ const views = {
       setButtonLoading(mobileResendBtn, true, "Resend OTP", "Resending...");
 
       try {
-        await postJson(API_ENDPOINTS.resendMobileOtp, {
+        const result = await postJson(API_ENDPOINTS.resendMobileOtp, {
           mobile: mobileContext.mobile
         });
+        renderDevJson(authApiResponse, result);
         mobileOtpSuccess.textContent = `OTP resent to ${mobileContext.mobile}.`;
       } catch (error) {
         mobileOtpError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileResendBtn, false, "Resend OTP", "Resending...");
       }
@@ -271,9 +309,11 @@ const views = {
           identifier: usernameValue,
           password: passwordValue
         });
+        renderDevJson(authApiResponse, result);
         handleAuthResult(result, userPassSuccess);
       } catch (error) {
         userPassError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
         if (error.message && error.message.toLowerCase().includes("invalid username/email or password")) {
           newUserPrompt.style.display = "flex";
         }
@@ -281,6 +321,20 @@ const views = {
         setButtonLoading(userPassLoginBtn, false, "Sign-in", "Signing in...");
       }
     });
+
+    if (fetchAuthDevStatusBtn) {
+      fetchAuthDevStatusBtn.addEventListener("click", async () => {
+        setButtonLoading(fetchAuthDevStatusBtn, true, "Check Backend Status", "Checking...");
+        try {
+          const result = await getJson(API_ENDPOINTS.authDevStatus);
+          renderDevJson(authDevStatusOutput, result);
+        } catch (error) {
+          renderDevJson(authDevStatusOutput, { message: error.message });
+        } finally {
+          setButtonLoading(fetchAuthDevStatusBtn, false, "Check Backend Status", "Checking...");
+        }
+      });
+    }
 
 (function () {
       function openHashTarget() {

@@ -73,6 +73,21 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("CidrBlock: 10.0.0.0/26", content)
         self.assertIn("CidrBlock: 10.0.0.64/26", content)
 
+    def test_template_registers_schema_init_lambda_and_custom_resource(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("AuthSchemaInit:", content)
+        self.assertIn("Handler: AuthSchemaInit.lambda_handler", content)
+        self.assertIn("HappnixAuthSchemaInitializer:", content)
+        self.assertIn("ServiceToken: !GetAtt AuthSchemaInit.Arn", content)
+
+    def test_template_exposes_dev_status_route(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("AuthDevStatus:", content)
+        self.assertIn("Path: /api/auth/dev/status", content)
+        self.assertIn("Method: get", content)
+
 
 class BackendDeployWorkflowTests(unittest.TestCase):
     def test_backend_deploy_workflow_is_pinned_to_ap_south_1(self):

@@ -40,6 +40,13 @@ The backend stack now creates two backend subnets inside `vpc-010824d98891a054f`
 - RDS uses the same subnets through the DB subnet group
 - `AUTH_DB_HOST` and `AUTH_DB_PORT` now come from stack outputs, not manual GitHub secrets
 
+## Automatic Schema Initialization
+
+The stack now runs the auth schema automatically during deployment through the `AuthSchemaInit` Lambda-backed custom resource.
+
+- No manual schema SQL step is required for normal deploys
+- Repeat deploys are safe because the schema SQL is idempotent
+
 ## App Client Security
 
 1. Open `User Pool > App integration > App clients`.
@@ -62,6 +69,15 @@ The backend stack now creates two backend subnets inside `vpc-010824d98891a054f`
 4. In `dev` and `qa`, testers can use:
    - `debugOtp` returned by the API response
    - fixed OTP `123456` when `ALLOW_FIXED_TEST_OTP=true`
+
+## Frontend Verification Flow
+
+Use the dev test panel on the sign-in page to:
+
+- fetch `/api/auth/dev/status`
+- verify schema readiness
+- send and verify OTP
+- inspect raw backend responses during testing
 
 ## App Config Values To Populate
 

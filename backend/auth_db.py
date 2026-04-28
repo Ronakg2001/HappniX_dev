@@ -21,6 +21,29 @@ def _connect():
     )
 
 
+def execute_sql_script(sql_text):
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(sql_text)
+        connection.commit()
+
+
+def table_exists(table_name):
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = %s
+                )
+                """,
+                (table_name,),
+            )
+            return bool(cursor.fetchone()[0])
+
+
 def fetch_user_claims_by_sub(cognito_sub):
     with _connect() as connection:
         with connection.cursor(cursor_factory=RealDictCursor) as cursor:
