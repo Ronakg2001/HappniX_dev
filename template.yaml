@@ -37,6 +37,116 @@ Globals:
         R2_ENDPOINT: !Ref R2Endpoint
 
 Resources:
+  HappnixUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: happnix-dev-user-pool
+      UserPoolTier: ESSENTIALS
+      DeletionProtection: ACTIVE
+      AliasAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      DeviceConfiguration:
+        ChallengeRequiredOnNewDevice: true
+        DeviceOnlyRememberedOnUserPrompt: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+        SignInPolicy:
+          AllowedFirstAuthFactors:
+            - PASSWORD
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailSubject: HappniX verification code
+        EmailMessage: "Your HappniX verification code is {####}"
+      LambdaConfig:
+        PostConfirmation: !GetAtt CognitoPostConfirmation.Arn
+        PreTokenGenerationConfig:
+          LambdaArn: !GetAtt CognitoPreToken.Arn
+          LambdaVersion: V2_0
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+          StringAttributeConstraints:
+            MinLength: "5"
+            MaxLength: "255"
+        - Name: phone_number
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "10"
+            MaxLength: "20"
+        - Name: userType
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "3"
+            MaxLength: "20"
+        - Name: dateOfBirth
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "10"
+            MaxLength: "10"
+
+  HappnixUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: happnix-dev-web-client
+      UserPoolId: !Ref HappnixUserPool
+      GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ReadAttributes:
+        - email
+        - email_verified
+        - phone_number
+        - phone_number_verified
+        - preferred_username
+        - custom:userType
+        - custom:dateOfBirth
+      WriteAttributes:
+        - email
+        - phone_number
+        - preferred_username
+        - custom:userType
+        - custom:dateOfBirth
+
   CognitoPostConfirmation:
     Type: AWS::Serverless::Function
     Properties:
@@ -54,6 +164,22 @@ Resources:
       Description: Inject userID and userType claims from HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
+
+  CognitoPostConfirmationInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CognitoPostConfirmation
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  CognitoPreTokenInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CognitoPreToken
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
 
   SignupSignin:
     Type: AWS::Serverless::Function
@@ -137,3 +263,12 @@ Outputs:
   SignupSigninUrl:
     Description: Auth entry endpoint for the HappniX API.
     Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}/api/auth/mobile/send-otp"
+  HappnixUserPoolId:
+    Description: Cognito User Pool ID for HappniX authentication.
+    Value: !Ref HappnixUserPool
+  HappnixUserPoolClientId:
+    Description: Cognito App Client ID for HappniX authentication.
+    Value: !Ref HappnixUserPoolClient
+  HappnixUserPoolArn:
+    Description: Cognito User Pool ARN for HappniX authentication.
+    Value: !GetAtt HappnixUserPool.Arn
