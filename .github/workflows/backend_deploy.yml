@@ -52,13 +52,13 @@ jobs:
           --no-fail-on-empty-changeset
           --capabilities CAPABILITY_IAM
           --parameter-overrides
-          ApiStageName=dev
-          AppEnvironment=dev
-          AuthDbName=${{ secrets.AUTH_DB_NAME }}
-          AuthDbUser=${{ secrets.AUTH_DB_USER }}
-          AuthDbPassword=${{ secrets.AUTH_DB_PASSWORD }}
-          AuthDbConnectTimeout=5
-          TestOtpMode=false
-          AllowFixedTestOtp=false
-          R2BucketName=${{ secrets.R2_BUCKET_NAME }}
-          R2Endpoint=${{ secrets.R2_ENDPOINT }}
+          ParameterKey=ApiStageName,ParameterValue=dev
+          ParameterKey=AppEnvironment,ParameterValue=dev
+          ParameterKey=AuthDbName,ParameterValue='${{ secrets.AUTH_DB_NAME }}'
+          ParameterKey=AuthDbUser,ParameterValue='${{ secrets.AUTH_DB_USER }}'
+          ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'
+          ParameterKey=AuthDbConnectTimeout,ParameterValue=5
+          ParameterKey=TestOtpMode,ParameterValue=false
+          ParameterKey=AllowFixedTestOtp,ParameterValue=false
+          ParameterKey=R2BucketName,ParameterValue='${{ secrets.R2_BUCKET_NAME }}'
+          ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'
