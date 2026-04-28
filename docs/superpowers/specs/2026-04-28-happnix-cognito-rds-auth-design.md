@@ -354,6 +354,63 @@ Only store values in Cognito that genuinely benefit identity workflows. Prefer R
 - Index `cognitoSub` and `phoneNumber` because they are on the hot path.
 - Consider using RDS Proxy if Lambda concurrency grows.
 
+## Existing VPC Deployment Update
+
+### Goal
+
+Deploy the backend networking and database resources inside the existing HappniX VPC instead of relying on manually selected external subnets that may belong to a different VPC.
+
+### Approved VPC target
+
+- VPC: `vpc-010824d98891a054f`
+- Existing route table for backend subnets: `rtb-0ba30fda9bcdd76c4`
+
+### Updated network design
+
+- Keep Cognito User Pool and API Gateway as AWS-managed regional services outside the VPC boundary.
+- Place all backend compute and data resources inside the approved VPC:
+  - `SignupSignin` Lambda
+  - `CognitoPostConfirmation` Lambda
+  - `CognitoPreToken` Lambda
+  - PostgreSQL RDS instance
+- Stop depending on manually supplied external subnet IDs for Lambda and RDS placement.
+- Instead, create two stack-owned backend subnets inside `vpc-010824d98891a054f`.
+- Associate both subnets with the approved route table `rtb-0ba30fda9bcdd76c4`.
+
+### Subnet strategy
+
+- Create two non-overlapping subnets in different Availability Zones.
+- Use these subnets for:
+  - Lambda `VpcConfig`
+  - RDS `DBSubnetGroup`
+- The stack should own these subnets so CloudFormation-controlled backend resources always live in a consistent network boundary.
+
+### Security model
+
+- Create a dedicated Lambda security group.
+- Create a dedicated RDS security group.
+- Allow inbound PostgreSQL `5432` to RDS only from the Lambda security group.
+- Keep the database non-public:
+  - `PubliclyAccessible: false`
+
+### Operational impact
+
+- `template.yaml` should create:
+  - two backend subnets
+  - route table associations
+  - Lambda and RDS security groups
+  - RDS subnet group
+  - PostgreSQL `db.t3.micro` instance
+- GitHub deployment still supplies:
+  - `AUTH_DB_NAME`
+  - `AUTH_DB_USER`
+  - `AUTH_DB_PASSWORD`
+- Lambda database host and port should come from the created RDS instance endpoint instead of manual host/port secrets.
+
+### Reason for this update
+
+The earlier deployment attempt failed because the provided subnet IDs and the selected VPC ID did not belong to the same VPC. Creating stack-owned subnets inside the approved VPC removes that mismatch and makes the backend network reproducible.
+
 ## SQL And Lambda Deliverables To Produce In Implementation
 
 Implementation should produce:

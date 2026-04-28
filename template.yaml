@@ -12,12 +12,9 @@ Parameters:
   AppVpcId:
     Type: String
     Default: "vpc-010824d98891a054f"
-  AppSubnetA:
+  AppRouteTableId:
     Type: String
-    Default: "subnet-0bf6a30e0d784a8bd"
-  AppSubnetB:
-    Type: String
-    Default: "subnet-0e20cb82546c2f672"
+    Default: "rtb-0ba30fda9bcdd76c4"
   AuthDbName:
     Type: String
     Default: ""
@@ -67,10 +64,44 @@ Globals:
       SecurityGroupIds:
         - !Ref HappnixLambdaSecurityGroup
       SubnetIds:
-        - !Ref AppSubnetA
-        - !Ref AppSubnetB
+        - !Ref HappnixBackendSubnetA
+        - !Ref HappnixBackendSubnetB
 
 Resources:
+  HappnixBackendSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVpcId
+      CidrBlock: 10.0.10.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: happnix-backend-subnet-a
+
+  HappnixBackendSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref AppVpcId
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: happnix-backend-subnet-b
+
+  HappnixBackendSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTableId
+      SubnetId: !Ref HappnixBackendSubnetA
+
+  HappnixBackendSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref AppRouteTableId
+      SubnetId: !Ref HappnixBackendSubnetB
+
   HappnixLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -93,8 +124,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: Subnets for HappniX PostgreSQL database.
       SubnetIds:
-        - !Ref AppSubnetA
-        - !Ref AppSubnetB
+        - !Ref HappnixBackendSubnetA
+        - !Ref HappnixBackendSubnetB
 
   HappnixPostgresDatabase:
     Type: AWS::RDS::DBInstance

@@ -23,8 +23,6 @@
 
 Add these GitHub Actions secrets before the backend deploy can fully wire Cognito to PostgreSQL:
 
-- `AUTH_DB_HOST`
-- `AUTH_DB_PORT`
 - `AUTH_DB_NAME`
 - `AUTH_DB_USER`
 - `AUTH_DB_PASSWORD`
@@ -33,6 +31,14 @@ Add these GitHub Actions secrets before the backend deploy can fully wire Cognit
 - `AWS_ROLE_ARN`
 
 These are passed into the SAM stack as CloudFormation parameters and become Lambda environment variables for the Cognito trigger functions.
+
+## VPC-Owned Backend Network
+
+The backend stack now creates two backend subnets inside `vpc-010824d98891a054f` and associates them with route table `rtb-0ba30fda9bcdd76c4`.
+
+- Lambda functions use these stack-created subnets through `VpcConfig`
+- RDS uses the same subnets through the DB subnet group
+- `AUTH_DB_HOST` and `AUTH_DB_PORT` now come from stack outputs, not manual GitHub secrets
 
 ## App Client Security
 
@@ -64,6 +70,8 @@ After deployment, copy these stack outputs into the frontend/mobile Cognito conf
 - `HappnixUserPoolId`
 - `HappnixUserPoolClientId`
 - `HappnixCognitoRegion`
+- `HappnixDatabaseEndpoint`
+- `HappnixDatabasePort`
 
 ## Recommended Sign-In Model
 

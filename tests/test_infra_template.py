@@ -11,8 +11,7 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("AuthDbPassword:", content)
         self.assertIn("AuthDbConnectTimeout:", content)
         self.assertIn("AppVpcId:", content)
-        self.assertIn("AppSubnetA:", content)
-        self.assertIn("AppSubnetB:", content)
+        self.assertIn("AppRouteTableId:", content)
 
     def test_template_provisions_cognito_user_pool_and_client(self):
         content = Path("template.yaml").read_text(encoding="utf-8")
@@ -46,6 +45,12 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("DBInstanceClass: db.t3.micro", content)
         self.assertIn("Engine: postgres", content)
         self.assertIn("PubliclyAccessible: false", content)
+        self.assertIn("HappnixBackendSubnetA:", content)
+        self.assertIn("HappnixBackendSubnetB:", content)
+        self.assertIn("Type: AWS::EC2::Subnet", content)
+        self.assertIn("HappnixBackendSubnetARouteTableAssociation:", content)
+        self.assertIn("HappnixBackendSubnetBRouteTableAssociation:", content)
+        self.assertIn("RouteTableId: !Ref AppRouteTableId", content)
 
     def test_template_outputs_user_pool_identifiers(self):
         content = Path("template.yaml").read_text(encoding="utf-8")
@@ -55,6 +60,13 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("HappnixDatabaseEndpoint:", content)
         self.assertIn("HappnixDatabasePort:", content)
 
+    def test_template_uses_stack_created_subnets_for_lambda_and_rds(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("- !Ref HappnixBackendSubnetA", content)
+        self.assertIn("- !Ref HappnixBackendSubnetB", content)
+        self.assertIn("DBSubnetGroupName: !Ref HappnixDbSubnetGroup", content)
+
 
 class BackendDeployWorkflowTests(unittest.TestCase):
     def test_backend_deploy_workflow_is_pinned_to_ap_south_1(self):
@@ -63,6 +75,6 @@ class BackendDeployWorkflowTests(unittest.TestCase):
         self.assertIn("AWS_REGION: ap-south-1", content)
         self.assertIn("aws-region: ap-south-1", content)
         self.assertIn('--region "ap-south-1"', content)
-        self.assertIn("AuthDbName=${{ secrets.AUTH_DB_NAME }}", content)
-        self.assertIn("AuthDbUser=${{ secrets.AUTH_DB_USER }}", content)
-        self.assertIn("AuthDbPassword=${{ secrets.AUTH_DB_PASSWORD }}", content)
+        self.assertIn("ParameterKey=AuthDbName,ParameterValue='${{ secrets.AUTH_DB_NAME }}'", content)
+        self.assertIn("ParameterKey=AuthDbUser,ParameterValue='${{ secrets.AUTH_DB_USER }}'", content)
+        self.assertIn("ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'", content)
