@@ -59,8 +59,6 @@ Globals:
         AUTH_DB_PASSWORD: !Ref AuthDbPassword
         AUTH_DB_CONNECT_TIMEOUT: !Ref AuthDbConnectTimeout
         COGNITO_REGION: !Ref AWS::Region
-        COGNITO_USER_POOL_ID: !Ref HappnixUserPool
-        COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient
         R2_BUCKET_NAME: !Ref R2BucketName
         R2_ENDPOINT: !Ref R2Endpoint
     VpcConfig:
@@ -322,6 +320,10 @@ Resources:
       CodeUri: backend/
       Handler: SignupSignin.lambda_handler
       Description: HappniX signup and signin Lambda function.
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref HappnixUserPool
+          COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole

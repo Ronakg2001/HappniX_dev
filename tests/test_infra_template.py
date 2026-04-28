@@ -81,6 +81,16 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("HappnixAuthSchemaInitializer:", content)
         self.assertIn("ServiceToken: !GetAtt AuthSchemaInit.Arn", content)
 
+    def test_template_scopes_cognito_ids_to_signup_signin_function(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+        globals_block = content.split("Resources:", 1)[0]
+        signup_signin_block = content.split("  SignupSignin:", 1)[1]
+
+        self.assertNotIn("        COGNITO_USER_POOL_ID: !Ref HappnixUserPool", globals_block)
+        self.assertNotIn("        COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient", globals_block)
+        self.assertIn("          COGNITO_USER_POOL_ID: !Ref HappnixUserPool", signup_signin_block)
+        self.assertIn("          COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient", signup_signin_block)
+
     def test_template_exposes_dev_status_route(self):
         content = Path("template.yaml").read_text(encoding="utf-8")
 
