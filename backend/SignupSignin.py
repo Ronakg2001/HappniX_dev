@@ -69,6 +69,26 @@ def _generate_otp():
     return "".join(str(random.randint(0, 9)) for _ in range(6))
 
 
+def _app_environment():
+    return os.environ.get("APP_ENVIRONMENT", "dev").strip().lower()
+
+
+def _test_otp_mode_enabled():
+    return os.environ.get("TEST_OTP_MODE", "false").strip().lower() == "true"
+
+
+def _fixed_test_otp_allowed():
+    return (
+        _test_otp_mode_enabled()
+        and os.environ.get("ALLOW_FIXED_TEST_OTP", "false").strip().lower() == "true"
+        and _app_environment() != "prod"
+    )
+
+
+def _include_debug_otp():
+    return _test_otp_mode_enabled() and _app_environment() in {"dev", "qa"}
+
+
 def _set_session_cookie(response, session_token):
     if not session_token:
         return response
@@ -126,6 +146,21 @@ def _can_create_or_join_parties(user):
     return bool(user and user.get("profile", {}).get("gov_id_verified"))
 
 
+def _warning_verification_response(token, session):
+    session["warning_verification_required"] = True
+    _save_session(token, session)
+    return _with_session(
+        200,
+        {
+            "message": "Verification required before linking this device.",
+            "loginStatus": "warning_verification_required",
+            "overlapType": session.get("warning_overlap_type", "phone"),
+            "redirectUrl": "/auth/warning-verification/",
+        },
+        token,
+    )
+
+
 def send_mobile_otp(event):
     payload = _parse_body(event)
     mobile = str(payload.get("mobile", "")).strip()
@@ -139,7 +174,7 @@ def send_mobile_otp(event):
     response_payload = {
         "message": f"OTP sent successfully to {mobile}.",
     }
-    if os.environ.get("APP_ENVIRONMENT", "dev").lower() != "prod":
+    if _include_debug_otp():
         response_payload["debugOtp"] = otp
     return _with_session(
         200,
@@ -160,7 +195,7 @@ def resend_mobile_otp(event):
     response_payload = {
         "message": f"OTP resent to {mobile}.",
     }
-    if os.environ.get("APP_ENVIRONMENT", "dev").lower() != "prod":
+    if _include_debug_otp():
         response_payload["debugOtp"] = otp
     return _with_session(200, response_payload, token)
 
@@ -177,10 +212,13 @@ def verify_mobile_otp(event):
     if not saved_otp:
         return _with_session(400, {"message": "OTP session expired. Please request a new OTP."}, token)
     if saved_otp != otp:
-        return _with_session(400, {"message": "Invalid OTP."}, token)
+        if not (_fixed_test_otp_allowed() and otp == "123456"):
+            return _with_session(400, {"message": "Invalid OTP."}, token)
     user = dev_store.find_user_by_mobile(mobile)
     mobile_otp_map.pop(mobile, None)
     session["mobile_otp_map"] = mobile_otp_map
+    if session.get("warning_verification_required"):
+        return _warning_verification_response(token, session)
     if user:
         session["authenticated_user_id"] = user["id"]
         session.pop("pending_signup_mobile", None)

@@ -19,15 +19,42 @@ Parameters:
 Globals:
   Function:
     Runtime: python3.12
-    Timeout: 5
-    MemorySize: 128
+    Timeout: 10
+    MemorySize: 256
     Environment:
       Variables:
         APP_ENVIRONMENT: !Ref AppEnvironment
+        TEST_OTP_MODE: "false"
+        ALLOW_FIXED_TEST_OTP: "false"
+        ALLOW_MISSING_CLAIMS_FALLBACK: "false"
+        AUTH_DB_HOST: ""
+        AUTH_DB_PORT: "5432"
+        AUTH_DB_NAME: ""
+        AUTH_DB_USER: ""
+        AUTH_DB_PASSWORD: ""
+        AUTH_DB_CONNECT_TIMEOUT: "5"
         R2_BUCKET_NAME: !Ref R2BucketName
         R2_ENDPOINT: !Ref R2Endpoint
 
 Resources:
+  CognitoPostConfirmation:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: CognitoPostConfirmation.lambda_handler
+      Description: Sync confirmed Cognito users into HappniX PostgreSQL.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  CognitoPreToken:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: CognitoPreToken.lambda_handler
+      Description: Inject userID and userType claims from HappniX PostgreSQL.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
   SignupSignin:
     Type: AWS::Serverless::Function
     Properties:

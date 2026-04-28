@@ -6,6 +6,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
+from backend import dev_store
 from backend.SignupSignin import ROUTES, lambda_handler
 
 
@@ -15,9 +16,15 @@ class SignupSigninLambdaTests(unittest.TestCase):
         temp_root.mkdir(parents=True, exist_ok=True)
         self._state_path = temp_root.joinpath(f"{uuid.uuid4().hex}.json")
         os.environ["HAPPNIX_DEV_STORE_PATH"] = str(self._state_path)
+        os.environ["TEST_OTP_MODE"] = "true"
+        os.environ.pop("ALLOW_FIXED_TEST_OTP", None)
+        os.environ.pop("APP_ENVIRONMENT", None)
 
     def tearDown(self):
         os.environ.pop("HAPPNIX_DEV_STORE_PATH", None)
+        os.environ.pop("TEST_OTP_MODE", None)
+        os.environ.pop("ALLOW_FIXED_TEST_OTP", None)
+        os.environ.pop("APP_ENVIRONMENT", None)
         if self._state_path.exists():
             self._state_path.unlink()
 
@@ -44,6 +51,53 @@ class SignupSigninLambdaTests(unittest.TestCase):
 
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(body["message"], "Please enter a valid 10-digit mobile number.")
+
+    def test_verify_mobile_otp_allows_fixed_test_code_when_enabled(self):
+        os.environ["ALLOW_FIXED_TEST_OTP"] = "true"
+        send_response = self._post("/api/auth/mobile/send-otp", {"mobile": "9876543210"})
+        cookie = send_response["headers"]["Set-Cookie"]
+
+        response = self._post(
+            "/api/auth/mobile/verify-otp",
+            {"mobile": "9876543210", "otp": "123456"},
+            cookie=cookie,
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(body["userStatus"], "new")
+
+    def test_send_mobile_otp_hides_debug_otp_in_prod(self):
+        os.environ["APP_ENVIRONMENT"] = "prod"
+        response = self._post("/api/auth/mobile/send-otp", {"mobile": "9876543210"})
+        body = json.loads(response["body"])
+
+        self.assertNotIn("debugOtp", body)
+
+    def test_verify_mobile_otp_returns_warning_when_session_requires_device_verification(self):
+        send_response = self._post("/api/auth/mobile/send-otp", {"mobile": "9876543210"})
+        send_body = json.loads(send_response["body"])
+        cookie = send_response["headers"]["Set-Cookie"]
+        session_token = cookie.split(";", 1)[0].split("=", 1)[1]
+        dev_store.replace_session(
+            session_token,
+            {
+                "mobile_otp_map": {"9876543210": send_body["debugOtp"]},
+                "warning_verification_required": True,
+                "warning_overlap_type": "phone",
+            },
+        )
+
+        response = self._post(
+            "/api/auth/mobile/verify-otp",
+            {"mobile": "9876543210", "otp": send_body["debugOtp"]},
+            cookie=cookie,
+        )
+        body = json.loads(response["body"])
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(body["loginStatus"], "warning_verification_required")
+        self.assertEqual(body["overlapType"], "phone")
 
     def test_verify_mobile_otp_returns_new_user_redirect(self):
         send_response = self._post("/api/auth/mobile/send-otp", {"mobile": "9876543210"})
