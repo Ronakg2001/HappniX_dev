@@ -1,2 +1,0 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: Legacy single-stack entry point retired in favor of infra/network, infra/data, and infra/app templates.
