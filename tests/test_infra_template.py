@@ -119,3 +119,13 @@ class BackendDeployWorkflowTests(unittest.TestCase):
         self.assertIn("ParameterKey=AuthDbName,ParameterValue='${{ secrets.AUTH_DB_NAME }}'", content)
         self.assertIn("ParameterKey=AuthDbUser,ParameterValue='${{ secrets.AUTH_DB_USER }}'", content)
         self.assertIn("ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'", content)
+
+    def test_backend_deploy_workflow_builds_lambda_dependencies_with_sam(self):
+        content = Path(".github/workflows/backend_deploy.yml").read_text(encoding="utf-8")
+
+        self.assertIn("sam build --use-container --template-file template.yaml", content)
+
+    def test_backend_python_dependencies_include_postgres_driver(self):
+        content = Path("backend/requirements.txt").read_text(encoding="utf-8")
+
+        self.assertIn("psycopg2-binary", content)

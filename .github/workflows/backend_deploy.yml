@@ -39,7 +39,7 @@ jobs:
         uses: aws-actions/setup-sam@v2
 
       - name: Build SAM application
-        run: sam build --template-file template.yaml
+        run: sam build --use-container --template-file template.yaml
 
       - name: Deploy SAM stack
         run: >
