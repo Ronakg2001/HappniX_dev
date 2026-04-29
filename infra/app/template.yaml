@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: HappniX app stack for the dev environment.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnetAId:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnetBId:
+    Type: AWS::EC2::Subnet::Id
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  AuthDbHost:
+    Type: String
+  AuthDbPort:
+    Type: String
+    Default: "5432"
+  AuthDbName:
+    Type: String
+  AuthDbUser:
+    Type: String
+  AuthDbPassword:
+    Type: String
+    NoEcho: true
+  AuthDbConnectTimeout:
+    Type: String
+    Default: "5"
+  TestOtpMode:
+    Type: String
+    Default: "false"
+  AllowFixedTestOtp:
+    Type: String
+    Default: "false"
+  R2BucketName:
+    Type: String
+    Default: ""
+  R2Endpoint:
+    Type: String
+    Default: ""
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        APP_ENVIRONMENT: !Ref EnvironmentName
+        TEST_OTP_MODE: !Ref TestOtpMode
+        ALLOW_FIXED_TEST_OTP: !Ref AllowFixedTestOtp
+        ALLOW_MISSING_CLAIMS_FALLBACK: "false"
+        AUTH_DB_HOST: !Ref AuthDbHost
+        AUTH_DB_PORT: !Ref AuthDbPort
+        AUTH_DB_NAME: !Ref AuthDbName
+        AUTH_DB_USER: !Ref AuthDbUser
+        AUTH_DB_PASSWORD: !Ref AuthDbPassword
+        AUTH_DB_CONNECT_TIMEOUT: !Ref AuthDbConnectTimeout
+        COGNITO_REGION: !Ref AWS::Region
+        R2_BUCKET_NAME: !Ref R2BucketName
+        R2_ENDPOINT: !Ref R2Endpoint
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref LambdaSecurityGroupId
+      SubnetIds:
+        - !Ref PrivateSubnetAId
+        - !Ref PrivateSubnetBId
+
+Resources:
+  HappnixDevApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub happnix-${EnvironmentName}-api
+      StageName: !Ref EnvironmentName
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Requested-With'"
+        AllowOrigin: "'*'"
+
+  HappnixUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub happnix-${EnvironmentName}-user-pool
+      UserPoolTier: ESSENTIALS
+      DeletionProtection: ACTIVE
+      AliasAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      LambdaConfig:
+        PostConfirmation: !GetAtt CognitoPostConfirmation.Arn
+        PreTokenGenerationConfig:
+          LambdaArn: !GetAtt CognitoPreToken.Arn
+          LambdaVersion: V2_0
+
+  HappnixUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub happnix-${EnvironmentName}-web-client
+      UserPoolId: !Ref HappnixUserPool
+      GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+  SignupSignin:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/
+      Handler: SignupSignin.lambda_handler
+      Description: HappniX signup and signin Lambda function.
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref HappnixUserPool
+          COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+
+  CognitoPostConfirmation:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/
+      Handler: CognitoPostConfirmation.lambda_handler
+      Description: Sync confirmed Cognito users into HappniX PostgreSQL.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+
+  CognitoPreToken:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/
+      Handler: CognitoPreToken.lambda_handler
+      Description: Inject userID and userType claims from HappniX PostgreSQL.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+
+  AuthSchemaInit:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/
+      Handler: AuthSchemaInit.lambda_handler
+      Description: Initialize HappniX auth schema in PostgreSQL during deploy.
+      Timeout: 60
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+
+  CognitoPostConfirmationInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CognitoPostConfirmation
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  CognitoPreTokenInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CognitoPreToken
+      Principal: cognito-idp.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  HappnixAuthSchemaInitializer:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt AuthSchemaInit.Arn
+      SchemaVersion: "2026-04-29-clean-arch-v1"
+
+Outputs:
+  HappnixApiUrl:
+    Description: Invoke URL for the HappniX API.
+    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}"
+  HappnixCognitoRegion:
+    Description: Cognito region.
+    Value: !Ref AWS::Region
+  HappnixUserPoolId:
+    Description: Cognito User Pool ID.
+    Value: !Ref HappnixUserPool
+  HappnixUserPoolClientId:
+    Description: Cognito User Pool client ID.
+    Value: !Ref HappnixUserPoolClient

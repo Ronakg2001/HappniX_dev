@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: HappniX network stack for the dev environment.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  VpcCidr:
+    Type: String
+    Default: 10.20.0.0/16
+
+Resources:
+  HappnixVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-vpc
+
+  HappnixInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-igw
+
+  HappnixVpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref HappnixVpc
+      InternetGatewayId: !Ref HappnixInternetGateway
+
+  HappnixPublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref HappnixVpc
+      CidrBlock: 10.20.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-public-a
+
+  HappnixPublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref HappnixVpc
+      CidrBlock: 10.20.1.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-public-b
+
+  HappnixPrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref HappnixVpc
+      CidrBlock: 10.20.10.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-private-a
+
+  HappnixPrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref HappnixVpc
+      CidrBlock: 10.20.11.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-private-b
+
+  HappnixPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref HappnixVpc
+
+  HappnixPublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: HappnixVpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref HappnixPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref HappnixInternetGateway
+
+  HappnixPublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref HappnixPublicRouteTable
+      SubnetId: !Ref HappnixPublicSubnetA
+
+  HappnixPublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref HappnixPublicRouteTable
+      SubnetId: !Ref HappnixPublicSubnetB
+
+  HappnixNatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: HappnixVpcGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  HappnixNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt HappnixNatEip.AllocationId
+      SubnetId: !Ref HappnixPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub happnix-${EnvironmentName}-nat
+
+  HappnixPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref HappnixVpc
+
+  HappnixPrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref HappnixPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref HappnixNatGateway
+
+  HappnixPrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref HappnixPrivateRouteTable
+      SubnetId: !Ref HappnixPrivateSubnetA
+
+  HappnixPrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref HappnixPrivateRouteTable
+      SubnetId: !Ref HappnixPrivateSubnetB
+
+  HappnixLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub Lambda access for happnix-${EnvironmentName}
+      VpcId: !Ref HappnixVpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  HappnixDatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub Database access for happnix-${EnvironmentName}
+      VpcId: !Ref HappnixVpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref HappnixLambdaSecurityGroup
+
+Outputs:
+  VpcId:
+    Description: VPC ID for the HappniX environment.
+    Value: !Ref HappnixVpc
+  PublicSubnetAId:
+    Description: Public subnet A ID.
+    Value: !Ref HappnixPublicSubnetA
+  PublicSubnetBId:
+    Description: Public subnet B ID.
+    Value: !Ref HappnixPublicSubnetB
+  PrivateSubnetAId:
+    Description: Private subnet A ID.
+    Value: !Ref HappnixPrivateSubnetA
+  PrivateSubnetBId:
+    Description: Private subnet B ID.
+    Value: !Ref HappnixPrivateSubnetB
+  LambdaSecurityGroupId:
+    Description: Lambda security group ID.
+    Value: !Ref HappnixLambdaSecurityGroup
+  DatabaseSecurityGroupId:
+    Description: Database security group ID.
+    Value: !Ref HappnixDatabaseSecurityGroup

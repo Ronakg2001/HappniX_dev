@@ -1,27 +1,25 @@
 # Cognito Auth Setup
 
-## User Pool Sign-In
+## Stack Ownership
 
-1. Open the AWS Cognito console and create or select the HappniX User Pool.
-2. In `Sign-in experience`, enable:
-   - `Username`
-   - `Email`
-3. In `Sign-up experience`, collect:
-   - `email`
-   - `phone_number`
-4. Keep password-based sign-in enabled.
-5. Do not enable Cognito native SMS OTP for this phase if you want to avoid SMS cost on the Essential plan.
+Cognito is created by the `app` stack and should not be created manually in the AWS console for the normal dev flow.
+
+The `app` stack owns:
+
+- the Cognito User Pool
+- the Cognito app client
+- the Cognito trigger Lambda wiring
 
 ## Lambda Triggers
 
-1. Open `User Pool > Triggers`.
-2. Attach:
-   - `CognitoPostConfirmation` as the `Post confirmation` trigger
-   - `CognitoPreToken` as the `Pre token generation` trigger
+The `app` stack wires these Lambda functions to Cognito:
+
+1. `CognitoPostConfirmation`
+2. `CognitoPreToken`
 
 ## Required Deployment Secrets
 
-Add these GitHub Actions secrets before the backend deploy can fully wire Cognito to PostgreSQL:
+The app deploy workflow expects these secrets:
 
 - `AUTH_DB_NAME`
 - `AUTH_DB_USER`
@@ -29,68 +27,30 @@ Add these GitHub Actions secrets before the backend deploy can fully wire Cognit
 - `R2_BUCKET_NAME`
 - `R2_ENDPOINT`
 - `AWS_ROLE_ARN`
-
-These are passed into the SAM stack as CloudFormation parameters and become Lambda environment variables for the Cognito trigger functions.
-
-## VPC-Owned Backend Network
-
-The backend stack now creates two backend subnets inside `vpc-010824d98891a054f` and associates them with route table `rtb-0ba30fda9bcdd76c4`.
-
-- Lambda functions use these stack-created subnets through `VpcConfig`
-- RDS uses the same subnets through the DB subnet group
-- `AUTH_DB_HOST` and `AUTH_DB_PORT` now come from stack outputs, not manual GitHub secrets
+- `NETWORK_VPC_ID`
+- `NETWORK_PRIVATE_SUBNET_A_ID`
+- `NETWORK_PRIVATE_SUBNET_B_ID`
+- `NETWORK_LAMBDA_SECURITY_GROUP_ID`
+- `DATA_DB_HOST`
+- `DATA_DB_PORT`
 
 ## Automatic Schema Initialization
 
-The stack now runs the auth schema automatically during deployment through the `AuthSchemaInit` Lambda-backed custom resource.
+The app stack runs the auth schema automatically during deployment through the `AuthSchemaInit` Lambda-backed custom resource.
 
-- No manual schema SQL step is required for normal deploys
-- Repeat deploys are safe because the schema SQL is idempotent
+- no manual schema SQL step is required for a normal deploy
+- repeat deploys are safe because the schema SQL is idempotent
 
-## App Client Security
+## Cognito Outputs
 
-1. Open `User Pool > App integration > App clients`.
-2. Set refresh token expiration to `30 days`.
-3. Enable token revocation.
-
-## Attribute And Custom Field Guidance
-
-1. Keep `email` and `phone_number` available on the user profile.
-2. Add custom attributes only if they help identity workflows directly:
-   - `custom:userType`
-   - `custom:dateOfBirth`
-3. Prefer PostgreSQL for broader profile data and device-trust metadata.
-
-## OTP Bypass For Dev And QA
-
-1. Set Lambda env `TEST_OTP_MODE=true` in `dev` or `qa`.
-2. Set `ALLOW_FIXED_TEST_OTP=true` only when you intentionally want the fixed test code path.
-3. Never enable either flag in production.
-4. In `dev` and `qa`, testers can use:
-   - `debugOtp` returned by the API response
-   - fixed OTP `123456` when `ALLOW_FIXED_TEST_OTP=true`
-
-## Frontend Verification Flow
-
-Use the dev test panel on the sign-in page to:
-
-- fetch `/api/auth/dev/status`
-- verify schema readiness
-- send and verify OTP
-- inspect raw backend responses during testing
-
-## App Config Values To Populate
-
-After deployment, copy these stack outputs into the frontend/mobile Cognito config placeholders:
+After deployment, use these app stack outputs for downstream frontend or mobile configuration:
 
 - `HappnixUserPoolId`
 - `HappnixUserPoolClientId`
 - `HappnixCognitoRegion`
-- `HappnixDatabaseEndpoint`
-- `HappnixDatabasePort`
 
 ## Recommended Sign-In Model
 
-1. Use Cognito for email/username plus password.
-2. Use your custom HappniX OTP API for phone verification during build and test phases.
-3. After phone verification succeeds, link or continue the session through your backend device-trust logic instead of Cognito SMS.
+1. Use Cognito for email or username plus password.
+2. Keep phone OTP in the custom backend flow for the current phase.
+3. Let the app stack own all Cognito trigger changes so auth behavior and infrastructure stay together.

@@ -1,0 +1,49 @@
+name: Deploy Network
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "infra/network/**"
+      - ".github/workflows/deploy_network.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      STACK_NAME: happnix-network-dev
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v2
+
+      - name: Build network stack
+        run: sam build --template-file infra/network/template.yaml
+
+      - name: Deploy network stack
+        run: >
+          sam deploy
+          --stack-name "${STACK_NAME}"
+          --template-file .aws-sam/build/template.yaml
+          --resolve-s3
+          --region "ap-south-1"
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --capabilities CAPABILITY_IAM
+          --parameter-overrides
+          ParameterKey=EnvironmentName,ParameterValue=dev

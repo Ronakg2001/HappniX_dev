@@ -1,13 +1,13 @@
-name: Backend Deploy
+name: Deploy Data
 
 on:
   push:
     branches:
       - dev
     paths:
-      - "backend/**"
-      - "template.yaml"
-      - ".github/workflows/backend_deploy.yml"
+      - "infra/data/**"
+      - "backend/sql/**"
+      - ".github/workflows/deploy_data.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,15 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
-      STACK_NAME: HappnixDev
+      STACK_NAME: happnix-data-dev
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -38,10 +33,10 @@ jobs:
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v2
 
-      - name: Build SAM application
-        run: sam build --use-container --template-file template.yaml
+      - name: Build data stack
+        run: sam build --template-file infra/data/template.yaml
 
-      - name: Deploy SAM stack
+      - name: Deploy data stack
         run: >
           sam deploy
           --stack-name "${STACK_NAME}"
@@ -52,13 +47,10 @@ jobs:
           --no-fail-on-empty-changeset
           --capabilities CAPABILITY_IAM
           --parameter-overrides
-          ParameterKey=ApiStageName,ParameterValue=dev
-          ParameterKey=AppEnvironment,ParameterValue=dev
+          ParameterKey=EnvironmentName,ParameterValue=dev
+          ParameterKey=PrivateSubnetAId,ParameterValue='${{ secrets.NETWORK_PRIVATE_SUBNET_A_ID }}'
+          ParameterKey=PrivateSubnetBId,ParameterValue='${{ secrets.NETWORK_PRIVATE_SUBNET_B_ID }}'
+          ParameterKey=DatabaseSecurityGroupId,ParameterValue='${{ secrets.NETWORK_DATABASE_SECURITY_GROUP_ID }}'
           ParameterKey=AuthDbName,ParameterValue='${{ secrets.AUTH_DB_NAME }}'
           ParameterKey=AuthDbUser,ParameterValue='${{ secrets.AUTH_DB_USER }}'
           ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'
-          ParameterKey=AuthDbConnectTimeout,ParameterValue=5
-          ParameterKey=TestOtpMode,ParameterValue=false
-          ParameterKey=AllowFixedTestOtp,ParameterValue=false
-          ParameterKey=R2BucketName,ParameterValue='${{ secrets.R2_BUCKET_NAME }}'
-          ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'

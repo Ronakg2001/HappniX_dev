@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: HappniX data stack for the dev environment.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  PrivateSubnetAId:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnetBId:
+    Type: AWS::EC2::Subnet::Id
+  DatabaseSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  AuthDbName:
+    Type: String
+  AuthDbUser:
+    Type: String
+  AuthDbPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  HappnixDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub Subnets for happnix-${EnvironmentName} postgres
+      SubnetIds:
+        - !Ref PrivateSubnetAId
+        - !Ref PrivateSubnetBId
+
+  HappnixPostgresDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub happnix-postgres-${EnvironmentName}
+      Engine: postgres
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: "20"
+      StorageType: gp2
+      PubliclyAccessible: false
+      MultiAZ: false
+      DBName: !Ref AuthDbName
+      MasterUsername: !Ref AuthDbUser
+      MasterUserPassword: !Ref AuthDbPassword
+      Port: 5432
+      BackupRetentionPeriod: 1
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: false
+      DBSubnetGroupName: !Ref HappnixDbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroupId
+
+Outputs:
+  DatabaseEndpointAddress:
+    Description: PostgreSQL endpoint address.
+    Value: !GetAtt HappnixPostgresDatabase.Endpoint.Address
+  DatabaseEndpointPort:
+    Description: PostgreSQL endpoint port.
+    Value: !GetAtt HappnixPostgresDatabase.Endpoint.Port
+  DatabaseInstanceIdentifier:
+    Description: PostgreSQL instance identifier.
+    Value: !Ref HappnixPostgresDatabase
