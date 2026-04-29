@@ -81,6 +81,16 @@ class TemplateInfrastructureTests(unittest.TestCase):
         self.assertIn("HappnixAuthSchemaInitializer:", content)
         self.assertIn("ServiceToken: !GetAtt AuthSchemaInit.Arn", content)
 
+    def test_template_adds_s3_vpc_endpoint_for_custom_resource_responses(self):
+        content = Path("template.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("HappnixS3VpcEndpoint:", content)
+        self.assertIn("Type: AWS::EC2::VPCEndpoint", content)
+        self.assertIn("ServiceName: !Sub com.amazonaws.${AWS::Region}.s3", content)
+        self.assertIn("VpcEndpointType: Gateway", content)
+        self.assertIn("- !Ref AppRouteTableId", content)
+        self.assertIn("DependsOn: HappnixS3VpcEndpoint", content)
+
     def test_template_scopes_cognito_ids_to_signup_signin_function(self):
         content = Path("template.yaml").read_text(encoding="utf-8")
         globals_block = content.split("Resources:", 1)[0]

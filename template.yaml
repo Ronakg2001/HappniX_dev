@@ -103,6 +103,15 @@ Resources:
       RouteTableId: !Ref AppRouteTableId
       SubnetId: !Ref HappnixBackendSubnetB
 
+  HappnixS3VpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId: !Ref AppVpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - !Ref AppRouteTableId
+
   HappnixLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -310,6 +319,7 @@ Resources:
 
   HappnixAuthSchemaInitializer:
     Type: AWS::CloudFormation::CustomResource
+    DependsOn: HappnixS3VpcEndpoint
     Properties:
       ServiceToken: !GetAtt AuthSchemaInit.Arn
       SchemaVersion: "2026-04-28-auth-schema-v1"
