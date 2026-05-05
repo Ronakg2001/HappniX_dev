@@ -3,9 +3,16 @@ BEGIN;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_type_enum') THEN
-        CREATE TYPE user_type_enum AS ENUM ('Admin', 'Business', 'General');
+        CREATE TYPE user_type_enum AS ENUM ('Authority', 'Admin', 'Business', 'General');
+    ELSE
+        -- Add 'Authority' to existing enum if not present (safe for re-runs)
+        IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'Authority'
+                       AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_type_enum')) THEN
+            ALTER TYPE user_type_enum ADD VALUE 'Authority' BEFORE 'Admin';
+        END IF;
     END IF;
 END $$;
+
 
 CREATE TABLE IF NOT EXISTS users (
     "userID" CHAR(8) PRIMARY KEY,

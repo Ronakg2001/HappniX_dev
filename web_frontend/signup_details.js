@@ -13,6 +13,8 @@ const form = document.getElementById("detailsForm");
     const success = document.getElementById("success");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
+    const AUTH_ENDPOINT = "/api/auth";
+
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
         return csrfTokenTemplate;
@@ -31,35 +33,35 @@ const form = document.getElementById("detailsForm");
       dobInput.max = today.toISOString().split("T")[0];
     }
 
-	    function isStrongPassword(value) {
-	      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(value);
-	    }
+    function isStrongPassword(value) {
+      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(value);
+    }
 
-	    function buildApiUrl(path) {
-	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
-	      if (typeof runtimeConfig.buildApiUrl === "function") {
-	        return runtimeConfig.buildApiUrl(path);
-	      }
-	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
-	      return base ? `${base}${path}` : path;
-	    }
-
-	    async function postJson(url, payload) {
-	      const response = await fetch(buildApiUrl(url), {
-	        method: "POST",
-	        headers: {
-	          "Content-Type": "application/json",
-	          "X-CSRFToken": getCsrfToken()
-	        },
-	        credentials: "include",
-	        body: JSON.stringify(payload)
-	      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || "Request failed.");
+    function buildApiUrl(path) {
+      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+      if (typeof runtimeConfig.buildApiUrl === "function") {
+        return runtimeConfig.buildApiUrl(path);
       }
-      return data;
+      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+      return base ? `${base}${path}` : path;
+    }
+
+    async function callAuthAction(actionItem, data = {}) {
+      const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        credentials: "include",
+        body: JSON.stringify({ actionItem, ...data })
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.message || "Request failed.");
+      }
+      return body;
     }
 
     setDobMax();
@@ -77,7 +79,7 @@ const form = document.getElementById("detailsForm");
           throw new Error("Password must have uppercase, lowercase, number, special character, and minimum 8 characters.");
         }
 
-        const result = await postJson("/api/signup/details", {
+        const result = await callAuthAction("RegisterUserDetails", {
           fullName: document.getElementById("fullName").value.trim(),
           username: document.getElementById("username").value.trim(),
           password: passwordValue,

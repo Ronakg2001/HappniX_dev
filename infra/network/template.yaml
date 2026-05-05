@@ -1,152 +1,326 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: HappniX network stack for the dev environment.
+Description: >
+  HappniX network stack — dev environment.
+  Free tier optimized: NAT Instance (t2.micro, free tier 12 months) instead of
+  NAT Gateway (~$32/month). VPC Endpoints for DynamoDB and S3 (free).
 
 Parameters:
   EnvironmentName:
     Type: String
     Default: dev
+  ApplicationTag:
+    Type: String
+    Default: ""
+    Description: ARN from AWS myApplications. Links all resources to the HappniX-dev application dashboard.
   VpcCidr:
     Type: String
     Default: 10.20.0.0/16
+  NatMode:
+    Type: String
+    Default: instance
+    AllowedValues: [instance, gateway, none]
+    Description: >
+      How Lambdas in private subnets reach the internet (for Cognito, etc.).
+        instance = t2.micro NAT Instance (FREE TIER 12 months, then ~$8.50/mo)
+        gateway  = Managed NAT Gateway (~$32/month, more reliable)
+        none     = No internet access from private subnets (only VPC Endpoints)
+
+Conditions:
+  UseNatInstance:
+    Fn::Equals:
+      - Ref: NatMode
+      - "instance"
+  UseNatGateway:
+    Fn::Equals:
+      - Ref: NatMode
+      - "gateway"
+  HasNat:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: NatMode
+          - "none"
 
 Resources:
+  # ─── VPC ────────────────────────────────────────────────────────────
   HappnixVpc:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCidr
+      CidrBlock:
+        Ref: VpcCidr
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-vpc
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-vpc
 
   HappnixInternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-igw
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-igw
 
   HappnixVpcGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref HappnixVpc
-      InternetGatewayId: !Ref HappnixInternetGateway
+      VpcId:
+        Ref: HappnixVpc
+      InternetGatewayId:
+        Ref: HappnixInternetGateway
 
+  # ─── Public Subnets ────────────────────────────────────────────────
   HappnixPublicSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
       CidrBlock: 10.20.0.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-public-a
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-public-a
 
   HappnixPublicSubnetB:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
       CidrBlock: 10.20.1.0/24
-      AvailabilityZone: !Select [1, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-public-b
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-public-b
 
+  # ─── Private Subnets ───────────────────────────────────────────────
   HappnixPrivateSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
       CidrBlock: 10.20.10.0/24
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-private-a
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-private-a
 
   HappnixPrivateSubnetB:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
       CidrBlock: 10.20.11.0/24
-      AvailabilityZone: !Select [1, !GetAZs ""]
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-private-b
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-private-b
 
+  # ─── Public Route Table ────────────────────────────────────────────
   HappnixPublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
 
   HappnixPublicDefaultRoute:
     Type: AWS::EC2::Route
     DependsOn: HappnixVpcGatewayAttachment
     Properties:
-      RouteTableId: !Ref HappnixPublicRouteTable
+      RouteTableId:
+        Ref: HappnixPublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref HappnixInternetGateway
+      GatewayId:
+        Ref: HappnixInternetGateway
 
   HappnixPublicSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref HappnixPublicRouteTable
-      SubnetId: !Ref HappnixPublicSubnetA
+      RouteTableId:
+        Ref: HappnixPublicRouteTable
+      SubnetId:
+        Ref: HappnixPublicSubnetA
 
   HappnixPublicSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref HappnixPublicRouteTable
-      SubnetId: !Ref HappnixPublicSubnetB
+      RouteTableId:
+        Ref: HappnixPublicRouteTable
+      SubnetId:
+        Ref: HappnixPublicSubnetB
 
+  # ══════════════════════════════════════════════════════════════════════
+  # NAT Instance — FREE TIER (t2.micro, 12 months)
+  # Amazon Linux 2023 with iptables MASQUERADE for NAT.
+  # Replaces $32/month NAT Gateway for dev environments.
+  # ══════════════════════════════════════════════════════════════════════
+  HappnixNatInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: UseNatInstance
+    Properties:
+      GroupDescription:
+        Fn::Sub: NAT Instance SG for HappniX-${EnvironmentName}
+      VpcId:
+        Ref: HappnixVpc
+      SecurityGroupIngress:
+        # Allow all traffic from private subnets (Lambda, RDS, etc.)
+        - IpProtocol: -1
+          CidrIp: 10.20.10.0/24
+        - IpProtocol: -1
+          CidrIp: 10.20.11.0/24
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  HappnixNatInstance:
+    Type: AWS::EC2::Instance
+    Condition: UseNatInstance
+    DependsOn: HappnixVpcGatewayAttachment
+    Properties:
+      InstanceType: t2.micro                # ← Free tier (750 hrs/month, 12 months)
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      SubnetId:
+        Ref: HappnixPublicSubnetA
+      SecurityGroupIds:
+        - Ref: HappnixNatInstanceSecurityGroup
+      SourceDestCheck: false                 # ← REQUIRED for NAT to work
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          # Enable IP forwarding
+          echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.d/99-nat.conf
+          sysctl -p /etc/sysctl.d/99-nat.conf
+          # Set up iptables NAT masquerade
+          dnf install -y iptables-services
+          iptables -t nat -A POSTROUTING -s 10.20.0.0/16 -j MASQUERADE
+          iptables-save > /etc/sysconfig/iptables
+          systemctl enable iptables
+          systemctl start iptables
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-nat-instance
+
+  # ── NAT Gateway (OPTIONAL — $32/month, more reliable) ──────────────
   HappnixNatEip:
     Type: AWS::EC2::EIP
+    Condition: UseNatGateway
     DependsOn: HappnixVpcGatewayAttachment
     Properties:
       Domain: vpc
 
   HappnixNatGateway:
     Type: AWS::EC2::NatGateway
+    Condition: UseNatGateway
     Properties:
-      AllocationId: !GetAtt HappnixNatEip.AllocationId
-      SubnetId: !Ref HappnixPublicSubnetA
+      AllocationId:
+        Fn::GetAtt:
+          - HappnixNatEip
+          - AllocationId
+      SubnetId:
+        Ref: HappnixPublicSubnetA
       Tags:
         - Key: Name
-          Value: !Sub happnix-${EnvironmentName}-nat
+          Value:
+            Fn::Sub: HappniX-${EnvironmentName}-nat-gateway
 
+  # ─── Private Route Table ───────────────────────────────────────────
   HappnixPrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref HappnixVpc
+      VpcId:
+        Ref: HappnixVpc
 
-  HappnixPrivateDefaultRoute:
+  # Route via NAT Instance (t2.micro)
+  HappnixPrivateRouteViaNatInstance:
     Type: AWS::EC2::Route
+    Condition: UseNatInstance
     Properties:
-      RouteTableId: !Ref HappnixPrivateRouteTable
+      RouteTableId:
+        Ref: HappnixPrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref HappnixNatGateway
+      InstanceId:
+        Ref: HappnixNatInstance
+
+  # Route via NAT Gateway (managed)
+  HappnixPrivateRouteViaNatGateway:
+    Type: AWS::EC2::Route
+    Condition: UseNatGateway
+    Properties:
+      RouteTableId:
+        Ref: HappnixPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: HappnixNatGateway
 
   HappnixPrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref HappnixPrivateRouteTable
-      SubnetId: !Ref HappnixPrivateSubnetA
+      RouteTableId:
+        Ref: HappnixPrivateRouteTable
+      SubnetId:
+        Ref: HappnixPrivateSubnetA
 
   HappnixPrivateSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref HappnixPrivateRouteTable
-      SubnetId: !Ref HappnixPrivateSubnetB
+      RouteTableId:
+        Ref: HappnixPrivateRouteTable
+      SubnetId:
+        Ref: HappnixPrivateSubnetB
 
+  # ─── VPC Endpoints (FREE — AWS services without NAT) ───────────────
+  HappnixDynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.dynamodb
+      VpcId:
+        Ref: HappnixVpc
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - Ref: HappnixPrivateRouteTable
+
+  HappnixS3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.s3
+      VpcId:
+        Ref: HappnixVpc
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - Ref: HappnixPrivateRouteTable
+
+  # ─── Security Groups ──────────────────────────────────────────────
   HappnixLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub Lambda access for happnix-${EnvironmentName}
-      VpcId: !Ref HappnixVpc
+      GroupDescription:
+        Fn::Sub: Lambda access for HappniX-${EnvironmentName}
+      VpcId:
+        Ref: HappnixVpc
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -154,33 +328,47 @@ Resources:
   HappnixDatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub Database access for happnix-${EnvironmentName}
-      VpcId: !Ref HappnixVpc
+      GroupDescription:
+        Fn::Sub: Database access for HappniX-${EnvironmentName}
+      VpcId:
+        Ref: HappnixVpc
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-          SourceSecurityGroupId: !Ref HappnixLambdaSecurityGroup
+          SourceSecurityGroupId:
+            Ref: HappnixLambdaSecurityGroup
 
 Outputs:
   VpcId:
     Description: VPC ID for the HappniX environment.
-    Value: !Ref HappnixVpc
+    Value:
+      Ref: HappnixVpc
   PublicSubnetAId:
     Description: Public subnet A ID.
-    Value: !Ref HappnixPublicSubnetA
+    Value:
+      Ref: HappnixPublicSubnetA
   PublicSubnetBId:
     Description: Public subnet B ID.
-    Value: !Ref HappnixPublicSubnetB
+    Value:
+      Ref: HappnixPublicSubnetB
   PrivateSubnetAId:
     Description: Private subnet A ID.
-    Value: !Ref HappnixPrivateSubnetA
+    Value:
+      Ref: HappnixPrivateSubnetA
   PrivateSubnetBId:
     Description: Private subnet B ID.
-    Value: !Ref HappnixPrivateSubnetB
+    Value:
+      Ref: HappnixPrivateSubnetB
   LambdaSecurityGroupId:
     Description: Lambda security group ID.
-    Value: !Ref HappnixLambdaSecurityGroup
+    Value:
+      Ref: HappnixLambdaSecurityGroup
   DatabaseSecurityGroupId:
     Description: Database security group ID.
-    Value: !Ref HappnixDatabaseSecurityGroup
+    Value:
+      Ref: HappnixDatabaseSecurityGroup
+  NatMode:
+    Description: Active NAT mode (instance, gateway, or none).
+    Value:
+      Ref: NatMode

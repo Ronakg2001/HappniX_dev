@@ -37,6 +37,9 @@ const views = {
     const authApiResponse = document.getElementById("authApiResponse");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
+    // ─── Single API endpoint — all auth actions go here ─────────────
+    const AUTH_ENDPOINT = "/api/auth";
+
     document.addEventListener('click', (event) => {
       const actionEl = event.target.closest('[data-action]');
       if (!actionEl) return;
@@ -47,42 +50,49 @@ const views = {
 
     let mobileContext = { mobile: "" };
 
-	    const API_ENDPOINTS = {
-          authDevStatus: "/api/auth/dev/status",
-	      sendMobileOtp: "/api/auth/mobile/send-otp",
-	      verifyMobileOtp: "/api/auth/mobile/verify-otp",
-	      resendMobileOtp: "/api/auth/mobile/resend-otp",
-	      loginWithPassword: "/api/auth/username/login"
-	    };
+    function buildApiUrl(path) {
+      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+      if (typeof runtimeConfig.buildApiUrl === "function") {
+        return runtimeConfig.buildApiUrl(path);
+      }
+      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+      return base ? `${base}${path}` : path;
+    }
 
-	    function buildApiUrl(path) {
-	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
-	      if (typeof runtimeConfig.buildApiUrl === "function") {
-	        return runtimeConfig.buildApiUrl(path);
-	      }
-	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
-	      return base ? `${base}${path}` : path;
-	    }
-	    
-	    function normalizeMobile(value) {
-	      return value.replace(/\D/g, "");
-	    }
+    function normalizeMobile(value) {
+      return value.replace(/\D/g, "");
+    }
 
     function isValidMobile(value) {
       return /^\d{10}$/.test(normalizeMobile(value));
     }
 
-	    async function postJson(url, payload) {
-	      const csrfToken = getCsrfToken();
-	      const response = await fetch(buildApiUrl(url), {
-	        method: "POST",
-	        headers: {
-	          "Content-Type": "application/json",
-	          "X-CSRFToken": csrfToken
-	        },
-	        credentials: "include",
-	        body: JSON.stringify(payload)
-	      });
+    function getCsrfToken() {
+      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
+        return csrfTokenTemplate;
+      }
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; csrftoken=`);
+      if (parts.length === 2) {
+        return parts.pop().split(";").shift();
+      }
+      return "";
+    }
+
+    /**
+     * Send a request to the auth Lambda with an actionItem.
+     * All auth operations go through this single function.
+     */
+    async function callAuthAction(actionItem, data = {}) {
+      const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        credentials: "include",
+        body: JSON.stringify({ actionItem, ...data })
+      });
 
       let body = {};
       try {
@@ -95,47 +105,12 @@ const views = {
         throw new Error(body.message || "Request failed. Please try again.");
       }
 
-	      return body;
-	    }
+      return body;
+    }
 
-        async function getJson(url) {
-          const response = await fetch(buildApiUrl(url), {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            credentials: "include"
-          });
-
-          let body = {};
-          try {
-            body = await response.json();
-          } catch (_error) {
-            body = {};
-          }
-
-          if (!response.ok) {
-            throw new Error(body.message || "Request failed. Please try again.");
-          }
-
-          return body;
-        }
-
-        function renderDevJson(target, payload) {
-          if (!target) return;
-          target.textContent = JSON.stringify(payload, null, 2);
-        }
-
-    function getCsrfToken() {
-      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
-        return csrfTokenTemplate;
-      }
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; csrftoken=`);
-      if (parts.length === 2) {
-        return parts.pop().split(";").shift();
-      }
-      return "";
+    function renderDevJson(target, payload) {
+      if (!target) return;
+      target.textContent = JSON.stringify(payload, null, 2);
     }
 
     function resetMessages() {
@@ -204,6 +179,7 @@ const views = {
       });
     }
 
+    // ─── Send Mobile OTP ────────────────────────────────────────────
     views.mobileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const mobile = mobileNumber.value.trim();
@@ -222,7 +198,7 @@ const views = {
       setButtonLoading(mobileSendBtn, true, "Send OTP", "Sending...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.sendMobileOtp, {
+        const result = await callAuthAction("SendMobileOtp", {
           mobile: normalizeMobile(mobile)
         });
         renderDevJson(authApiResponse, result);
@@ -236,6 +212,7 @@ const views = {
       }
     });
 
+    // ─── Verify Mobile OTP ──────────────────────────────────────────
     views.mobileOtpForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const otp = mobileOtpCode.value.trim();
@@ -254,7 +231,7 @@ const views = {
       setButtonLoading(mobileVerifyBtn, true, "Verify OTP", "Verifying...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.verifyMobileOtp, {
+        const result = await callAuthAction("VerifyMobileOtp", {
           mobile: mobileContext.mobile,
           otp
         });
@@ -268,6 +245,7 @@ const views = {
       }
     });
 
+    // ─── Resend Mobile OTP ──────────────────────────────────────────
     mobileResendBtn.addEventListener("click", async () => {
       if (!mobileContext.mobile) {
         mobileOtpError.textContent = "Mobile session expired. Please request OTP again.";
@@ -278,7 +256,7 @@ const views = {
       setButtonLoading(mobileResendBtn, true, "Resend OTP", "Resending...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.resendMobileOtp, {
+        const result = await callAuthAction("ResendMobileOtp", {
           mobile: mobileContext.mobile
         });
         renderDevJson(authApiResponse, result);
@@ -291,6 +269,7 @@ const views = {
       }
     });
 
+    // ─── Login with Password ────────────────────────────────────────
     views.userPassForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const usernameValue = username.value.trim();
@@ -305,7 +284,7 @@ const views = {
       setButtonLoading(userPassLoginBtn, true, "Sign-in", "Signing in...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.loginWithPassword, {
+        const result = await callAuthAction("LoginWithPassword", {
           identifier: usernameValue,
           password: passwordValue
         });
@@ -322,11 +301,12 @@ const views = {
       }
     });
 
+    // ─── Dev Auth Status ────────────────────────────────────────────
     if (fetchAuthDevStatusBtn) {
       fetchAuthDevStatusBtn.addEventListener("click", async () => {
         setButtonLoading(fetchAuthDevStatusBtn, true, "Check Backend Status", "Checking...");
         try {
-          const result = await getJson(API_ENDPOINTS.authDevStatus);
+          const result = await callAuthAction("GetDevAuthStatus");
           renderDevJson(authDevStatusOutput, result);
         } catch (error) {
           renderDevJson(authDevStatusOutput, { message: error.message });

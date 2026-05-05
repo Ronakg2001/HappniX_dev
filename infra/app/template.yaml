@@ -1,11 +1,25 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: HappniX app stack for the dev environment.
+Description: >
+  HappniX app stack — dev environment. Free tier optimized: Cognito LITE tier
+  (50K MAU free), Lambda 128MB. Flexible: Lambda functions toggled on/off via
+  parameters.
 
 Parameters:
   EnvironmentName:
     Type: String
     Default: dev
+  ApplicationTag:
+    Type: String
+    Default: ""
+    Description: ARN from AWS myApplications.
+
+  FrontendUrl:
+    Type: String
+    Default: "https://happnix-dev.ronakgo1.workers.dev"
+    Description: Frontend origin for CORS (cannot be '*' if using cookies).
+
+  # ─── Network refs ───────────────────────────────────────────────────
   VpcId:
     Type: AWS::EC2::VPC::Id
   PrivateSubnetAId:
@@ -14,6 +28,8 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   LambdaSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
+
+  # ─── Database config ───────────────────────────────────────────────
   AuthDbHost:
     Type: String
   AuthDbPort:
@@ -29,12 +45,18 @@ Parameters:
   AuthDbConnectTimeout:
     Type: String
     Default: "5"
+
+  # ─── Dev/Test controls ─────────────────────────────────────────────
   TestOtpMode:
     Type: String
-    Default: "false"
+    Default: "true"
+    Description: When true, OTP is bypassed with fixed test OTP (123456).
   AllowFixedTestOtp:
     Type: String
-    Default: "false"
+    Default: "true"
+    Description: When true, accepts 123456 as valid OTP in dev environment.
+
+  # ─── Media storage ─────────────────────────────────────────────────
   R2BucketName:
     Type: String
     Default: ""
@@ -42,91 +64,249 @@ Parameters:
     Type: String
     Default: ""
 
+  # ─── DynamoDB table names (from data stack) ────────────────────────
+  UsersTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB users table name. Empty = feature disabled.
+
+  # ─── Feature toggles (add Lambdas when ready) ─────────────────────
+  EnableEventsApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+    Description: Enable Events Lambda. Set true when events_api.py is ready.
+  EnableTicketsApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableProfilesApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableMessagingApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableGroupChatApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableGuestsApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableNotificationsApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+  EnableMediaApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+
+Conditions:
+  HasEventsApi:
+    Fn::Equals:
+      - Ref: EnableEventsApi
+      - "true"
+  HasTicketsApi:
+    Fn::Equals:
+      - Ref: EnableTicketsApi
+      - "true"
+  HasProfilesApi:
+    Fn::Equals:
+      - Ref: EnableProfilesApi
+      - "true"
+  HasMessagingApi:
+    Fn::Equals:
+      - Ref: EnableMessagingApi
+      - "true"
+  HasGroupChatApi:
+    Fn::Equals:
+      - Ref: EnableGroupChatApi
+      - "true"
+  HasGuestsApi:
+    Fn::Equals:
+      - Ref: EnableGuestsApi
+      - "true"
+  HasNotificationsApi:
+    Fn::Equals:
+      - Ref: EnableNotificationsApi
+      - "true"
+  HasMediaApi:
+    Fn::Equals:
+      - Ref: EnableMediaApi
+      - "true"
+  HasUsersTable:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: UsersTableName
+          - ""
+
 Globals:
   Function:
     Runtime: python3.12
     Timeout: 10
-    MemorySize: 256
+    MemorySize: 128 # ← Free tier: 128MB is cheapest
     Environment:
       Variables:
-        APP_ENVIRONMENT: !Ref EnvironmentName
-        TEST_OTP_MODE: !Ref TestOtpMode
-        ALLOW_FIXED_TEST_OTP: !Ref AllowFixedTestOtp
+        APP_ENVIRONMENT:
+          Ref: EnvironmentName
+        TEST_OTP_MODE:
+          Ref: TestOtpMode
+        ALLOW_FIXED_TEST_OTP:
+          Ref: AllowFixedTestOtp
         ALLOW_MISSING_CLAIMS_FALLBACK: "false"
-        AUTH_DB_HOST: !Ref AuthDbHost
-        AUTH_DB_PORT: !Ref AuthDbPort
-        AUTH_DB_NAME: !Ref AuthDbName
-        AUTH_DB_USER: !Ref AuthDbUser
-        AUTH_DB_PASSWORD: !Ref AuthDbPassword
-        AUTH_DB_CONNECT_TIMEOUT: !Ref AuthDbConnectTimeout
-        COGNITO_REGION: !Ref AWS::Region
-        R2_BUCKET_NAME: !Ref R2BucketName
-        R2_ENDPOINT: !Ref R2Endpoint
+        AUTH_DB_HOST:
+          Ref: AuthDbHost
+        AUTH_DB_PORT:
+          Ref: AuthDbPort
+        AUTH_DB_NAME:
+          Ref: AuthDbName
+        AUTH_DB_USER:
+          Ref: AuthDbUser
+        AUTH_DB_PASSWORD:
+          Ref: AuthDbPassword
+        AUTH_DB_CONNECT_TIMEOUT:
+          Ref: AuthDbConnectTimeout
+        COGNITO_REGION:
+          Ref: AWS::Region
+        R2_BUCKET_NAME:
+          Ref: R2BucketName
+        R2_ENDPOINT:
+          Ref: R2Endpoint
+        USERS_TABLE_NAME:
+          Ref: UsersTableName
+        COGNITO_USER_POOL_ID:
+          # Moved here from SignupSignin
+          Ref: HappnixUserPool
+        COGNITO_USER_POOL_CLIENT_ID:
+          # Moved here from SignupSignin
+          Ref: HappnixUserPoolClient
     VpcConfig:
       SecurityGroupIds:
-        - !Ref LambdaSecurityGroupId
+        - Ref: LambdaSecurityGroupId
       SubnetIds:
-        - !Ref PrivateSubnetAId
-        - !Ref PrivateSubnetBId
+        - Ref: PrivateSubnetAId
+        - Ref: PrivateSubnetBId
 
 Resources:
+
+  # ══════════════════════════════════════════════════════════════════════
+  # API Gateway — Free Tier: 1M REST API calls/month (12 months)
+  # ══════════════════════════════════════════════════════════════════════
   HappnixDevApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub happnix-${EnvironmentName}-api
-      StageName: !Ref EnvironmentName
+      Name:
+        Fn::Sub: HappniX-${EnvironmentName}-api
+      StageName:
+        Ref: EnvironmentName
       EndpointConfiguration: REGIONAL
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Requested-With'"
-        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happn\
+          ix-Trace-Id'"
+        AllowOrigin:
+          Fn::Sub: "'${FrontendUrl}'"
+        AllowCredentials: true
+      MethodSettings:
+        - HttpMethod: "*"
+          ResourcePath: "/*"
+          ThrottlingRateLimit: 100 # 100 requests/sec steady state
+          ThrottlingBurstLimit: 50 # 50 concurrent burst
 
+  # ══════════════════════════════════════════════════════════════════════
+  # Cognito — Free Tier: LITE tier = 10K MAU free (always free)
+  # Supports 3 login methods:
+  #   1. Email + Password      → AliasAttributes: email
+  #   2. Username + Password   → Cognito native username (case-insensitive)
+  #   3. Mobile + OTP          → AliasAttributes: phone_number + CUSTOM_AUTH
+  # ══════════════════════════════════════════════════════════════════════
   HappnixUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub happnix-${EnvironmentName}-user-pool
-      UserPoolTier: ESSENTIALS
+      UserPoolName:
+        Fn::Sub: HappniX-${EnvironmentName}-user-pool
       DeletionProtection: ACTIVE
       AliasAttributes:
-        - email
+        # ← Users can sign in with any of these
+        - email #   email + password
+        - phone_number #   mobile + OTP
+        - preferred_username #   username + password
       AutoVerifiedAttributes:
         - email
       UsernameConfiguration:
-        CaseSensitive: false
+        CaseSensitive: false # ← "Ronak" = "ronak"
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: phone_number
+          AttributeDataType: String
+          Required: false
+          Mutable: true
       LambdaConfig:
-        PostConfirmation: !GetAtt CognitoPostConfirmation.Arn
+        PostConfirmation:
+          Fn::GetAtt:
+            - CognitoPostConfirmation
+            - Arn
         PreTokenGenerationConfig:
-          LambdaArn: !GetAtt CognitoPreToken.Arn
+          LambdaArn:
+            Fn::GetAtt:
+              - CognitoPreToken
+              - Arn
           LambdaVersion: V2_0
 
   HappnixUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub happnix-${EnvironmentName}-web-client
-      UserPoolId: !Ref HappnixUserPool
+      ClientName:
+        Fn::Sub: HappniX-${EnvironmentName}-web-client
+      UserPoolId:
+        Ref: HappnixUserPool
       GenerateSecret: false
       EnableTokenRevocation: true
       PreventUserExistenceErrors: ENABLED
       ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
-        - ALLOW_USER_SRP_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_PASSWORD_AUTH # ← Email/Username + Password
+        - ALLOW_USER_SRP_AUTH # ← Secure Remote Password (client-side)
+        - ALLOW_REFRESH_TOKEN_AUTH # ← Token refresh
+        - ALLOW_CUSTOM_AUTH # ← Mobile + OTP (custom challenge)
       SupportedIdentityProviders:
         - COGNITO
 
+  # ══════════════════════════════════════════════════════════════════════
+  # Core Auth Lambdas (always enabled)
+  # Free Tier: 1M requests + 400K GB-seconds/month (always free)
+  # ══════════════════════════════════════════════════════════════════════
   SignupSignin:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
       Handler: SignupSignin.lambda_handler
       Description: HappniX signup and signin Lambda function.
-      Environment:
-        Variables:
-          COGNITO_USER_POOL_ID: !Ref HappnixUserPool
-          COGNITO_USER_POOL_CLIENT_ID: !Ref HappnixUserPoolClient
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
+        # Fixed conditional logic for IAM Policies
+        Fn::If:
+          - HasUsersTable
+          - - AWSLambdaBasicExecutionRole
+            - AWSLambdaVPCAccessExecutionRole
+            - DynamoDBCrudPolicy:
+                TableName:
+                  Ref: UsersTableName
+          - - AWSLambdaBasicExecutionRole
+            - AWSLambdaVPCAccessExecutionRole
+      Events:
+        AuthAction:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/auth
+            Method: POST
 
   CognitoPostConfirmation:
     Type: AWS::Serverless::Function
@@ -159,38 +339,491 @@ Resources:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
 
+  # ── Cognito Invoke Permissions ─────────────────────────────────────
   CognitoPostConfirmationInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref CognitoPostConfirmation
+      FunctionName:
+        Ref: CognitoPostConfirmation
       Principal: cognito-idp.amazonaws.com
-      SourceAccount: !Ref AWS::AccountId
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+          - HappnixUserPool
+          - Arn
 
   CognitoPreTokenInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref CognitoPreToken
+      FunctionName:
+        Ref: CognitoPreToken
       Principal: cognito-idp.amazonaws.com
-      SourceAccount: !Ref AWS::AccountId
+      SourceAccount:
+        Ref: AWS::AccountId
+      SourceArn:
+        Fn::GetAtt:
+          - HappnixUserPool
+          - Arn
 
+  # ── Schema Initializer ─────────────────────────────────────────────
   HappnixAuthSchemaInitializer:
     Type: AWS::CloudFormation::CustomResource
     Properties:
-      ServiceToken: !GetAtt AuthSchemaInit.Arn
+      ServiceToken:
+        Fn::GetAtt:
+          - AuthSchemaInit
+          - Arn
       SchemaVersion: "2026-04-29-clean-arch-v1"
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Feature Lambdas — each toggled independently.
+  # Set EnableEventsApi=true (etc.) when you've written the handler.
+  # These are STUBS — update Handler/CodeUri when your code is ready.
+  # ══════════════════════════════════════════════════════════════════════
+
+  EventsApi:
+    Type: AWS::Serverless::Function
+    Condition: HasEventsApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: events_api.lambda_handler
+      Description: Events CRUD — create, list, discover, delete.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        CreateEvent:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/create
+            Method: POST
+        MyEvents:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/mine
+            Method: GET
+        NearbyEvents:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/nearby
+            Method: GET
+        LiveEvents:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/live
+            Method: GET
+        GetEvent:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/{id}
+            Method: GET
+        DeleteEvent:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/events/{id}
+            Method: DELETE
+
+  TicketsApi:
+    Type: AWS::Serverless::Function
+    Condition: HasTicketsApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: tickets_api.lambda_handler
+      Description: Ticket booking, payment, cancellation, group management.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        ListTickets:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets
+            Method: GET
+        BookTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/book
+            Method: POST
+        PayTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/pay
+            Method: POST
+        CancelTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/cancel
+            Method: POST
+        ArchiveTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/archive
+            Method: POST
+        DeleteTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/delete
+            Method: DELETE
+        GroupTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/group
+            Method: POST
+        VerifyTicket:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/tickets/{id}/verify
+            Method: POST
+
+  ProfilesApi:
+    Type: AWS::Serverless::Function
+    Condition: HasProfilesApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: profiles_api.lambda_handler
+      Description: User profiles, follow system, search, settings.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        SearchUsers:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/users/search
+            Method: GET
+        FollowUser:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/users/follow
+            Method: POST
+        PublicProfile:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/users/{id}/profile
+            Method: GET
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/me
+            Method: GET
+        UpdateProfile:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/update
+            Method: POST
+        ProfilePrivacy:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/privacy
+            Method: POST
+        FollowRequests:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/follow-requests
+            Method: GET
+        FollowGraph:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/{graph_type}
+            Method: GET
+
+  MessagingApi:
+    Type: AWS::Serverless::Function
+    Condition: HasMessagingApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: messaging_api.lambda_handler
+      Description: Direct messaging — conversations, messages, attachments.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        ListConversations:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations
+            Method: GET
+        StartConversation:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations/start
+            Method: POST
+        ConversationMessages:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations/{id}/messages
+            Method: GET
+        MarkRead:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations/{id}/read
+            Method: POST
+        EditMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/messages/{id}/edit
+            Method: POST
+        ForwardMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/messages/{id}/forward
+            Method: POST
+        DeleteMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/messages/{id}/delete
+            Method: POST
+        UnsendMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/messages/{id}/unsend
+            Method: POST
+
+  GroupChatApi:
+    Type: AWS::Serverless::Function
+    Condition: HasGroupChatApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: group_chat_api.lambda_handler
+      Description: Group conversations — CRUD, members, messages.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        CreateGroup:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/create
+            Method: POST
+        GroupDetails:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}
+            Method: GET
+        GroupMessages:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/messages
+            Method: GET
+        AddMembers:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/members
+            Method: POST
+        LeaveGroup:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/leave
+            Method: POST
+        RenameGroup:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/rename
+            Method: POST
+
+  GuestsApi:
+    Type: AWS::Serverless::Function
+    Condition: HasGuestsApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: guests_api.lambda_handler
+      Description: Guest invite system — create, OTP, onboarding, payment.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        CreateInvite:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites
+            Method: POST
+        GuestSendOtp:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites/{token}/send-mobile-otp
+            Method: POST
+        GuestVerifyOtp:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites/{token}/verify-mobile-otp
+            Method: POST
+        GuestOnboarding:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites/{token}/onboarding
+            Method: POST
+        GuestPay:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites/{token}/pay
+            Method: POST
+        GuestCancel:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/guest-invites/{token}/cancel
+            Method: POST
+
+  NotificationsApi:
+    Type: AWS::Serverless::Function
+    Condition: HasNotificationsApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: notifications_api.lambda_handler
+      Description: Activity notifications — list, log, mark read.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        ListNotifications:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/notifications
+            Method: GET
+        LogActivity:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/notifications/activity
+            Method: POST
+        MarkRead:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/notifications/read
+            Method: POST
+
+  MediaApi:
+    Type: AWS::Serverless::Function
+    Condition: HasMediaApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: media_api.lambda_handler
+      Description: Media upload — presigned URL generation for R2.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+      Events:
+        GetUploadUrl:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/media/upload-url
+            Method: POST
+        DeleteMedia:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/media/delete
+            Method: POST
 
 Outputs:
   HappnixApiUrl:
     Description: Invoke URL for the HappniX API.
-    Value: !Sub "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}"
+    Value:
+      Fn::Sub: "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${E\
+        nvironmentName}"
   HappnixCognitoRegion:
     Description: Cognito region.
-    Value: !Ref AWS::Region
+    Value:
+      Ref: AWS::Region
   HappnixUserPoolId:
     Description: Cognito User Pool ID.
-    Value: !Ref HappnixUserPool
+    Value:
+      Ref: HappnixUserPool
   HappnixUserPoolClientId:
     Description: Cognito User Pool client ID.
-    Value: !Ref HappnixUserPoolClient
+    Value:
+      Ref: HappnixUserPoolClient

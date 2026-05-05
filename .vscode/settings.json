@@ -1,0 +1,25 @@
+{
+  "yaml.schemas": {},
+  "yaml.customTags": [
+    "!Ref",
+    "!Sub scalar",
+    "!Sub sequence",
+    "!GetAtt scalar",
+    "!GetAtt sequence",
+    "!GetAZs scalar",
+    "!GetAZs sequence",
+    "!Select sequence",
+    "!Equals sequence",
+    "!Not sequence",
+    "!If sequence",
+    "!Join sequence",
+    "!Split sequence",
+    "!FindInMap sequence",
+    "!Condition scalar",
+    "!ImportValue scalar",
+    "!Base64 scalar",
+    "!Cidr sequence"
+  ],
+  "yaml.validate": true,
+  "yaml.schemaStore.enable": true
+}

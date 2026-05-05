@@ -14,43 +14,45 @@ const profileForm = document.getElementById("profileForm");
     const success = document.getElementById("success");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-	    function getCsrfToken() {
-	      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
-	        return csrfTokenTemplate;
-	      }
+    const AUTH_ENDPOINT = "/api/auth";
+
+    function getCsrfToken() {
+      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
+        return csrfTokenTemplate;
+      }
       const value = `; ${document.cookie}`;
       const parts = value.split(`; csrftoken=`);
       if (parts.length === 2) {
         return parts.pop().split(";").shift();
-	      }
-	      return "";
-	    }
-
-	    function buildApiUrl(path) {
-	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
-	      if (typeof runtimeConfig.buildApiUrl === "function") {
-	        return runtimeConfig.buildApiUrl(path);
-	      }
-	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
-	      return base ? `${base}${path}` : path;
-	    }
-
-	    async function postJson(payload) {
-	      const response = await fetch(buildApiUrl("/api/signup/profile"), {
-	        method: "POST",
-	        headers: {
-	          "Content-Type": "application/json",
-	          "X-CSRFToken": getCsrfToken()
-	        },
-	        credentials: "include",
-	        body: JSON.stringify(payload)
-	      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || "Request failed.");
       }
-      return data;
+      return "";
+    }
+
+    function buildApiUrl(path) {
+      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+      if (typeof runtimeConfig.buildApiUrl === "function") {
+        return runtimeConfig.buildApiUrl(path);
+      }
+      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+      return base ? `${base}${path}` : path;
+    }
+
+    async function callAuthAction(actionItem, data = {}) {
+      const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        credentials: "include",
+        body: JSON.stringify({ actionItem, ...data })
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.message || "Request failed.");
+      }
+      return body;
     }
 
     async function submitProfile(payload, loadingText, button) {
@@ -61,7 +63,7 @@ const profileForm = document.getElementById("profileForm");
       button.textContent = loadingText;
 
       try {
-        const result = await postJson(payload);
+        const result = await callAuthAction("CompleteProfileSetup", payload);
         success.textContent = result.message || "Completed.";
         if (result.redirectUrl) {
           window.location.href = result.redirectUrl;
