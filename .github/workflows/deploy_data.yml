@@ -48,9 +48,9 @@ jobs:
           --capabilities CAPABILITY_IAM
           --parameter-overrides
           ParameterKey=EnvironmentName,ParameterValue=dev
-          ParameterKey=PrivateSubnetAId,ParameterValue='${{ secrets.NETWORK_PRIVATE_SUBNET_A_ID }}'
-          ParameterKey=PrivateSubnetBId,ParameterValue='${{ secrets.NETWORK_PRIVATE_SUBNET_B_ID }}'
-          ParameterKey=DatabaseSecurityGroupId,ParameterValue='${{ secrets.NETWORK_DATABASE_SECURITY_GROUP_ID }}'
-          ParameterKey=AuthDbName,ParameterValue='${{ secrets.AUTH_DB_NAME }}'
-          ParameterKey=AuthDbUser,ParameterValue='${{ secrets.AUTH_DB_USER }}'
+          ParameterKey=PrivateSubnetAId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_A_ID }}'
+          ParameterKey=PrivateSubnetBId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_B_ID }}'
+          ParameterKey=DatabaseSecurityGroupId,ParameterValue='${{ vars.NETWORK_DATABASE_SECURITY_GROUP_ID }}'
+          ParameterKey=AuthDbName,ParameterValue='${{ vars.AUTH_DB_NAME }}'
+          ParameterKey=AuthDbUser,ParameterValue='${{ vars.AUTH_DB_USER }}'
           ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'
