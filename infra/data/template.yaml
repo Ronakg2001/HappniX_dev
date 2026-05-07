@@ -1,0 +1,364 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  HappniX data stack — dev environment.
+  Free tier optimized. Each resource is independently toggleable.
+  RDS db.t4g.micro (free tier). DynamoDB on-demand (always free 25 WCU/RCU).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  ApplicationTag:
+    Type: String
+    Default: ""
+    Description: ARN from AWS myApplications.
+
+  # ─── RDS Toggle ─────────────────────────────────────────────────────
+  EnableRds:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable RDS PostgreSQL (free tier db.t4g.micro for 12 months).
+  PrivateSubnetAId:
+    Type: String
+    Default: ""
+  PrivateSubnetBId:
+    Type: String
+    Default: ""
+  DatabaseSecurityGroupId:
+    Type: String
+    Default: ""
+  AuthDbName:
+    Type: String
+    Default: "happnixdb"
+  AuthDbUser:
+    Type: String
+    Default: "happnixadmin"
+  AuthDbPassword:
+    Type: String
+    NoEcho: true
+    Default: "changeme"
+
+  # ─── DynamoDB Table Toggles ─────────────────────────────────────────
+  # Turn on/off any table independently. Only creates what you need NOW.
+  EnableUsersTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB users table for username lookups (free tier).
+  EnableSessionsTable:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB sessions table — replaces dev_store.py.
+  EnableOtpTable:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB OTP table with 5-min TTL.
+  EnableConnectionsTable:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB WebSocket connections registry.
+  EnablePresenceTable:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB presence table for online/offline.
+  EnableNotificationsTable:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: DynamoDB notifications table.
+
+Conditions:
+  HasRds:
+    Fn::Equals:
+      - Ref: EnableRds
+      - "true"
+  HasUsersTable:
+    Fn::Equals:
+      - Ref: EnableUsersTable
+      - "true"
+  HasSessionsTable:
+    Fn::Equals:
+      - Ref: EnableSessionsTable
+      - "true"
+  HasOtpTable:
+    Fn::Equals:
+      - Ref: EnableOtpTable
+      - "true"
+  HasConnectionsTable:
+    Fn::Equals:
+      - Ref: EnableConnectionsTable
+      - "true"
+  HasPresenceTable:
+    Fn::Equals:
+      - Ref: EnablePresenceTable
+      - "true"
+  HasNotificationsTable:
+    Fn::Equals:
+      - Ref: EnableNotificationsTable
+      - "true"
+
+Resources:
+
+  # ══════════════════════════════════════════════════════════════════════
+  # RDS PostgreSQL — Free Tier: db.t4g.micro, 20GB, 750 hrs/mo (12 months)
+  # ══════════════════════════════════════════════════════════════════════
+  HappnixDbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Condition: HasRds
+    Properties:
+      DBSubnetGroupDescription:
+        Fn::Sub: Subnets for HappniX-${EnvironmentName} postgres
+      SubnetIds:
+        - Ref: PrivateSubnetAId
+        - Ref: PrivateSubnetBId
+
+  HappnixPostgresDatabase:
+    Type: AWS::RDS::DBInstance
+    Condition: HasRds
+    Properties:
+      DBInstanceIdentifier:
+        Fn::Sub: happnix-postgres-${EnvironmentName}
+      Engine: postgres
+      EngineVersion: "16"
+      DBInstanceClass: db.t4g.micro        # ← Free tier eligible (12 months)
+      AllocatedStorage: "20"               # ← Free tier limit: 20 GB
+      StorageType: gp2                     # ← Free tier (gp3 not free tier)
+      PubliclyAccessible: false
+      MultiAZ: false                       # ← Multi-AZ is NOT free tier
+      DBName:
+        Ref: AuthDbName
+      MasterUsername:
+        Ref: AuthDbUser
+      MasterUserPassword:
+        Ref: AuthDbPassword
+      Port: 5432
+      BackupRetentionPeriod: 1             # ← Minimum (0 disables, 1 is free)
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: false
+      DBSubnetGroupName:
+        Ref: HappnixDbSubnetGroup
+      VPCSecurityGroups:
+        - Ref: DatabaseSecurityGroupId
+
+  # ══════════════════════════════════════════════════════════════════════
+  # DynamoDB — Always Free Tier: 25 WCU, 25 RCU, 25 GB storage
+  # PAY_PER_REQUEST = on-demand = auto-scales within free tier limits
+  # ══════════════════════════════════════════════════════════════════════
+
+  # ─── Users Table (username lookups + uniqueness) ───────────────────
+  HappnixUsersTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasUsersTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-users-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userID
+          AttributeType: S
+        - AttributeName: userName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userID
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userName-index
+          KeySchema:
+            - AttributeName: userName
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-users-${EnvironmentName}
+
+  # ─── Sessions Table (replaces dev_store.py JSON file) ──────────────
+  HappnixSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasSessionsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-sessions-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionToken
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionToken
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-sessions-${EnvironmentName}
+
+  # ─── OTP Table (5-minute TTL auto-cleanup) ─────────────────────────
+  HappnixOtpTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasOtpTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-otp-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: mobile
+          AttributeType: S
+      KeySchema:
+        - AttributeName: mobile
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-otp-${EnvironmentName}
+
+  # ─── WebSocket Connections Registry ────────────────────────────────
+  HappnixConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasConnectionsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-connections-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-connections-${EnvironmentName}
+
+  # ─── Presence (online/offline with heartbeat TTL) ──────────────────
+  HappnixPresenceTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasPresenceTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-presence-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-presence-${EnvironmentName}
+
+  # ─── Notifications ─────────────────────────────────────────────────
+  HappnixNotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasNotificationsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-notifications-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: recipientUserId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: recipientUserId
+          KeyType: HASH
+        - AttributeName: createdAt
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-notifications-${EnvironmentName}
+
+# ══════════════════════════════════════════════════════════════════════
+# Outputs — conditional so they only appear when the resource exists
+# ══════════════════════════════════════════════════════════════════════
+Outputs:
+  # RDS
+  DatabaseEndpointAddress:
+    Condition: HasRds
+    Description: PostgreSQL endpoint address.
+    Value:
+      Fn::GetAtt:
+        - HappnixPostgresDatabase
+        - Endpoint.Address
+  DatabaseEndpointPort:
+    Condition: HasRds
+    Description: PostgreSQL endpoint port.
+    Value:
+      Fn::GetAtt:
+        - HappnixPostgresDatabase
+        - Endpoint.Port
+  DatabaseInstanceIdentifier:
+    Condition: HasRds
+    Description: PostgreSQL instance identifier.
+    Value:
+      Ref: HappnixPostgresDatabase
+
+  # DynamoDB
+  UsersTableName:
+    Condition: HasUsersTable
+    Description: DynamoDB users table name.
+    Value:
+      Ref: HappnixUsersTable
+  UsersTableArn:
+    Condition: HasUsersTable
+    Description: DynamoDB users table ARN.
+    Value:
+      Fn::GetAtt:
+        - HappnixUsersTable
+        - Arn
+  SessionsTableName:
+    Condition: HasSessionsTable
+    Description: DynamoDB sessions table name.
+    Value:
+      Ref: HappnixSessionsTable
+  OtpTableName:
+    Condition: HasOtpTable
+    Description: DynamoDB OTP table name.
+    Value:
+      Ref: HappnixOtpTable
+  ConnectionsTableName:
+    Condition: HasConnectionsTable
+    Description: DynamoDB connections table name.
+    Value:
+      Ref: HappnixConnectionsTable
+  PresenceTableName:
+    Condition: HasPresenceTable
+    Description: DynamoDB presence table name.
+    Value:
+      Ref: HappnixPresenceTable
+  NotificationsTableName:
+    Condition: HasNotificationsTable
+    Description: DynamoDB notifications table name.
+    Value:
+      Ref: HappnixNotificationsTable

@@ -1,0 +1,56 @@
+name: Deploy Data
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "infra/data/**"
+      - "backend/sql/**"
+      - ".github/workflows/deploy_data.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      STACK_NAME: happnix-data-dev
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v2
+
+      - name: Build data stack
+        run: sam build --template-file infra/data/template.yaml
+
+      - name: Deploy data stack
+        run: >
+          sam deploy
+          --stack-name "${STACK_NAME}"
+          --template-file .aws-sam/build/template.yaml
+          --resolve-s3
+          --region "ap-south-1"
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --capabilities CAPABILITY_IAM
+          --parameter-overrides
+          ParameterKey=EnvironmentName,ParameterValue=dev
+          ParameterKey=PrivateSubnetAId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_A_ID }}'
+          ParameterKey=PrivateSubnetBId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_B_ID }}'
+          ParameterKey=DatabaseSecurityGroupId,ParameterValue='${{ vars.NETWORK_DATABASE_SECURITY_GROUP_ID }}'
+          ParameterKey=AuthDbName,ParameterValue='${{ vars.AUTH_DB_NAME }}'
+          ParameterKey=AuthDbUser,ParameterValue='${{ vars.AUTH_DB_USER }}'
+          ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'

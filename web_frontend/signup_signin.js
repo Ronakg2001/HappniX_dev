@@ -32,7 +32,13 @@ const views = {
     const userPassError = document.getElementById("userPassError");
     const userPassSuccess = document.getElementById("userPassSuccess");
     const newUserPrompt = document.getElementById("newUserPrompt");
+    const fetchAuthDevStatusBtn = document.getElementById("fetchAuthDevStatusBtn");
+    const authDevStatusOutput = document.getElementById("authDevStatusOutput");
+    const authApiResponse = document.getElementById("authApiResponse");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
+
+    // ─── Single API endpoint — all auth actions go here ─────────────
+    const AUTH_ENDPOINT = "/api/auth";
 
     document.addEventListener('click', (event) => {
       const actionEl = event.target.closest('[data-action]');
@@ -44,41 +50,49 @@ const views = {
 
     let mobileContext = { mobile: "" };
 
-	    const API_ENDPOINTS = {
-	      sendMobileOtp: "/api/auth/mobile/send-otp",
-	      verifyMobileOtp: "/api/auth/mobile/verify-otp",
-	      resendMobileOtp: "/api/auth/mobile/resend-otp",
-	      loginWithPassword: "/api/auth/username/login"
-	    };
+    function buildApiUrl(path) {
+      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+      if (typeof runtimeConfig.buildApiUrl === "function") {
+        return runtimeConfig.buildApiUrl(path);
+      }
+      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+      return base ? `${base}${path}` : path;
+    }
 
-	    function buildApiUrl(path) {
-	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
-	      if (typeof runtimeConfig.buildApiUrl === "function") {
-	        return runtimeConfig.buildApiUrl(path);
-	      }
-	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
-	      return base ? `${base}${path}` : path;
-	    }
-	    
-	    function normalizeMobile(value) {
-	      return value.replace(/\D/g, "");
-	    }
+    function normalizeMobile(value) {
+      return value.replace(/\D/g, "");
+    }
 
     function isValidMobile(value) {
       return /^\d{10}$/.test(normalizeMobile(value));
     }
 
-	    async function postJson(url, payload) {
-	      const csrfToken = getCsrfToken();
-	      const response = await fetch(buildApiUrl(url), {
-	        method: "POST",
-	        headers: {
-	          "Content-Type": "application/json",
-	          "X-CSRFToken": csrfToken
-	        },
-	        credentials: "include",
-	        body: JSON.stringify(payload)
-	      });
+    function getCsrfToken() {
+      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
+        return csrfTokenTemplate;
+      }
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; csrftoken=`);
+      if (parts.length === 2) {
+        return parts.pop().split(";").shift();
+      }
+      return "";
+    }
+
+    /**
+     * Send a request to the auth Lambda with an actionItem.
+     * All auth operations go through this single function.
+     */
+    async function callAuthAction(actionItem, data = {}) {
+      const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        credentials: "include",
+        body: JSON.stringify({ actionItem, ...data })
+      });
 
       let body = {};
       try {
@@ -94,16 +108,9 @@ const views = {
       return body;
     }
 
-    function getCsrfToken() {
-      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
-        return csrfTokenTemplate;
-      }
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; csrftoken=`);
-      if (parts.length === 2) {
-        return parts.pop().split(";").shift();
-      }
-      return "";
+    function renderDevJson(target, payload) {
+      if (!target) return;
+      target.textContent = JSON.stringify(payload, null, 2);
     }
 
     function resetMessages() {
@@ -172,6 +179,7 @@ const views = {
       });
     }
 
+    // ─── Send Mobile OTP ────────────────────────────────────────────
     views.mobileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const mobile = mobileNumber.value.trim();
@@ -190,18 +198,21 @@ const views = {
       setButtonLoading(mobileSendBtn, true, "Send OTP", "Sending...");
 
       try {
-        await postJson(API_ENDPOINTS.sendMobileOtp, {
+        const result = await callAuthAction("SendMobileOtp", {
           mobile: normalizeMobile(mobile)
         });
+        renderDevJson(authApiResponse, result);
         openMobileOtpView(mobile);
         mobileOtpSuccess.textContent = "OTP sent successfully.";
       } catch (error) {
         mobileError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileSendBtn, false, "Send OTP", "Sending...");
       }
     });
 
+    // ─── Verify Mobile OTP ──────────────────────────────────────────
     views.mobileOtpForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const otp = mobileOtpCode.value.trim();
@@ -220,18 +231,21 @@ const views = {
       setButtonLoading(mobileVerifyBtn, true, "Verify OTP", "Verifying...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.verifyMobileOtp, {
+        const result = await callAuthAction("VerifyMobileOtp", {
           mobile: mobileContext.mobile,
           otp
         });
+        renderDevJson(authApiResponse, result);
         handleAuthResult(result, mobileOtpSuccess);
       } catch (error) {
         mobileOtpError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileVerifyBtn, false, "Verify OTP", "Verifying...");
       }
     });
 
+    // ─── Resend Mobile OTP ──────────────────────────────────────────
     mobileResendBtn.addEventListener("click", async () => {
       if (!mobileContext.mobile) {
         mobileOtpError.textContent = "Mobile session expired. Please request OTP again.";
@@ -242,17 +256,20 @@ const views = {
       setButtonLoading(mobileResendBtn, true, "Resend OTP", "Resending...");
 
       try {
-        await postJson(API_ENDPOINTS.resendMobileOtp, {
+        const result = await callAuthAction("ResendMobileOtp", {
           mobile: mobileContext.mobile
         });
+        renderDevJson(authApiResponse, result);
         mobileOtpSuccess.textContent = `OTP resent to ${mobileContext.mobile}.`;
       } catch (error) {
         mobileOtpError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
       } finally {
         setButtonLoading(mobileResendBtn, false, "Resend OTP", "Resending...");
       }
     });
 
+    // ─── Login with Password ────────────────────────────────────────
     views.userPassForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const usernameValue = username.value.trim();
@@ -267,13 +284,15 @@ const views = {
       setButtonLoading(userPassLoginBtn, true, "Sign-in", "Signing in...");
 
       try {
-        const result = await postJson(API_ENDPOINTS.loginWithPassword, {
+        const result = await callAuthAction("LoginWithPassword", {
           identifier: usernameValue,
           password: passwordValue
         });
+        renderDevJson(authApiResponse, result);
         handleAuthResult(result, userPassSuccess);
       } catch (error) {
         userPassError.textContent = error.message;
+        renderDevJson(authApiResponse, { message: error.message });
         if (error.message && error.message.toLowerCase().includes("invalid username/email or password")) {
           newUserPrompt.style.display = "flex";
         }
@@ -281,6 +300,21 @@ const views = {
         setButtonLoading(userPassLoginBtn, false, "Sign-in", "Signing in...");
       }
     });
+
+    // ─── Dev Auth Status ────────────────────────────────────────────
+    if (fetchAuthDevStatusBtn) {
+      fetchAuthDevStatusBtn.addEventListener("click", async () => {
+        setButtonLoading(fetchAuthDevStatusBtn, true, "Check Backend Status", "Checking...");
+        try {
+          const result = await callAuthAction("GetDevAuthStatus");
+          renderDevJson(authDevStatusOutput, result);
+        } catch (error) {
+          renderDevJson(authDevStatusOutput, { message: error.message });
+        } finally {
+          setButtonLoading(fetchAuthDevStatusBtn, false, "Check Backend Status", "Checking...");
+        }
+      });
+    }
 
 (function () {
       function openHashTarget() {

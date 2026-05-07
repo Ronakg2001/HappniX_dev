@@ -14,37 +14,39 @@ const form = document.getElementById("forgotPasswordForm");
     const submitBtn = document.getElementById("submitBtn");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-	    function getCsrfToken() {
-	      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
-	        return csrfTokenTemplate;
-	      }
+    const AUTH_ENDPOINT = "/api/auth";
+
+    function getCsrfToken() {
+      if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
+        return csrfTokenTemplate;
+      }
       const value = `; ${document.cookie}`;
       const parts = value.split(`; csrftoken=`);
       if (parts.length === 2) {
         return parts.pop().split(";").shift();
-	      }
-	      return "";
-	    }
+      }
+      return "";
+    }
 
-	    function buildApiUrl(path) {
-	      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
-	      if (typeof runtimeConfig.buildApiUrl === "function") {
-	        return runtimeConfig.buildApiUrl(path);
-	      }
-	      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
-	      return base ? `${base}${path}` : path;
-	    }
+    function buildApiUrl(path) {
+      const runtimeConfig = window.HAPPNIX_RUNTIME_CONFIG || {};
+      if (typeof runtimeConfig.buildApiUrl === "function") {
+        return runtimeConfig.buildApiUrl(path);
+      }
+      const base = String(runtimeConfig.apiBaseUrl || "").replace(/\/$/, "");
+      return base ? `${base}${path}` : path;
+    }
 
-	    async function postJson(url, payload) {
-	      const response = await fetch(buildApiUrl(url), {
-	        method: "POST",
-	        headers: {
-	          "Content-Type": "application/json",
-	          "X-CSRFToken": getCsrfToken()
-	        },
-	        credentials: "include",
-	        body: JSON.stringify(payload)
-	      });
+    async function callAuthAction(actionItem, data = {}) {
+      const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        credentials: "include",
+        body: JSON.stringify({ actionItem, ...data })
+      });
 
       let body = {};
       try {
@@ -78,7 +80,7 @@ const form = document.getElementById("forgotPasswordForm");
 
       setLoading(true);
       try {
-        const result = await postJson("/api/auth/password/forgot", { email: emailValue });
+        const result = await callAuthAction("ForgotPasswordRequest", { email: emailValue });
         successMsg.textContent = result.message || "Verification email sent successfully.";
       } catch (error) {
         errorMsg.textContent = error.message;

@@ -1,13 +1,12 @@
-name: Backend Deploy
+name: Deploy Network
 
 on:
   push:
     branches:
       - dev
     paths:
-      - "backend/**"
-      - "template.yaml"
-      - ".github/workflows/backend_deploy.yml"
+      - "infra/network/**"
+      - ".github/workflows/deploy_network.yml"
   workflow_dispatch:
 
 permissions:
@@ -18,41 +17,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      STACK_NAME: HappnixDev
+      AWS_REGION: ap-south-1
+      STACK_NAME: happnix-network-dev
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-south-1
 
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v2
 
-      - name: Build SAM application
-        run: sam build --template-file template.yaml
+      - name: Build network stack
+        run: sam build --template-file infra/network/template.yaml
 
-      - name: Deploy SAM stack
+      - name: Deploy network stack
         run: >
           sam deploy
           --stack-name "${STACK_NAME}"
           --template-file .aws-sam/build/template.yaml
           --resolve-s3
-          --region "${AWS_REGION}"
+          --region "ap-south-1"
           --no-confirm-changeset
           --no-fail-on-empty-changeset
           --capabilities CAPABILITY_IAM
           --parameter-overrides
-          ApiStageName=dev
-          AppEnvironment=dev
-          R2BucketName=${{ secrets.R2_BUCKET_NAME }}
-          R2Endpoint=${{ secrets.R2_ENDPOINT }}
+          ParameterKey=EnvironmentName,ParameterValue=dev
