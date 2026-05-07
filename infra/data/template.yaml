@@ -125,7 +125,7 @@ Resources:
       DBInstanceIdentifier:
         Fn::Sub: happnix-postgres-${EnvironmentName}
       Engine: postgres
-      EngineVersion: "16.4"
+      EngineVersion: "16"
       DBInstanceClass: db.t4g.micro        # ← Free tier eligible (12 months)
       AllocatedStorage: "20"               # ← Free tier limit: 20 GB
       StorageType: gp2                     # ← Free tier (gp3 not free tier)
