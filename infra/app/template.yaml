@@ -289,16 +289,23 @@ Resources:
       Handler: SignupSignin.lambda_handler
       Description: HappniX signup and signin Lambda function.
       Policies:
-        # Fixed conditional logic for IAM Policies
-        Fn::If:
-          - HasUsersTable
-          - - AWSLambdaBasicExecutionRole
-            - AWSLambdaVPCAccessExecutionRole
-            - DynamoDBCrudPolicy:
-                TableName:
-                  Ref: UsersTableName
-          - - AWSLambdaBasicExecutionRole
-            - AWSLambdaVPCAccessExecutionRole
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                Fn::If:
+                  - HasUsersTable
+                  - - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}"
+                    - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}/index/*"
+                  - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/dummy-table-not-used"
       Events:
         AuthAction:
           Type: Api
