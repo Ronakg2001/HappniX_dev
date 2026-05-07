@@ -324,6 +324,10 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: ""
+          COGNITO_USER_POOL_CLIENT_ID: ""
 
   CognitoPreToken:
     Type: AWS::Serverless::Function
@@ -334,6 +338,10 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: ""
+          COGNITO_USER_POOL_CLIENT_ID: ""
 
   AuthSchemaInit:
     Type: AWS::Serverless::Function
