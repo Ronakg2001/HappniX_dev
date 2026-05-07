@@ -198,7 +198,7 @@ Resources:
     Condition: UseNatInstance
     DependsOn: HappnixVpcGatewayAttachment
     Properties:
-      InstanceType: t2.micro                # ← Free tier (750 hrs/month, 12 months)
+      InstanceType: t3.micro                # ← Free tier (750 hrs/month, 12 months)
       ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
       SubnetId:
         Ref: HappnixPublicSubnetA
