@@ -63,7 +63,7 @@ jobs:
           ParameterKey=AuthDbUser,ParameterValue='${{ vars.AUTH_DB_USER }}'
           ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'
           ParameterKey=AuthDbConnectTimeout,ParameterValue=5
-          ParameterKey=TestOtpMode,ParameterValue=false
-          ParameterKey=AllowFixedTestOtp,ParameterValue=false
+          ParameterKey=TestOtpMode,ParameterValue=true
+          ParameterKey=AllowFixedTestOtp,ParameterValue=true
           ParameterKey=R2BucketName,ParameterValue='${{ secrets.R2_BUCKET_NAME }}'
           ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'
