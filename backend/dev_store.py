@@ -9,6 +9,8 @@ def _state_path():
     configured = os.environ.get("HAPPNIX_DEV_STORE_PATH", "").strip()
     if configured:
         return Path(configured)
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        return Path("/tmp/auth_state.json")
     return Path(__file__).with_name("dev_data").joinpath("auth_state.json")
 
 
