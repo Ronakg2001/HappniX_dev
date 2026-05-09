@@ -260,6 +260,14 @@ Resources:
           AttributeDataType: String
           Required: false
           Mutable: true
+        - Name: dateOfBirth
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: userType
+          AttributeDataType: String
+          Required: false
+          Mutable: true
       LambdaConfig:
         PostConfirmation:
           Fn::GetAtt:
