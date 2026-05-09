@@ -13,6 +13,13 @@ except ImportError:
     import dev_store
     from auth_db import table_exists
 
+try:
+    import boto3
+    cognito = boto3.client("cognito-idp")
+except ImportError:
+    boto3 = None
+    cognito = None
+
 
 # ══════════════════════════════════════════════════════════════════════
 # Helpers (only shared utilities that are used by 2+ action methods)
@@ -181,22 +188,62 @@ def VerifyMobileOtp(event, payload):
 
 
 def LoginWithPassword(event, payload):
-    """Authenticate with username/email and password."""
+    """Authenticate with username/email and password via Cognito."""
     identifier = str(payload.get("identifier", payload.get("username", ""))).strip()
     password = str(payload.get("password", "")).strip()
     if not identifier or not password:
         return _Error("Username/email and password are required.")
-    user = dev_store.find_user_by_identifier(identifier)
-    if not user or not dev_store.verify_password(user, password):
-        return _JsonResponse(401, {"message": "Invalid username/email or password."})
+        
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    clientId = os.environ.get("COGNITO_USER_POOL_CLIENT_ID")
+    
+    fullName = "User"
+    user_id = None
+    
+    if cognito and userPoolId and clientId:
+        try:
+            response = cognito.admin_initiate_auth(
+                UserPoolId=userPoolId,
+                ClientId=clientId,
+                AuthFlow='ADMIN_NO_SRP_AUTH',
+                AuthParameters={
+                    'USERNAME': identifier,
+                    'PASSWORD': password
+                }
+            )
+            # Fetch user details to get sub and name
+            user_info = cognito.admin_get_user(
+                UserPoolId=userPoolId,
+                Username=identifier
+            )
+            user_id = next((attr["Value"] for attr in user_info["UserAttributes"] if attr["Name"] == "sub"), None)
+            fullName = next((attr["Value"] for attr in user_info["UserAttributes"] if attr["Name"] == "name"), identifier)
+        except (cognito.exceptions.NotAuthorizedException, cognito.exceptions.UserNotFoundException):
+            return _JsonResponse(401, {"message": "Invalid username/email or password."})
+        except Exception as e:
+            return _Error(f"Login failed: {str(e)}", statusCode=500)
+    else:
+        # Fallback for local mock testing
+        user = dev_store.find_user_by_identifier(identifier)
+        if not user or not dev_store.verify_password(user, password):
+            return _JsonResponse(401, {"message": "Invalid username/email or password."})
+        user_id = user["id"]
+        fullName = (user.get("first_name") or user.get("username") or "User").strip()
+
     token, session = _GetOrCreateSession(event)
-    session["authenticated_user_id"] = user["id"]
+    session["authenticated_user_id"] = user_id
     dev_store.replace_session(token, session)
-    fullName = (user.get("first_name") or user.get("username") or "User").strip()
+    
+    # Check if user has government ID verified for party creation
+    can_create = False
+    fallback_user = dev_store.find_user_by_identifier(identifier)
+    if fallback_user:
+        can_create = _CanCreateOrJoinParties(fallback_user)
+
     return _WithSession(200, {
         "message": f"Signed in successfully. Welcome, {fullName}.",
         "userStatus": "existing",
-        "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
+        "canCreateOrJoinParties": can_create,
         "redirectUrl": "/home_page.html",
     }, token)
 

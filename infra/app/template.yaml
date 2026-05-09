@@ -329,6 +329,7 @@ Resources:
                 - cognito-idp:AdminSetUserPassword
                 - cognito-idp:AdminGetUser
                 - cognito-idp:ListUsers
+                - cognito-idp:AdminInitiateAuth
               Resource:
                 Fn::GetAtt:
                   - HappnixUserPool
