@@ -315,6 +315,16 @@ Resources:
               Resource:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminGetUser
+                - cognito-idp:ListUsers
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
       Events:
         AuthAction:
           Type: Api

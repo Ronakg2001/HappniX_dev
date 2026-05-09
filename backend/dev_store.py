@@ -8,9 +8,11 @@ from pathlib import Path
 try:
     import boto3
     dynamodb = boto3.resource("dynamodb")
+    cognito = boto3.client("cognito-idp")
 except ImportError:
     boto3 = None
     dynamodb = None
+    cognito = None
 
 
 def _get_sessions_table():
@@ -128,25 +130,70 @@ def find_user_by_identifier(identifier):
 
 
 def username_exists(username):
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId:
+        try:
+            cognito.admin_get_user(UserPoolId=userPoolId, Username=username)
+            return True
+        except cognito.exceptions.UserNotFoundException:
+            pass
     state = load_state()
     return any(user.get("username") == username for user in state["users"])
 
 
 def email_exists(email):
     lookup = (email or "").strip().lower()
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId:
+        response = cognito.list_users(UserPoolId=userPoolId, Filter=f'email = "{lookup}"')
+        if response.get("Users"):
+            return True
     state = load_state()
     return any(user.get("email", "").lower() == lookup for user in state["users"])
 
 
 def mobile_exists(mobile):
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId:
+        formattedMobile = mobile if str(mobile).startswith("+") else f"+91{mobile}"
+        response = cognito.list_users(UserPoolId=userPoolId, Filter=f'phone_number = "{formattedMobile}"')
+        if response.get("Users"):
+            return True
     state = load_state()
     return any(user.get("profile", {}).get("mobile") == mobile for user in state["users"])
 
 
 def create_user(full_name, username, password, email, sex, date_of_birth, mobile, gov_id):
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    cognito_sub = None
+    if cognito and userPoolId:
+        formattedMobile = mobile if str(mobile).startswith("+") else f"+91{mobile}"
+        response = cognito.admin_create_user(
+            UserPoolId=userPoolId,
+            Username=username,
+            UserAttributes=[
+                {"Name": "email", "Value": email},
+                {"Name": "phone_number", "Value": formattedMobile},
+                {"Name": "preferred_username", "Value": username},
+                {"Name": "name", "Value": full_name},
+                {"Name": "custom:dateOfBirth", "Value": date_of_birth},
+                {"Name": "custom:userType", "Value": "General"},
+                {"Name": "email_verified", "Value": "true"},
+                {"Name": "phone_number_verified", "Value": "true"}
+            ],
+            MessageAction="SUPPRESS"
+        )
+        cognito_sub = next((attr["Value"] for attr in response["User"]["Attributes"] if attr["Name"] == "sub"), None)
+        cognito.admin_set_user_password(
+            UserPoolId=userPoolId,
+            Username=username,
+            Password=password,
+            Permanent=True
+        )
+
     state = load_state()
     user = {
-        "id": state["next_user_id"],
+        "id": cognito_sub or state["next_user_id"],
         "first_name": full_name,
         "username": username,
         "email": email,
