@@ -69,6 +69,14 @@ Parameters:
     Type: String
     Default: ""
     Description: DynamoDB users table name. Empty = feature disabled.
+  SessionsTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB sessions table name.
+  OtpTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB OTP table name.
 
   # ─── Feature toggles (add Lambdas when ready) ─────────────────────
   EnableEventsApi:
@@ -178,6 +186,10 @@ Globals:
           Ref: R2Endpoint
         USERS_TABLE_NAME:
           Ref: UsersTableName
+        SESSIONS_TABLE_NAME:
+          Ref: SessionsTableName
+        OTP_TABLE_NAME:
+          Ref: OtpTableName
         COGNITO_USER_POOL_ID:
           # Moved here from SignupSignin
           Ref: HappnixUserPool
@@ -301,11 +313,8 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
-                Fn::If:
-                  - HasUsersTable
-                  - - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}"
-                    - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}/index/*"
-                  - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/dummy-table-not-used"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
       Events:
         AuthAction:
           Type: Api

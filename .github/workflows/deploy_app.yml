@@ -67,3 +67,6 @@ jobs:
           ParameterKey=AllowFixedTestOtp,ParameterValue=true
           ParameterKey=R2BucketName,ParameterValue='${{ secrets.R2_BUCKET_NAME }}'
           ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'
+          ParameterKey=UsersTableName,ParameterValue='HappniX-users-dev'
+          ParameterKey=SessionsTableName,ParameterValue='HappniX-sessions-dev'
+          ParameterKey=OtpTableName,ParameterValue='HappniX-otp-dev'

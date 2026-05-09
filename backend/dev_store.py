@@ -2,8 +2,22 @@ import hashlib
 import json
 import os
 import uuid
+import time
 from pathlib import Path
 
+try:
+    import boto3
+    dynamodb = boto3.resource("dynamodb")
+except ImportError:
+    boto3 = None
+    dynamodb = None
+
+
+def _get_sessions_table():
+    table_name = os.environ.get("SESSIONS_TABLE_NAME")
+    if not dynamodb or not table_name:
+        return None
+    return dynamodb.Table(table_name)
 
 def _state_path():
     configured = os.environ.get("HAPPNIX_DEV_STORE_PATH", "").strip()
@@ -32,22 +46,57 @@ def save_state(state):
 
 
 def ensure_session(session_token=None):
-    state = load_state()
     token = session_token or uuid.uuid4().hex
+    table = _get_sessions_table()
+    if table:
+        response = table.get_item(Key={"sessionToken": token})
+        if "Item" in response:
+            return token, json.loads(response["Item"].get("data", "{}"))
+        
+        expires_at = int(time.time()) + 86400  # 24 hours TTL
+        table.put_item(Item={
+            "sessionToken": token,
+            "data": "{}",
+            "expiresAt": expires_at
+        })
+        return token, {}
+
+    state = load_state()
     state["sessions"].setdefault(token, {})
     save_state(state)
     return token, state["sessions"][token]
 
 
 def get_session(session_token):
-    state = load_state()
     if not session_token:
         return None, None
+        
+    table = _get_sessions_table()
+    if table:
+        response = table.get_item(Key={"sessionToken": session_token})
+        if "Item" in response:
+            return session_token, json.loads(response["Item"].get("data", "{}"))
+        return session_token, None
+
+    state = load_state()
     session = state["sessions"].get(session_token)
     return session_token, session
 
 
 def replace_session(token, session_data):
+    if not token:
+        return
+        
+    table = _get_sessions_table()
+    if table:
+        expires_at = int(time.time()) + 86400
+        table.put_item(Item={
+            "sessionToken": token,
+            "data": json.dumps(session_data),
+            "expiresAt": expires_at
+        })
+        return
+
     state = load_state()
     state["sessions"][token] = session_data
     save_state(state)
