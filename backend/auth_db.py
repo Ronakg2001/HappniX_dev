@@ -119,3 +119,45 @@ def upsert_cognito_user(record):
                 """,
                 record,
             )
+
+
+def get_user_by_sub(cognito_sub):
+    with _connect() as connection:
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute('SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
+            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+
+
+def get_user_by_mobile(phone_number):
+    with _connect() as connection:
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute('SELECT * FROM users WHERE "phoneNumber" = %s', (phone_number,))
+            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+
+
+def get_user_by_identifier(identifier):
+    with _connect() as connection:
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute('SELECT * FROM users WHERE "userName" = %s OR "emailAddress" = %s', (identifier, identifier))
+            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+
+
+def update_user_profile(cognito_sub, bio=None, profile_picture_url=None):
+    with _connect() as connection:
+        with connection.cursor() as cursor:
+            updates = []
+            params = []
+            if bio is not None:
+                updates.append('"bio" = %s')
+                params.append(bio)
+            if profile_picture_url is not None:
+                updates.append('"profilePictureUrl" = %s')
+                params.append(profile_picture_url)
+            
+            if not updates:
+                return
+
+            updates.append('"updatedAt" = CURRENT_TIMESTAMP')
+            query = f'UPDATE users SET {", ".join(updates)} WHERE "cognitoSub" = %s'
+            params.append(cognito_sub)
+            cursor.execute(query, tuple(params))

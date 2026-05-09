@@ -8,10 +8,10 @@ from email.utils import parseaddr
 
 try:
     from . import dev_store
-    from .auth_db import table_exists
+    from . import auth_db
 except ImportError:
     import dev_store
-    from auth_db import table_exists
+    import auth_db
 
 try:
     import boto3
@@ -92,11 +92,11 @@ def _CurrentUser(event):
     userId = session.get("authenticated_user_id")
     if not userId:
         return token, session, None
-    return token, session, dev_store.find_user_by_id(userId)
+    return token, session, auth_db.get_user_by_sub(userId)
 
 
 def _CanCreateOrJoinParties(user):
-    return bool(user and user.get("profile", {}).get("gov_id_verified"))
+    return bool(user and user.get("adharVerified"))
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -153,7 +153,8 @@ def VerifyMobileOtp(event, payload):
     )
     if savedOtp != otp and not (fixedOtpAllowed and otp == "123456"):
         return _WithSession(400, {"message": "Invalid OTP."}, token)
-    user = dev_store.find_user_by_mobile(mobile)
+    formattedMobile = mobile if str(mobile).startswith("+") else f"+91{mobile}"
+    user = auth_db.get_user_by_mobile(formattedMobile)
     mobileOtpMap.pop(mobile, None)
     session["mobile_otp_map"] = mobileOtpMap
     # Warning verification flow (device overlap)
@@ -167,10 +168,10 @@ def VerifyMobileOtp(event, payload):
             "redirectUrl": "/auth/warning-verification/",
         }, token)
     if user:
-        session["authenticated_user_id"] = user["id"]
+        session["authenticated_user_id"] = user["cognitoSub"]
         session.pop("pending_signup_mobile", None)
         dev_store.replace_session(token, session)
-        fullName = (user.get("first_name") or user.get("username") or "User").strip()
+        fullName = (user.get("userName") or "User").strip()
         return _WithSession(200, {
             "message": f"Welcome back, {fullName}! Mobile OTP verified.",
             "userStatus": "existing",
@@ -223,12 +224,12 @@ def LoginWithPassword(event, payload):
         except Exception as e:
             return _Error(f"Login failed: {str(e)}", statusCode=500)
     else:
-        # Fallback for local mock testing
-        user = dev_store.find_user_by_identifier(identifier)
-        if not user or not dev_store.verify_password(user, password):
+        # Fallback for local mock testing if Cognito isn't set up
+        user = auth_db.get_user_by_identifier(identifier)
+        if not user:
             return _JsonResponse(401, {"message": "Invalid username/email or password."})
-        user_id = user["id"]
-        fullName = (user.get("first_name") or user.get("username") or "User").strip()
+        user_id = user["cognitoSub"]
+        fullName = (user.get("userName") or "User").strip()
 
     token, session = _GetOrCreateSession(event)
     session["authenticated_user_id"] = user_id
@@ -236,7 +237,7 @@ def LoginWithPassword(event, payload):
     
     # Check if user has government ID verified for party creation
     can_create = False
-    fallback_user = dev_store.find_user_by_identifier(identifier)
+    fallback_user = auth_db.get_user_by_identifier(identifier)
     if fallback_user:
         can_create = _CanCreateOrJoinParties(fallback_user)
 
@@ -283,9 +284,9 @@ def RegisterUserDetails(event, payload):
         return _WithSession(400, {"message": "Select a valid sex option."}, token)
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", dobText):
         return _WithSession(400, {"message": "Enter a valid date of birth."}, token)
-    if dev_store.username_exists(userName):
+    if auth_db.get_user_by_identifier(userName):
         return _WithSession(400, {"message": "Username already exists. Please choose another one."}, token)
-    if dev_store.email_exists(email):
+    if auth_db.get_user_by_identifier(email):
         return _WithSession(400, {"message": "Email already registered. Please use another email."}, token)
     if not _IsValidEmail(email):
         return _WithSession(400, {"message": "Enter a valid email address."}, token)
@@ -293,12 +294,39 @@ def RegisterUserDetails(event, payload):
         return _WithSession(400, {
             "message": "Password must include uppercase, lowercase, number, special character, and minimum 8 characters."
         }, token)
-    if dev_store.mobile_exists(pendingMobile):
+    if auth_db.get_user_by_mobile(pendingMobile):
         return _WithSession(400, {"message": "Mobile number already registered."}, token)
-    user = dev_store.create_user(fullName, userName, password, email, sex, dobText, pendingMobile, govId)
+        
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    cognito_sub = None
+    if cognito and userPoolId:
+        formattedMobile = pendingMobile if str(pendingMobile).startswith("+") else f"+91{pendingMobile}"
+        response = cognito.admin_create_user(
+            UserPoolId=userPoolId,
+            Username=userName,
+            UserAttributes=[
+                {"Name": "email", "Value": email},
+                {"Name": "phone_number", "Value": formattedMobile},
+                {"Name": "preferred_username", "Value": userName},
+                {"Name": "name", "Value": fullName},
+                {"Name": "custom:dateOfBirth", "Value": dobText},
+                {"Name": "custom:userType", "Value": "General"},
+                {"Name": "email_verified", "Value": "true"},
+                {"Name": "phone_number_verified", "Value": "true"}
+            ],
+            MessageAction="SUPPRESS"
+        )
+        cognito_sub = next((attr["Value"] for attr in response["User"]["Attributes"] if attr["Name"] == "sub"), None)
+        cognito.admin_set_user_password(
+            UserPoolId=userPoolId,
+            Username=userName,
+            Password=password,
+            Permanent=True
+        )
+
     session.pop("pending_signup_mobile", None)
     session["pending_profile_setup"] = True
-    session["authenticated_user_id"] = user["id"]
+    session["authenticated_user_id"] = cognito_sub
     dev_store.replace_session(token, session)
     return _WithSession(200, {
         "message": "Details saved successfully. You can add profile details next.",
@@ -317,7 +345,9 @@ def CompleteProfileSetup(event, payload):
     if not payload.get("skip", False):
         bio = str(payload.get("bio", "")).strip()
         profilePictureUrl = str(payload.get("profilePictureUrl", "")).strip()
-        user = dev_store.update_user_profile(user["id"], bio=bio, profile_picture_url=profilePictureUrl)
+        auth_db.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=profilePictureUrl)
+        user["bio"] = bio
+        user["profilePictureUrl"] = profilePictureUrl
     session.pop("pending_profile_setup", None)
     dev_store.replace_session(token, session)
     return _WithSession(200, {

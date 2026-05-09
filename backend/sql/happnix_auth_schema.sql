@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
     "emailVerified" BOOLEAN NOT NULL,
     "isActive" BOOLEAN NOT NULL,
     "dateOfBirth" DATE NOT NULL,
+    "bio" TEXT,
+    "profilePictureUrl" VARCHAR(500),
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastLogin" TIMESTAMPTZ,
