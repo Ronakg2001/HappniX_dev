@@ -49,12 +49,12 @@ Parameters:
     Description: DynamoDB users table for username lookups (free tier).
   EnableSessionsTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB sessions table — replaces dev_store.py.
   EnableOtpTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB OTP table with 5-min TTL.
   EnableConnectionsTable:
