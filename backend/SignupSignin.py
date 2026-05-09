@@ -365,6 +365,19 @@ ACTION_REGISTRY = {
 # ══════════════════════════════════════════════════════════════════════
 
 def lambda_handler(event, context):
+    try:
+        response = _lambda_handler_inner(event, context)
+    except Exception as exc:
+        response = _Error(f"Unhandled exception: {str(exc)}", statusCode=500)
+    
+    response.setdefault("headers", {})
+    headers = event.get("headers") or {}
+    origin = headers.get("origin") or headers.get("Origin") or "https://happnix-dev.ronakgo1.workers.dev"
+    response["headers"]["Access-Control-Allow-Origin"] = origin
+    response["headers"]["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+def _lambda_handler_inner(event, context):
     del context
     requestContext = event.get("requestContext") or {}
     traceId = requestContext.get("requestId") or uuid.uuid4().hex
@@ -394,16 +407,12 @@ def lambda_handler(event, context):
         _LogTrace("error", traceId, "Unhandled exception",
                   actionItem=actionItem, errorType=type(exc).__name__,
                   errorMessage=str(exc), traceback=traceback.format_exc())
-        return _Error("Internal server error.", statusCode=500, traceId=traceId)
+        return _Error(f"Internal server error: {str(exc)}", statusCode=500, traceId=traceId)
 
     response.setdefault("headers", {})
     response["headers"].setdefault("X-Happnix-Trace-Id", traceId)
     
-    # Inject CORS headers dynamically based on request origin
-    headers = event.get("headers") or {}
-    origin = headers.get("origin") or headers.get("Origin") or "https://happnix-dev.ronakgo1.workers.dev"
-    response["headers"]["Access-Control-Allow-Origin"] = origin
-    response["headers"]["Access-Control-Allow-Credentials"] = "true"
+    # CORS headers are now injected by the lambda_handler wrapper
 
     try:
         bodyPayload = json.loads(response.get("body") or "{}")
