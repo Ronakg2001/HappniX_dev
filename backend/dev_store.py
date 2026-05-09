@@ -113,6 +113,27 @@ def verify_password(user, password):
 
 
 def find_user_by_mobile(mobile):
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId:
+        formattedMobile = mobile if str(mobile).startswith("+") else f"+91{mobile}"
+        try:
+            response = cognito.list_users(UserPoolId=userPoolId, Filter=f'phone_number = "{formattedMobile}"')
+            if response.get("Users"):
+                c_user = response["Users"][0]
+                attrs = {a["Name"]: a["Value"] for a in c_user.get("Attributes", [])}
+                return {
+                    "id": attrs.get("sub", c_user.get("Username")),
+                    "first_name": attrs.get("name", "User"),
+                    "username": c_user.get("Username"),
+                    "email": attrs.get("email", ""),
+                    "profile": {
+                        "mobile": mobile,
+                        "gov_id_verified": False
+                    }
+                }
+        except Exception:
+            pass
+
     state = load_state()
     for user in state["users"]:
         if user.get("profile", {}).get("mobile") == mobile or user.get("username") == mobile:
@@ -121,10 +142,50 @@ def find_user_by_mobile(mobile):
 
 
 def find_user_by_identifier(identifier):
-    lookup = (identifier or "").strip().lower()
+    lookup = (identifier or "").strip()
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId and lookup:
+        try:
+            # Try by username
+            try:
+                user_info = cognito.admin_get_user(UserPoolId=userPoolId, Username=lookup)
+                attrs = {a["Name"]: a["Value"] for a in user_info.get("UserAttributes", [])}
+                return {
+                    "id": attrs.get("sub", user_info.get("Username")),
+                    "first_name": attrs.get("name", "User"),
+                    "username": user_info.get("Username"),
+                    "email": attrs.get("email", ""),
+                    "profile": {
+                        "mobile": attrs.get("phone_number", ""),
+                        "gov_id_verified": False
+                    }
+                }
+            except cognito.exceptions.UserNotFoundException:
+                pass
+                
+            # Try by email
+            if "@" in lookup:
+                response = cognito.list_users(UserPoolId=userPoolId, Filter=f'email = "{lookup}"')
+                if response.get("Users"):
+                    c_user = response["Users"][0]
+                    attrs = {a["Name"]: a["Value"] for a in c_user.get("Attributes", [])}
+                    return {
+                        "id": attrs.get("sub", c_user.get("Username")),
+                        "first_name": attrs.get("name", "User"),
+                        "username": c_user.get("Username"),
+                        "email": attrs.get("email", ""),
+                        "profile": {
+                            "mobile": attrs.get("phone_number", ""),
+                            "gov_id_verified": False
+                        }
+                    }
+        except Exception:
+            pass
+
+    lookup_lower = lookup.lower()
     state = load_state()
     for user in state["users"]:
-        if user.get("username") == identifier or user.get("email", "").lower() == lookup:
+        if user.get("username") == lookup or user.get("email", "").lower() == lookup_lower:
             return user
     return None
 
@@ -234,6 +295,26 @@ def update_user_profile(user_id, *, bio=None, profile_picture_url=None, gov_id_n
 
 
 def find_user_by_id(user_id):
+    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+    if cognito and userPoolId and user_id:
+        try:
+            response = cognito.list_users(UserPoolId=userPoolId, Filter=f'sub = "{user_id}"')
+            if response.get("Users"):
+                c_user = response["Users"][0]
+                attrs = {a["Name"]: a["Value"] for a in c_user.get("Attributes", [])}
+                return {
+                    "id": attrs.get("sub", c_user.get("Username")),
+                    "first_name": attrs.get("name", "User"),
+                    "username": c_user.get("Username"),
+                    "email": attrs.get("email", ""),
+                    "profile": {
+                        "mobile": attrs.get("phone_number", ""),
+                        "gov_id_verified": False
+                    }
+                }
+        except Exception:
+            pass
+
     state = load_state()
     for user in state["users"]:
         if user.get("id") == user_id:
