@@ -398,7 +398,13 @@ def lambda_handler(event, context):
 
     response.setdefault("headers", {})
     response["headers"].setdefault("X-Happnix-Trace-Id", traceId)
-    # Inject traceId into response body if missing
+    
+    # Inject CORS headers dynamically based on request origin
+    headers = event.get("headers") or {}
+    origin = headers.get("origin") or headers.get("Origin") or "https://happnix-dev.ronakgo1.workers.dev"
+    response["headers"]["Access-Control-Allow-Origin"] = origin
+    response["headers"]["Access-Control-Allow-Credentials"] = "true"
+
     try:
         bodyPayload = json.loads(response.get("body") or "{}")
         if isinstance(bodyPayload, dict) and "traceId" not in bodyPayload:
