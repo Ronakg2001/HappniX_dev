@@ -68,7 +68,7 @@ def _WithSession(statusCode, payload, sessionToken, traceId=None):
         payload = {**payload, "traceId": traceId}
     response = _JsonResponse(statusCode, payload, traceId=traceId)
     if sessionToken:
-        response["headers"]["Set-Cookie"] = f"happnix_session={sessionToken}; Path=/; HttpOnly; SameSite=Lax"
+        response["headers"]["Set-Cookie"] = f"happnix_session={sessionToken}; Path=/; HttpOnly; SameSite=None; Secure"
     return response
 
 
