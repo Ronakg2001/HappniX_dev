@@ -168,7 +168,7 @@ def VerifyMobileOtp(event, payload):
             "message": f"Welcome back, {fullName}! Mobile OTP verified.",
             "userStatus": "existing",
             "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
-            "redirectUrl": "/home/",
+            "redirectUrl": "/home_page.html",
         }, token)
     session["pending_signup_mobile"] = mobile
     dev_store.replace_session(token, session)
@@ -176,7 +176,7 @@ def VerifyMobileOtp(event, payload):
         "message": "Mobile OTP verified. User not found; continue sign up.",
         "userStatus": "new",
         "canCreateOrJoinParties": False,
-        "redirectUrl": "/signup/details/",
+        "redirectUrl": "/signup_details.html",
     }, token)
 
 
@@ -197,7 +197,7 @@ def LoginWithPassword(event, payload):
         "message": f"Signed in successfully. Welcome, {fullName}.",
         "userStatus": "existing",
         "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
-        "redirectUrl": "/home/",
+        "redirectUrl": "/home_page.html",
     }, token)
 
 
@@ -256,7 +256,7 @@ def RegisterUserDetails(event, payload):
     return _WithSession(200, {
         "message": "Details saved successfully. You can add profile details next.",
         "canCreateOrJoinParties": False,
-        "redirectUrl": "/signup/profile/",
+        "redirectUrl": "/signup_profile_optional.html",
     }, token)
 
 
@@ -276,7 +276,7 @@ def CompleteProfileSetup(event, payload):
     return _WithSession(200, {
         "message": "Profile setup completed.",
         "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
-        "redirectUrl": "/home/",
+        "redirectUrl": "/home_page.html",
     }, token)
 
 
