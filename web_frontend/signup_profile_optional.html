@@ -1,36 +1,48 @@
-{% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Happnix | Profile Setup</title>
-  <link rel="stylesheet" href="{% static 'css/signup_flow.css' %}" />
-</head>
-<body>
-  <main class="card">
-    <h1>Add Profile Details</h1>
-    <p class="sub">Profile picture and bio are optional. You can skip now.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Happnix | Profile Setup</title>
+    <link rel="icon" href="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/HX_Logo.PNG" type="image/png" class="h-auto w-auto" />
+    <link rel="apple-touch-icon" href="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/HX_Logo.PNG" class="h-auto w-auto" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="signup_signin.css" />
+  </head>
 
-    <form id="profileForm" novalidate>
-      <label for="profilePictureUrl">Profile Picture URL</label>
-      <input id="profilePictureUrl" type="url" placeholder="https://example.com/my-photo.jpg" />
+  <body>
+    <div class="orb orb-violet"></div>
+    <div class="orb orb-fuchsia"></div>
 
-      <label for="bio">Bio</label>
-      <textarea id="bio" rows="4" placeholder="Write something about yourself"></textarea>
+    <main class="auth-shell glass-card" style="max-width: 600px; width: 100%; display: block; margin: 2rem auto;">
+      <section class="forms" style="width: 100%;">
+        <form id="profileForm" class="form-card active" novalidate style="width: 100%; box-sizing: border-box;">
+          <h2>Add Profile Details</h2>
+          <p class="sub">Profile picture and bio are optional. You can skip now.</p>
 
-      <p id="error" class="error"></p>
-      <p id="success" class="success"></p>
+          <div class="field">
+            <label for="profilePictureUrl">Profile Picture URL</label>
+            <input id="profilePictureUrl" type="url" placeholder="https://example.com/my-photo.jpg" />
+          </div>
 
-      <button id="saveBtn" type="submit">Save And Continue</button>
-      <button id="skipBtn" type="button" class="ghost">Skip</button>
-    </form>
-  </main>
+          <div class="field">
+            <label for="bio">Bio</label>
+            <textarea id="bio" rows="4" placeholder="Write something about yourself" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #fff; outline: none; font-family: inherit; box-sizing: border-box;"></textarea>
+          </div>
 
-  
-  
-  <script id="signup-profile-optional-boot-config" type="application/json">{"csrfToken":"{{ csrf_token|escapejs }}"}</script>
-  <script src="runtime-config.js"></script>
-  <script src="{% static 'js/signup_profile_optional.js' %}"></script>
-</body>
+          <p id="error" class="error"></p>
+          <p id="success" class="success"></p>
+
+          <button id="saveBtn" class="btn btn-primary" type="submit" style="margin-bottom: 1rem;">Save And Continue</button>
+          <button id="skipBtn" class="btn btn-secondary" type="button">Skip</button>
+        </form>
+      </section>
+    </main>
+
+    <script id="signup-profile-optional-boot-config" type="application/json">{}</script>
+    <script src="runtime-config.js"></script>
+    <script src="signup_profile_optional.js"></script>
+  </body>
 </html>

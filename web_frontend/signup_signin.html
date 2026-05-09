@@ -55,10 +55,6 @@
       </section>
 
       <section class="forms">
-        {% if server_note %}
-        <p class="sub">{{ server_note }}</p>
-        {% endif %}
-
         <form id="mobileForm" class="form-card active" novalidate>
           <h2>Continue with mobile</h2>
           <p class="sub">Enter your phone number.</p>
@@ -252,9 +248,11 @@
     </main>
 
     <script id="signup-signin-boot-config" type="application/json">
-      { "csrfToken": "{{ csrf_token|escapejs }}" }
+      {}
     </script>
     <script src="runtime-config.js"></script>
     <script src="signup_signin.js"></script>
   </body>
 </html>
+
+
