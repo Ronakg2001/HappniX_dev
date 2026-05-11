@@ -419,6 +419,19 @@ def GetDevAuthStatus(event, payload):
     })
 
 
+def GetCurrentUser(event, payload):
+    """Return the currently authenticated user's profile for the home page."""
+    token, session, user = _CurrentUser(event)
+    if not user:
+        return _JsonResponse(401, {"message": "Not authenticated."})
+    return _WithSession(200, {
+        "userName": user.get("userName") or user.get("username") or "",
+        "profilePictureUrl": user.get("profilePictureUrl") or "",
+        "isVerified": bool(user.get("adharVerified") or user.get("gov_id_verified")),
+        "bio": user.get("bio") or "",
+    }, token)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # Action Registry
 # ══════════════════════════════════════════════════════════════════════
@@ -434,6 +447,7 @@ ACTION_REGISTRY = {
     "SendAadhaarOtp": SendAadhaarOtp,
     "VerifyAadhaarOtp": VerifyAadhaarOtp,
     "GetDevAuthStatus": GetDevAuthStatus,
+    "GetCurrentUser": GetCurrentUser,
 }
 
 

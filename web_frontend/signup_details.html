@@ -1,80 +1,57 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Happnix | Complete Details</title>
-    <link rel="icon" href="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/HX_Logo.PNG" type="image/png" class="h-auto w-auto" />
-    <link rel="apple-touch-icon" href="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/HX_Logo.PNG" class="h-auto w-auto" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="signup_signin.css" />
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Happnix | Complete Details</title>
+  <link rel="stylesheet" href="signup_flow.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Complete Your Account</h1>
+    <p class="sub">Fill mandatory details to continue.</p>
 
-  <body>
-    <div class="orb orb-violet"></div>
-    <div class="orb orb-fuchsia"></div>
+    <form id="detailsForm" novalidate>
+      <label for="fullName">Full Name</label>
+      <input id="fullName" type="text" placeholder="Enter your full name" required />
 
-    <main class="auth-shell glass-card" style="max-width: 600px; width: 100%; display: block; margin: 2rem auto; overflow-y: auto; max-height: 90vh;">
-      <section class="forms" style="width: 100%;">
-        <form id="detailsForm" class="form-card active" novalidate style="width: 100%; box-sizing: border-box;">
-          <h2>Complete Your Account</h2>
-          <p class="sub">Fill mandatory details to continue.</p>
+      <label for="username">Username (unique)</label>
+      <input id="username" type="text" placeholder="Choose a username" required />
 
-          <div class="field">
-            <label for="fullName">Full Name</label>
-            <input id="fullName" type="text" placeholder="Enter your full name" required />
-          </div>
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="Create a password" required />
+      <p class="sub" style="margin-top:-8px;">Use at least 8 chars with uppercase, lowercase, number, and special character.</p>
 
-          <div class="field">
-            <label for="username">Username (unique)</label>
-            <input id="username" type="text" placeholder="Choose a username" required />
-          </div>
+      <label for="sex">Sex</label>
+      <select id="sex" required>
+        <option value="">Select</option>
+        <option value="mr.">Mr.</option>
+        <option value="miss.">Miss.</option>
+        <option value="mrs.">Mrs.</option>
+        <option value="other">Other</option>
+      </select>
 
-          <div class="field">
-            <label for="password">Password</label>
-            <input id="password" type="password" placeholder="Create a password" required />
-            <p class="sub" style="margin-top:-8px; font-size: 0.8rem;">At least 8 chars with uppercase, lowercase, number, and special character.</p>
-          </div>
+      <label for="dob">Date of Birth</label>
+      <input id="dob" type="date" required />
 
-          <div class="field" style="display: flex; gap: 1rem;">
-            <div style="flex: 1;">
-              <label for="sex">Sex</label>
-              <select id="sex" required style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #fff; outline: none; font-family: inherit;">
-                <option value="" style="color: #000">Select</option>
-                <option value="mr." style="color: #000">Mr.</option>
-                <option value="miss." style="color: #000">Miss.</option>
-                <option value="mrs." style="color: #000">Mrs.</option>
-                <option value="other" style="color: #000">Other</option>
-              </select>
-            </div>
-            <div style="flex: 1;">
-              <label for="dob">Date of Birth</label>
-              <input id="dob" type="date" required style="width: 100%; box-sizing: border-box;" />
-            </div>
-          </div>
+      <label for="email">Email Address</label>
+      <input id="email" type="email" placeholder="you@example.com" required />
 
-          <div class="field">
-            <label for="email">Email Address</label>
-            <input id="email" type="email" placeholder="you@example.com" required />
-          </div>
+      <label for="mobile">Mobile Number</label>
+      <input id="mobile" type="text" readonly />
 
-          <div class="field">
-            <label for="govId">Government ID (optional for now)</label>
-            <input id="govId" type="text" placeholder="e.g. Passport/Aadhaar/Driver ID number" />
-            <p class="sub" style="margin-top:-8px; font-size: 0.8rem;">Later this will be required to create or join parties.</p>
-          </div>
+      <label for="govId">Government ID (optional for now)</label>
+      <input id="govId" type="text" placeholder="e.g. Passport/Aadhaar/Driver ID number" />
+      <p class="sub" style="margin-top:-8px;">Later this will be required to create or join parties.</p>
 
-          <p id="error" class="error"></p>
-          <p id="success" class="success"></p>
-          <button id="submitBtn" class="btn btn-primary" type="submit">Continue</button>
-        </form>
-      </section>
-    </main>
+      <p id="error" class="error"></p>
+      <p id="success" class="success"></p>
+      <button id="submitBtn" type="submit">Continue</button>
+    </form>
+  </main>
 
-    <script id="signup-details-boot-config" type="application/json">{}</script>
-    <script src="runtime-config.js"></script>
-    <script src="signup_details.js"></script>
-  </body>
+  <script id="signup-details-boot-config" type="application/json">{}</script>
+  <script src="runtime-config.js"></script>
+  <script src="signup_details.js"></script>
+</body>
 </html>
