@@ -7,6 +7,12 @@ except ImportError:  # pragma: no cover - exercised only when dependency is abse
     psycopg2 = None
     RealDictCursor = None
 
+try:
+    import boto3
+    cognito = boto3.client("cognito-idp")
+except ImportError:
+    cognito = None
+
 
 def _connect():
     if psycopg2 is None:
@@ -121,25 +127,82 @@ def upsert_cognito_user(record):
             )
 
 
+def _auto_heal_user(cognito_user):
+    try:
+        attrs = {a["Name"]: a["Value"] for a in cognito_user.get("Attributes", cognito_user.get("UserAttributes", []))}
+        import string
+        import random
+        candidate = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        record = {
+            "userID": candidate,
+            "cognitoSub": attrs.get("sub"),
+            "userName": cognito_user.get("Username"),
+            "emailAddress": attrs.get("email", ""),
+            "userType": attrs.get("custom:userType", "General"),
+            "phoneNumber": attrs.get("phone_number", ""),
+            "emailVerified": str(attrs.get("email_verified", "false")).lower() == "true",
+            "isActive": True,
+            "dateOfBirth": attrs.get("custom:dateOfBirth", "2000-01-01"),
+        }
+        upsert_cognito_user(record)
+        return record
+    except Exception as e:
+        print("Auto-heal failed:", e)
+    return None
+
 def get_user_by_sub(cognito_sub):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute('SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
-            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            
+            if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
+                try:
+                    response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'sub = "{cognito_sub}"')
+                    if response.get("Users"):
+                        return _auto_heal_user(response["Users"][0])
+                except Exception:
+                    pass
+            return user
 
 
 def get_user_by_mobile(phone_number):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute('SELECT * FROM users WHERE "phoneNumber" = %s', (phone_number,))
-            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            
+            if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
+                try:
+                    response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'phone_number = "{phone_number}"')
+                    if response.get("Users"):
+                        return _auto_heal_user(response["Users"][0])
+                except Exception:
+                    pass
+            return user
 
 
 def get_user_by_identifier(identifier):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute('SELECT * FROM users WHERE "userName" = %s OR "emailAddress" = %s', (identifier, identifier))
-            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            
+            if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
+                try:
+                    try:
+                        user_info = cognito.admin_get_user(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Username=identifier)
+                        return _auto_heal_user(user_info)
+                    except cognito.exceptions.UserNotFoundException:
+                        pass
+                    
+                    if "@" in identifier:
+                        response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'email = "{identifier}"')
+                        if response.get("Users"):
+                            return _auto_heal_user(response["Users"][0])
+                except Exception:
+                    pass
+            return user
 
 
 def update_user_profile(cognito_sub, bio=None, profile_picture_url=None):
