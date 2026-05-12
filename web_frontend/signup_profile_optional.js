@@ -1,4 +1,4 @@
-const bootConfigEl = document.getElementById('signup-profile-optional-boot-config');
+﻿const bootConfigEl = document.getElementById('signup-profile-optional-boot-config');
 let bootConfig = {};
 if (bootConfigEl) {
   try {
@@ -14,7 +14,7 @@ const profileForm = document.getElementById("profileForm");
     const success = document.getElementById("success");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-    const AUTH_ENDPOINT = "/api/auth";
+    const AUTH_ENDPOINT = "/auth";
 
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
@@ -120,3 +120,4 @@ const profileForm = document.getElementById("profileForm");
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", openHashTarget);
     })();
+

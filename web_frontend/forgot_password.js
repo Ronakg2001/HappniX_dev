@@ -1,4 +1,4 @@
-const bootConfigEl = document.getElementById('forgot-password-boot-config');
+﻿const bootConfigEl = document.getElementById('forgot-password-boot-config');
 let bootConfig = {};
 if (bootConfigEl) {
   try {
@@ -14,7 +14,7 @@ const form = document.getElementById("forgotPasswordForm");
     const submitBtn = document.getElementById("submitBtn");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-    const AUTH_ENDPOINT = "/api/auth";
+    const AUTH_ENDPOINT = "/auth";
 
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
@@ -116,3 +116,4 @@ const form = document.getElementById("forgotPasswordForm");
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", openHashTarget);
     })();
+

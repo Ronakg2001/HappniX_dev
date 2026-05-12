@@ -1668,38 +1668,28 @@
     <!-- HTML Include Loader: replaces Django {% include %} tags -->
     <script>
       (function () {
+        const api = (window.HAPPNIX_RUNTIME_CONFIG || {}).getApiBaseUrl
+          ? window.HAPPNIX_RUNTIME_CONFIG.getApiBaseUrl()
+          : 'https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev';
+
         const includes = [
           { id: 'mobile-navigation-container', file: 'mobile_navigation.html' },
           { id: 'create-post-event-container', file: 'create_post_event.html' },
           { id: 'messages-modal-container', file: 'messages_modal.html' },
           { id: 'data-and-time-container', file: 'data_and_time.html' },
         ];
-        Promise.all(
-          includes.map(({ id, file }) =>
-            fetch(file)
-              .then(r => r.text())
-              .then(html => {
-                const el = document.getElementById(id);
-                if (el) el.outerHTML = html;
-              })
-              .catch(() => {})
-          )
-        ).then(() => {
-          // After includes are loaded, hydrate user state from runtime-config
-          const cfg = window.__HAPPNIX_CONFIG__ || {};
-          const username = cfg.currentUsername || '';
-          const avatarUrl = cfg.currentAvatarUrl || '';
-          const isVerified = cfg.isVerified || false;
 
-          // Populate username placeholders
+        function hydrateUser(cfg) {
+          const username = (cfg && cfg.currentUsername) || '';
+          const avatarUrl = (cfg && cfg.currentAvatarUrl) || '';
+          const isVerified = (cfg && cfg.isVerified) || false;
+
           document.querySelectorAll('.current-username-placeholder').forEach(el => {
             el.textContent = username;
           });
           document.querySelectorAll('#sidebar-username-label').forEach(el => {
             el.textContent = username || 'Profile';
           });
-
-          // Show/hide verification blocks
           document.querySelectorAll('.is-unverified-block').forEach(el => {
             el.style.display = isVerified ? 'none' : '';
           });
@@ -1709,12 +1699,47 @@
           document.querySelectorAll('.if-not-verified').forEach(el => {
             el.style.display = isVerified ? 'none' : '';
           });
-
-          // Set avatar images
           if (avatarUrl) {
-            const avatarEls = document.querySelectorAll('#profile-avatar, #desktop-sidebar-profile-avatar, #mobile-nav-profile-avatar');
-            avatarEls.forEach(el => { el.src = avatarUrl; });
+            document.querySelectorAll('#profile-avatar, #desktop-sidebar-profile-avatar, #mobile-nav-profile-avatar').forEach(el => {
+              el.src = avatarUrl;
+            });
           }
+        }
+
+        // Load HTML includes and fetch current user in parallel
+        Promise.all([
+          Promise.all(
+            includes.map(({ id, file }) =>
+              fetch(file)
+                .then(r => r.text())
+                .then(html => {
+                  const el = document.getElementById(id);
+                  if (el) el.outerHTML = html;
+                })
+                .catch(() => {})
+            )
+          ),
+          fetch(`${api}/auth`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actionItem: 'GetCurrentUser' }),
+          })
+            .then(r => r.json())
+            .then(data => {
+              window.__HAPPNIX_CONFIG__ = {
+                currentUsername: data.userName || data.username || '',
+                currentAvatarUrl: data.profilePictureUrl || data.avatarUrl || '',
+                isVerified: !!(data.isVerified || data.adharVerified),
+              };
+              return window.__HAPPNIX_CONFIG__;
+            })
+            .catch(() => {
+              window.__HAPPNIX_CONFIG__ = { currentUsername: '', currentAvatarUrl: '', isVerified: false };
+              return window.__HAPPNIX_CONFIG__;
+            }),
+        ]).then(([, cfg]) => {
+          hydrateUser(cfg);
         });
       })();
     </script>
