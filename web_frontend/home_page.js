@@ -582,24 +582,6 @@ async function deleteTicket(ticketId) {
 
   const numericTicketId = Number(safeTicketId);
   if (!Number.isFinite(numericTicketId) || numericTicketId <= 0) {
-    applyLocalDelete();
-    return;
-  }
-
-  try {
-    await fetch(`/api/tickets/${numericTicketId}/delete`, {
-      method: "DELETE",
-      headers: { "X-CSRFToken": getCsrfToken() },
-      credentials: "same-origin",
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Request failed.");
-      return data;
-    });
-    applyLocalDelete();
-  } catch (error) {
-    const message = String(error?.message || "");
-    if (message.toLowerCase().includes("ticket not found")) {
       applyLocalDelete();
       return;
     }
@@ -846,8 +828,17 @@ function getCsrfToken() {
   return "";
 }
 
+function _apiUrl(path) {
+  const cfg = window.HAPPNIX_RUNTIME_CONFIG || {};
+  if (typeof cfg.buildApiUrl === 'function') return cfg.buildApiUrl(path);
+  const base = String(cfg.apiBaseUrl || '').replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return base ? `${base}${cleanPath}` : cleanPath;
+}
+
 async function getJson(url) {
-  const response = await fetch(url, { credentials: "same-origin" });
+  const resolved = _apiUrl(url);
+  const response = await fetch(resolved, { credentials: "include" });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -856,13 +847,10 @@ async function getJson(url) {
 }
 
 async function postJson(url, payload) {
-  const response = await fetch(url, {
+  const response = await fetch(_apiUrl(url), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   const data = await response.json().catch(() => ({}));
@@ -1051,12 +1039,9 @@ function renderCurrentUserProfile() {
 }
 
 async function postFormData(url, formData) {
-  const response = await fetch(url, {
+  const response = await fetch(_apiUrl(url), {
     method: "POST",
-    headers: {
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    credentials: "include",
     body: formData,
   });
   const data = await response.json().catch(() => ({}));
@@ -1067,13 +1052,10 @@ async function postFormData(url, formData) {
 }
 
 async function deleteJson(url, body = null) {
-  const response = await fetch(url, {
+  const response = await fetch(_apiUrl(url), {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: body ? JSON.stringify(body) : null,
   });
   const data = await response.json().catch(() => ({}));
@@ -8581,3 +8563,5 @@ if (!window.__finalGroupTicketBindingsBound) {
   );
   window.setTimeout(() => loadTickets(), 150);
 }
+
+

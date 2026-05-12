@@ -205,9 +205,9 @@ def get_user_by_identifier(identifier):
             return user
 
 
-def update_user_profile(cognito_sub, bio=None, profile_picture_url=None):
+def update_user_profile(cognito_sub, bio=None, profile_picture_url=None, privacy_mode=None):
     with _connect() as connection:
-        with connection.cursor() as cursor:
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             updates = []
             params = []
             if bio is not None:
@@ -216,11 +216,41 @@ def update_user_profile(cognito_sub, bio=None, profile_picture_url=None):
             if profile_picture_url is not None:
                 updates.append('"profilePictureUrl" = %s')
                 params.append(profile_picture_url)
-            
-            if not updates:
-                return
+            if privacy_mode is not None:
+                updates.append('"privacyMode" = %s')
+                params.append(privacy_mode)
 
-            updates.append('"updatedAt" = CURRENT_TIMESTAMP')
-            query = f'UPDATE users SET {", ".join(updates)} WHERE "cognitoSub" = %s'
-            params.append(cognito_sub)
-            cursor.execute(query, tuple(params))
+            if updates:
+                updates.append('"updatedAt" = CURRENT_TIMESTAMP')
+                query = f'UPDATE users SET {", ".join(updates)} WHERE "cognitoSub" = %s'
+                params.append(cognito_sub)
+                cursor.execute(query, tuple(params))
+                connection.commit()
+
+            # Return the updated row
+            cursor.execute('SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
+            row = cursor.fetchone()
+            return dict(row) if row else {}
+
+
+# Alias — profiles_api.py uses this name
+get_user_by_cognito_sub = get_user_by_sub
+
+
+def search_users_by_username(query, limit=20):
+    """Case-insensitive prefix search on userName and bio."""
+    safe_query = str(query or "").strip()
+    if not safe_query:
+        return []
+    pattern = f"%{safe_query}%"
+    with _connect() as connection:
+        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+            cursor.execute(
+                '''SELECT * FROM users
+                   WHERE "isActive" = TRUE
+                     AND ("userName" ILIKE %s OR "displayName" ILIKE %s)
+                   ORDER BY "userName" ASC
+                   LIMIT %s''',
+                (pattern, pattern, limit),
+            )
+            return [dict(row) for row in cursor.fetchall()]

@@ -299,6 +299,7 @@ Resources:
           Value:
             Fn::Sub: HappniX-notifications-${EnvironmentName}
 
+
 # ══════════════════════════════════════════════════════════════════════
 # Outputs — conditional so they only appear when the resource exists
 # ══════════════════════════════════════════════════════════════════════
@@ -362,3 +363,4 @@ Outputs:
     Description: DynamoDB notifications table name.
     Value:
       Ref: HappnixNotificationsTable
+

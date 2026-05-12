@@ -64,7 +64,7 @@ Parameters:
     Type: String
     Default: ""
 
-  # ─── DynamoDB table names (from data stack) ────────────────────────
+  # ─── DynamoDB table names (from data stack) ────────────────────
   UsersTableName:
     Type: String
     Default: ""
@@ -190,6 +190,7 @@ Globals:
           Ref: SessionsTableName
         OTP_TABLE_NAME:
           Ref: OtpTableName
+
         COGNITO_USER_POOL_ID:
           # Moved here from SignupSignin
           Ref: HappnixUserPool

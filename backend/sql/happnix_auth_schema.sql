@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     "dateOfBirth" DATE NOT NULL,
     "bio" TEXT,
     "profilePictureUrl" VARCHAR(500),
+    "privacyMode" VARCHAR(10) NOT NULL DEFAULT 'public',
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastLogin" TIMESTAMPTZ,
