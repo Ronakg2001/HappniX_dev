@@ -38,7 +38,7 @@ const views = {
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
     // ─── Single API endpoint — all auth actions go here ─────────────
-    const AUTH_ENDPOINT = "/auth";
+    const AUTH_ENDPOINT = "/api/auth";
 
     document.addEventListener('click', (event) => {
       const actionEl = event.target.closest('[data-action]');
