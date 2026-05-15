@@ -182,7 +182,7 @@ Resources:
     Condition: HasSessionsTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-sessions-${EnvironmentName}
+        Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: sessionToken
@@ -196,7 +196,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-sessions-${EnvironmentName}
+            Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
 
   # ─── OTP Table (5-minute TTL auto-cleanup) ─────────────────────────
   HappnixOtpTable:
@@ -204,7 +204,7 @@ Resources:
     Condition: HasOtpTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-otp-${EnvironmentName}
+        Fn::Sub: HappniX-otp-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: mobile
@@ -218,7 +218,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-otp-${EnvironmentName}
+            Fn::Sub: HappniX-otp-v2-${EnvironmentName}
 
   # ─── WebSocket Connections Registry ────────────────────────────────
   HappnixConnectionsTable:
@@ -226,7 +226,7 @@ Resources:
     Condition: HasConnectionsTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-connections-${EnvironmentName}
+        Fn::Sub: HappniX-connections-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: connectionId
@@ -246,7 +246,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-connections-${EnvironmentName}
+            Fn::Sub: HappniX-connections-v2-${EnvironmentName}
 
   # ─── Presence (online/offline with heartbeat TTL) ──────────────────
   HappnixPresenceTable:
