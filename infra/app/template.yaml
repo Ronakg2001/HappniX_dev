@@ -190,11 +190,11 @@ Globals:
         R2_ENDPOINT:
           Ref: R2Endpoint
         USERS_TABLE_NAME:
-          Ref: UsersTableName
+          Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
         SESSIONS_TABLE_NAME:
-          Ref: SessionsTableName
+          Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
         OTP_TABLE_NAME:
-          Ref: OtpTableName
+          Fn::Sub: HappniX-otp-v2-${EnvironmentName}
 
         NOTIFICATIONS_TABLE_NAME:
           Ref: NotificationsTableName
