@@ -435,8 +435,8 @@ def GetDevAuthStatus(event, payload):
     """Return dev environment status — schema health, Cognito config."""
     if APP_ENV() != "dev":
         return _JsonResponse(404, {"message": "Route not found."})
-    usersReady = table_exists("users")
-    devicesReady = table_exists("user_devices")
+    usersReady = auth_db.table_exists("users")
+    devicesReady = auth_db.table_exists("user_devices")
     return _JsonResponse(200, {
         "apiStatus": "ok",
         "environment": APP_ENV(),
