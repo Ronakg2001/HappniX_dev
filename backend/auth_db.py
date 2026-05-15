@@ -64,6 +64,18 @@ def fetch_user_claims_by_sub(cognito_sub):
             return cursor.fetchone()
 
 
+def get_all_users():
+    with _connect() as connection:
+        with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute('SELECT * FROM users;')
+            rows = cursor.fetchall()
+            for row in rows:
+                for k, v in row.items():
+                    if hasattr(v, 'isoformat'):
+                        row[k] = v.isoformat()
+            return rows
+
+
 def user_id_exists(user_id):
     with _connect() as connection:
         with connection.cursor() as cursor:

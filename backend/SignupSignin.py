@@ -461,6 +461,17 @@ def WipeDevUsers(event, payload):
         return _Error(f"Failed to wipe users: {e}", statusCode=500)
 
 
+def GetDevAllUsers(event, payload):
+    """Temporary dev endpoint to fetch all users from RDS."""
+    if APP_ENV() != "dev":
+        return _JsonResponse(403, {"message": "Forbidden outside of dev."})
+    try:
+        users = auth_db.get_all_users()
+        return _JsonResponse(200, {"users": users})
+    except Exception as e:
+        return _Error(f"Failed to fetch users: {e}", statusCode=500)
+
+
 def GetCurrentUser(event, payload):
     """Return the currently authenticated user's profile for the home page."""
     token, session, user = _CurrentUser(event)
@@ -491,6 +502,7 @@ ACTION_REGISTRY = {
     "GetDevAuthStatus": GetDevAuthStatus,
     "GetCurrentUser": GetCurrentUser,
     "WipeDevUsers": WipeDevUsers,
+    "GetDevAllUsers": GetDevAllUsers,
 }
 
 
