@@ -69,9 +69,10 @@ Parameters:
     Description: DynamoDB presence table for online/offline.
   EnableNotificationsTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB notifications table.
+
 
 Conditions:
   HasRds:
@@ -102,6 +103,7 @@ Conditions:
     Fn::Equals:
       - Ref: EnableNotificationsTable
       - "true"
+
 
 Resources:
 
@@ -151,7 +153,7 @@ Resources:
   # PAY_PER_REQUEST = on-demand = auto-scales within free tier limits
   # ══════════════════════════════════════════════════════════════════════
 
-  # ─── Users Table (username lookups + uniqueness) ───────────────────
+  # ─── Users Table (User Profiles & Personal Details) ───────────────────
   HappnixUsersTable:
     Type: AWS::DynamoDB::Table
     Condition: HasUsersTable
@@ -167,13 +169,8 @@ Resources:
       KeySchema:
         - AttributeName: userID
           KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: userName-index
-          KeySchema:
-            - AttributeName: userName
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
+        - AttributeName: userName
+          KeyType: RANGE
       Tags:
         - Key: Name
           Value:
@@ -300,6 +297,8 @@ Resources:
             Fn::Sub: HappniX-notifications-${EnvironmentName}
 
 
+
+
 # ══════════════════════════════════════════════════════════════════════
 # Outputs — conditional so they only appear when the resource exists
 # ══════════════════════════════════════════════════════════════════════
@@ -363,4 +362,5 @@ Outputs:
     Description: DynamoDB notifications table name.
     Value:
       Ref: HappnixNotificationsTable
+
 

@@ -1,4 +1,4 @@
-﻿const bootConfigEl = document.getElementById('signup-details-boot-config');
+const bootConfigEl = document.getElementById('signup-details-boot-config');
 let bootConfig = {};
 if (bootConfigEl) {
   try {
@@ -50,8 +50,7 @@ const form = document.getElementById("detailsForm");
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
+          "Content-Type": "application/json"
         },
         credentials: "include",
         body: JSON.stringify({ actionItem, ...data })

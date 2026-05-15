@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from boto3.dynamodb.conditions import Key, Attr
 
 # ── Environment variable names ────────────────────────────────────────────────
+_USERS_TABLE_NAME         = os.environ.get("USERS_TABLE_NAME", "")
 _EVENTS_TABLE_NAME        = os.environ.get("EVENTS_TABLE_NAME", "")
 _TICKETS_TABLE_NAME       = os.environ.get("TICKETS_TABLE_NAME", "")
 _SOCIAL_TABLE_NAME        = os.environ.get("SOCIAL_TABLE_NAME", "")
@@ -40,6 +41,45 @@ def _now_iso():
 
 def _new_id():
     return uuid.uuid4().hex[:16]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# USERS TABLE
+# PK: userID  SK: userName
+# Stores personal details: fullName, email, phone, address, aadhar
+# ══════════════════════════════════════════════════════════════════════════════
+
+def put_user_profile(user_id: str, username: str, personal_details: dict) -> dict:
+    """
+    Save user profile with structured personal details.
+    Expected personal_details keys: fullName, email, phoneNumber, address, aadharNumber
+    """
+    item = {
+        "userID": user_id,
+        "userName": username,
+        "createdAt": _now_iso(),
+        "updatedAt": _now_iso(),
+        "personalDetails": {
+            "fullName": personal_details.get("fullName", ""),
+            "email": personal_details.get("email", ""),
+            "phoneNumber": personal_details.get("phoneNumber", ""),
+            "address": personal_details.get("address", ""),
+            "aadharNumber": personal_details.get("aadharNumber", "")
+        }
+    }
+    _table(_USERS_TABLE_NAME).put_item(Item=item)
+    return item
+
+def get_user_profile(user_id: str) -> dict | None:
+    """
+    Fetch user profile. Since userName is the SK, we query by PK (userID)
+    to get the profile without needing to know the username upfront.
+    """
+    resp = _table(_USERS_TABLE_NAME).query(
+        KeyConditionExpression=Key("userID").eq(user_id)
+    )
+    items = resp.get("Items", [])
+    return items[0] if items else None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

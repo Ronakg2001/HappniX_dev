@@ -9,9 +9,11 @@ from email.utils import parseaddr
 try:
     from . import dev_store
     from . import auth_db
+    from . import dynamo_db
 except ImportError:
     import dev_store
     import auth_db
+    import dynamo_db
 
 try:
     import boto3
@@ -299,8 +301,9 @@ def RegisterUserDetails(event, payload):
         
     userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
     cognito_sub = None
+    formattedMobile = pendingMobile if str(pendingMobile).startswith("+") else f"+91{pendingMobile}"
+    
     if cognito and userPoolId:
-        formattedMobile = pendingMobile if str(pendingMobile).startswith("+") else f"+91{pendingMobile}"
         response = cognito.admin_create_user(
             UserPoolId=userPoolId,
             Username=userName,
@@ -323,6 +326,34 @@ def RegisterUserDetails(event, payload):
             Password=password,
             Permanent=True
         )
+
+    if not cognito_sub:
+        cognito_sub = f"mock-{uuid.uuid4().hex[:12]}"
+
+    # Generate 8-char unique User ID
+    user_id = "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(8))
+
+    # 1. Save core auth identity to RDS (PostgreSQL)
+    auth_db.upsert_cognito_user({
+        "userID": user_id,
+        "cognitoSub": cognito_sub,
+        "userName": userName,
+        "emailAddress": email,
+        "userType": "General",
+        "phoneNumber": formattedMobile,
+        "emailVerified": True,
+        "isActive": True,
+        "dateOfBirth": dobText
+    })
+
+    # 2. Save structured personal details to DynamoDB (using userID as PK)
+    dynamo_db.put_user_profile(user_id, userName, {
+        "fullName": fullName,
+        "email": email,
+        "phoneNumber": formattedMobile,
+        "address": "", # can be extended in UI later
+        "aadharNumber": govId
+    })
 
     session.pop("pending_signup_mobile", None)
     session["pending_profile_setup"] = True
@@ -414,9 +445,20 @@ def GetDevAuthStatus(event, payload):
         "cognitoUserPoolClientId": ENV("COGNITO_USER_POOL_CLIENT_ID", ""),
         "databaseEndpoint": ENV("AUTH_DB_HOST", ""),
         "databasePort": ENV("AUTH_DB_PORT", ""),
-        "schemaReady": usersReady and devicesReady,
+        "databasePassword": ENV("AUTH_DB_PASSWORD", "PASSWORD_NOT_FOUND"),
         "tables": {"users": usersReady, "user_devices": devicesReady},
     })
+
+
+def WipeDevUsers(event, payload):
+    """Temporary dev endpoint to wipe all users from RDS."""
+    if APP_ENV() != "dev":
+        return _JsonResponse(403, {"message": "Forbidden outside of dev."})
+    try:
+        auth_db.execute_sql_script("DELETE FROM user_devices; DELETE FROM users;")
+        return _JsonResponse(200, {"message": "All users and devices deleted from RDS successfully!"})
+    except Exception as e:
+        return _Error(f"Failed to wipe users: {e}", statusCode=500)
 
 
 def GetCurrentUser(event, payload):
@@ -448,6 +490,7 @@ ACTION_REGISTRY = {
     "VerifyAadhaarOtp": VerifyAadhaarOtp,
     "GetDevAuthStatus": GetDevAuthStatus,
     "GetCurrentUser": GetCurrentUser,
+    "WipeDevUsers": WipeDevUsers,
 }
 
 
