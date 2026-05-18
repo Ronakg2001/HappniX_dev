@@ -73,6 +73,18 @@ class InfraContractTests(unittest.TestCase):
         template = (ROOT / "infra" / "app" / "template.yaml").read_text(encoding="utf-8")
         self.assertIn("table/Happnix-userInfoTable-${EnvironmentName}", template)
 
+    def test_auth_lambda_supports_canonical_and_legacy_paths(self):
+        template = (ROOT / "infra" / "app" / "template.yaml").read_text(encoding="utf-8")
+        self.assertIn("Path: /api/auth", template)
+        self.assertIn("Path: /auth", template)
+
+
+class WebContractTests(unittest.TestCase):
+    def test_signup_profile_optional_posts_to_canonical_auth_endpoint(self):
+        script = (ROOT / "web_frontend" / "signup_profile_optional.js").read_text(encoding="utf-8")
+        self.assertIn('const AUTH_ENDPOINT = "/api/auth";', script)
+        self.assertNotIn('const AUTH_ENDPOINT = "/auth";', script)
+
 
 if __name__ == "__main__":
     unittest.main()

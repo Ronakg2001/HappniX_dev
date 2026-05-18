@@ -14,7 +14,7 @@ const profileForm = document.getElementById("profileForm");
     const success = document.getElementById("success");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-    const AUTH_ENDPOINT = "/auth";
+    const AUTH_ENDPOINT = "/api/auth";
 
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {

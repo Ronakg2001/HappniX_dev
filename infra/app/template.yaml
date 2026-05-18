@@ -352,6 +352,13 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/auth
             Method: POST
+        AuthActionLegacy:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /auth
+            Method: POST
 
   CognitoPostConfirmation:
     Type: AWS::Serverless::Function
