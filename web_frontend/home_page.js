@@ -582,9 +582,13 @@ async function deleteTicket(ticketId) {
 
   const numericTicketId = Number(safeTicketId);
   if (!Number.isFinite(numericTicketId) || numericTicketId <= 0) {
-      applyLocalDelete();
-      return;
-    }
+    applyLocalDelete();
+    return;
+  }
+  try {
+    await postJson(`/api/tickets/${numericTicketId}/delete`, {});
+    applyLocalDelete();
+  } catch (error) {
     setLocationStatus(error.message || "Failed to delete ticket.", true);
   }
 }
