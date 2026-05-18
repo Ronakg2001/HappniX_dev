@@ -104,4 +104,37 @@ def replace_session(token, session_data):
     save_state(state)
 
 
+def delete_session(token):
+    if not token:
+        return
 
+    table = _get_sessions_table()
+    if table:
+        table.delete_item(Key={"sessionToken": token})
+        return
+
+    state = load_state()
+    state["sessions"].pop(token, None)
+    save_state(state)
+
+
+def email_exists(email):
+    safe_email = str(email or "").strip().lower()
+    if not safe_email:
+        return False
+    return any(
+        str(user.get("email", user.get("emailAddress", ""))).strip().lower() == safe_email
+        for user in load_state().get("users", [])
+    )
+
+
+def update_user_profile(user_id, **updates):
+    state = load_state()
+    for user in state.get("users", []):
+        if str(user.get("id", user.get("userID", ""))) == str(user_id):
+            profile = user.setdefault("profile", {})
+            profile.update(updates)
+            user.update(updates)
+            save_state(state)
+            return user
+    return None

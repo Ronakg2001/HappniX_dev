@@ -67,6 +67,13 @@ def _ExtractSessionToken(event):
     return None
 
 
+def _FormatIndianMobile(mobile):
+    raw = str(mobile or "").strip()
+    if raw.startswith("+"):
+        return raw
+    return f"+91{raw}" if raw else ""
+
+
 def _GetOrCreateSession(event):
     incomingToken = _ExtractSessionToken(event)
     return dev_store.ensure_session(incomingToken)
@@ -99,6 +106,17 @@ def _CurrentUser(event):
 
 def _CanCreateOrJoinParties(user):
     return bool(user and user.get("adharVerified"))
+
+
+def _SyncDynamoUserProfile(user_id, user_name, full_name, email, phone_number, gov_id=""):
+    """Mirror signup personal details into DynamoDB for the serverless profile store."""
+    return dynamo_db.put_user_profile(user_id, user_name, {
+        "fullName": full_name,
+        "email": email,
+        "phoneNumber": phone_number,
+        "address": "",
+        "aadharNumber": gov_id,
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -296,12 +314,12 @@ def RegisterUserDetails(event, payload):
         return _WithSession(400, {
             "message": "Password must include uppercase, lowercase, number, special character, and minimum 8 characters."
         }, token)
-    if auth_db.get_user_by_mobile(pendingMobile):
+    formattedMobile = _FormatIndianMobile(pendingMobile)
+    if auth_db.get_user_by_mobile(formattedMobile):
         return _WithSession(400, {"message": "Mobile number already registered."}, token)
         
     userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
     cognito_sub = None
-    formattedMobile = pendingMobile if str(pendingMobile).startswith("+") else f"+91{pendingMobile}"
     
     if cognito and userPoolId:
         response = cognito.admin_create_user(
@@ -347,13 +365,7 @@ def RegisterUserDetails(event, payload):
     })
 
     # 2. Save structured personal details to DynamoDB (using userID as PK)
-    dynamo_db.put_user_profile(user_id, userName, {
-        "fullName": fullName,
-        "email": email,
-        "phoneNumber": formattedMobile,
-        "address": "", # can be extended in UI later
-        "aadharNumber": govId
-    })
+    _SyncDynamoUserProfile(user_id, userName, fullName, email, formattedMobile, govId)
 
     session.pop("pending_signup_mobile", None)
     session["pending_profile_setup"] = True
@@ -478,11 +490,39 @@ def GetCurrentUser(event, payload):
     if not user:
         return _JsonResponse(401, {"message": "Not authenticated."})
     return _WithSession(200, {
+        "userID": user.get("userID") or "",
         "userName": user.get("userName") or user.get("username") or "",
+        "email": user.get("emailAddress") or "",
+        "mobile": user.get("phoneNumber") or "",
         "profilePictureUrl": user.get("profilePictureUrl") or "",
         "isVerified": bool(user.get("adharVerified") or user.get("gov_id_verified")),
         "bio": user.get("bio") or "",
     }, token)
+
+
+def GetSignupSessionDetails(event, payload):
+    """Return the verified signup mobile number for the details form."""
+    token, session = _GetOrCreateSession(event)
+    pending_mobile = str(session.get("pending_signup_mobile") or "").strip()
+    if not pending_mobile:
+        return _WithSession(401, {"message": "Signup session expired. Verify mobile OTP again."}, token)
+    return _WithSession(200, {
+        "mobile": pending_mobile,
+        "formattedMobile": _FormatIndianMobile(pending_mobile),
+    }, token)
+
+
+def Logout(event, payload):
+    """Clear the browser cookie and remove server-side session state."""
+    token = _ExtractSessionToken(event)
+    if token:
+        dev_store.delete_session(token)
+    response = _JsonResponse(200, {"message": "Signed out successfully."})
+    response["headers"]["Set-Cookie"] = (
+        "happnix_session=; Path=/; HttpOnly; SameSite=None; Secure; "
+        "Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    )
+    return response
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -501,6 +541,8 @@ ACTION_REGISTRY = {
     "VerifyAadhaarOtp": VerifyAadhaarOtp,
     "GetDevAuthStatus": GetDevAuthStatus,
     "GetCurrentUser": GetCurrentUser,
+    "GetSignupSessionDetails": GetSignupSessionDetails,
+    "Logout": Logout,
     "WipeDevUsers": WipeDevUsers,
     "GetDevAllUsers": GetDevAllUsers,
 }

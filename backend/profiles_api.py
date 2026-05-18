@@ -60,17 +60,24 @@ def _get_session_user(event):
     token = None
     for part in cookies_raw.split(";"):
         part = part.strip()
+        if part.startswith("happnix_session="):
+            token = part[len("happnix_session="):].strip()
+            break
         if part.startswith("session="):
             token = part[len("session="):].strip()
             break
     if not token:
         return None, None
 
-    session = get_session(token)
+    _token, session = get_session(token)
     if not session:
         return None, None
 
-    cognito_sub = session.get("cognitoSub") or session.get("sub")
+    cognito_sub = (
+        session.get("authenticated_user_id")
+        or session.get("cognitoSub")
+        or session.get("sub")
+    )
     if not cognito_sub:
         return None, None
 
@@ -84,17 +91,35 @@ def _format_public_profile(user_row: dict, following_count=0, followers_count=0,
         return {}
     return {
         "sql_user_id": user_row.get("userID"),
+        "userID": user_row.get("userID"),
         "cognitoSub": user_row.get("cognitoSub"),
         "username": user_row.get("userName"),
         "fullName": user_row.get("displayName") or user_row.get("userName"),
+        "full_name": user_row.get("displayName") or user_row.get("userName"),
+        "email": user_row.get("emailAddress") or "",
+        "mobile": user_row.get("phoneNumber") or "",
+        "date_of_birth": str(user_row.get("dateOfBirth") or ""),
         "bio": user_row.get("bio") or "",
         "profile_picture_url": user_row.get("profilePictureUrl") or "",
         "isVerified": bool(user_row.get("adharVerified")),
+        "gov_id_verified": bool(user_row.get("adharVerified")),
         "privacyMode": user_row.get("privacyMode") or "public",
+        "is_private": (user_row.get("privacyMode") or "public") == "private",
         "followingCount": following_count,
+        "following_count": following_count,
         "followersCount": followers_count,
+        "followers_count": followers_count,
         "isFollowing": is_following,
     }
+
+
+def _optional_ddb(default, func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except RuntimeError as exc:
+        if "DynamoDB table name not configured" in str(exc):
+            return default
+        raise
 
 
 # ── Action Handlers ───────────────────────────────────────────────────────────
@@ -104,9 +129,9 @@ def GetMe(event, path_params, query_params, body):
     if not user:
         return _err("Not authenticated.", 401)
 
-    following = ddb.list_following(cognito_sub)
-    followers = ddb.list_followers(cognito_sub)
-    prefs = ddb.get_preferences(cognito_sub)
+    following = _optional_ddb([], ddb.list_following, cognito_sub)
+    followers = _optional_ddb([], ddb.list_followers, cognito_sub)
+    prefs = _optional_ddb({}, ddb.get_preferences, cognito_sub)
 
     return _ok({
         "profile": _format_public_profile(

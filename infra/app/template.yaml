@@ -329,7 +329,9 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-userInfoTable-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-userInfoTable-${EnvironmentName}/index/*"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
             - Effect: Allow
               Action:

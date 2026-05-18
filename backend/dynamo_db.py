@@ -14,9 +14,15 @@ Tables:
 
 import os
 import uuid
-import boto3
 from datetime import datetime, timezone
-from boto3.dynamodb.conditions import Key, Attr
+
+try:
+    import boto3
+    from boto3.dynamodb.conditions import Key, Attr
+except ImportError:  # pragma: no cover - local environments may not install AWS deps
+    boto3 = None
+    Key = None
+    Attr = None
 
 # ── Environment variable names ────────────────────────────────────────────────
 _USERS_TABLE_NAME         = os.environ.get("USERS_TABLE_NAME", "")
@@ -26,12 +32,18 @@ _SOCIAL_TABLE_NAME        = os.environ.get("SOCIAL_TABLE_NAME", "")
 _SETTINGS_TABLE_NAME      = os.environ.get("SETTINGS_TABLE_NAME", "")
 _NOTIFICATIONS_TABLE_NAME = os.environ.get("NOTIFICATIONS_TABLE_NAME", "")
 
-_dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
+_dynamodb = (
+    boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "ap-south-1"))
+    if boto3
+    else None
+)
 
 
 def _table(name):
     if not name:
         raise RuntimeError(f"DynamoDB table name not configured (env var empty).")
+    if _dynamodb is None:
+        raise RuntimeError("boto3 is required for DynamoDB helpers.")
     return _dynamodb.Table(name)
 
 

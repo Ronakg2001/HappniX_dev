@@ -16,7 +16,8 @@ except ImportError:
 
 def _connect():
     if psycopg2 is None:
-        raise RuntimeError("psycopg2 is required for PostgreSQL-backed auth helpers.")
+        raise RuntimeError(
+            "psycopg2 is required for PostgreSQL-backed auth helpers.")
     return psycopg2.connect(
         host=os.environ["AUTH_DB_HOST"],
         port=os.environ.get("AUTH_DB_PORT", "5432"),
@@ -79,7 +80,8 @@ def get_all_users():
 def user_id_exists(user_id):
     with _connect() as connection:
         with connection.cursor() as cursor:
-            cursor.execute('SELECT 1 FROM users WHERE "userID" = %s', (user_id,))
+            cursor.execute(
+                'SELECT 1 FROM users WHERE "userID" = %s', (user_id,))
             return cursor.fetchone() is not None
 
 
@@ -141,10 +143,12 @@ def upsert_cognito_user(record):
 
 def _auto_heal_user(cognito_user):
     try:
-        attrs = {a["Name"]: a["Value"] for a in cognito_user.get("Attributes", cognito_user.get("UserAttributes", []))}
+        attrs = {a["Name"]: a["Value"] for a in cognito_user.get(
+            "Attributes", cognito_user.get("UserAttributes", []))}
         import string
         import random
-        candidate = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        candidate = "".join(random.choice(
+            string.ascii_uppercase + string.digits) for _ in range(8))
         record = {
             "userID": candidate,
             "cognitoSub": attrs.get("sub"),
@@ -162,15 +166,18 @@ def _auto_heal_user(cognito_user):
         print("Auto-heal failed:", e)
     return None
 
+
 def get_user_by_sub(cognito_sub):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute('SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
+            cursor.execute(
+                'SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
             user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
-            
+
             if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
                 try:
-                    response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'sub = "{cognito_sub}"')
+                    response = cognito.list_users(
+                        UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'sub = "{cognito_sub}"')
                     if response.get("Users"):
                         return _auto_heal_user(response["Users"][0])
                 except Exception:
@@ -181,12 +188,14 @@ def get_user_by_sub(cognito_sub):
 def get_user_by_mobile(phone_number):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute('SELECT * FROM users WHERE "phoneNumber" = %s', (phone_number,))
+            cursor.execute(
+                'SELECT * FROM users WHERE "phoneNumber" = %s', (phone_number,))
             user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
-            
+
             if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
                 try:
-                    response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'phone_number = "{phone_number}"')
+                    response = cognito.list_users(
+                        UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'phone_number = "{phone_number}"')
                     if response.get("Users"):
                         return _auto_heal_user(response["Users"][0])
                 except Exception:
@@ -197,19 +206,22 @@ def get_user_by_mobile(phone_number):
 def get_user_by_identifier(identifier):
     with _connect() as connection:
         with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            cursor.execute('SELECT * FROM users WHERE "userName" = %s OR "emailAddress" = %s', (identifier, identifier))
+            cursor.execute(
+                'SELECT * FROM users WHERE "userName" = %s OR "emailAddress" = %s', (identifier, identifier))
             user = dict(cursor.fetchone()) if cursor.rowcount > 0 else None
-            
+
             if not user and cognito and os.environ.get("COGNITO_USER_POOL_ID"):
                 try:
                     try:
-                        user_info = cognito.admin_get_user(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Username=identifier)
+                        user_info = cognito.admin_get_user(
+                            UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Username=identifier)
                         return _auto_heal_user(user_info)
                     except cognito.exceptions.UserNotFoundException:
                         pass
-                    
+
                     if "@" in identifier:
-                        response = cognito.list_users(UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'email = "{identifier}"')
+                        response = cognito.list_users(
+                            UserPoolId=os.environ["COGNITO_USER_POOL_ID"], Filter=f'email = "{identifier}"')
                         if response.get("Users"):
                             return _auto_heal_user(response["Users"][0])
                 except Exception:
@@ -234,13 +246,15 @@ def update_user_profile(cognito_sub, bio=None, profile_picture_url=None, privacy
 
             if updates:
                 updates.append('"updatedAt" = CURRENT_TIMESTAMP')
-                query = f'UPDATE users SET {", ".join(updates)} WHERE "cognitoSub" = %s'
+                query = f'UPDATE users SET {
+                    ", ".join(updates)} WHERE "cognitoSub" = %s'
                 params.append(cognito_sub)
                 cursor.execute(query, tuple(params))
                 connection.commit()
 
             # Return the updated row
-            cursor.execute('SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
+            cursor.execute(
+                'SELECT * FROM users WHERE "cognitoSub" = %s', (cognito_sub,))
             row = cursor.fetchone()
             return dict(row) if row else {}
 

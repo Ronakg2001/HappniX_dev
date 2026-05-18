@@ -65,6 +65,20 @@ const form = document.getElementById("detailsForm");
 
     setDobMax();
 
+    async function hydrateVerifiedMobile() {
+      const mobileInput = document.getElementById("mobile");
+      if (!mobileInput) return;
+      try {
+        const result = await callAuthAction("GetSignupSessionDetails");
+        mobileInput.value = result.formattedMobile || result.mobile || "";
+      } catch (err) {
+        error.textContent = err.message || "Verify mobile OTP again before continuing.";
+        submitBtn.disabled = true;
+      }
+    }
+
+    hydrateVerifiedMobile();
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       error.textContent = "";

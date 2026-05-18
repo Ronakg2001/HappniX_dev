@@ -3761,8 +3761,18 @@ function goToHomeTabAndRefresh() {
   window.location.href = "/home/?tab=home";
 }
 
-function handleLogout() {
-  window.location.replace("/logout/");
+async function handleLogout() {
+  try {
+    await postJson("/api/auth", { actionItem: "Logout" });
+  } catch (_error) {
+    // Redirect anyway so the user is not trapped in the signed-in UI.
+  }
+  try {
+    localStorage.removeItem("happnix_active_tab");
+  } catch (_error) {
+    // Ignore storage cleanup failures.
+  }
+  window.location.replace("/signup_signin.html");
 }
 
 function getInitialTabFromUrl() {
