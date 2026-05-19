@@ -222,6 +222,33 @@ def ForgotPasswordRequest(event, payload):
     return util.ok({"success": True, "message": msg})
 
 
+
+def CheckUsername(event, payload):
+    """
+    Check if a username is available before the user submits the signup form.
+    Frontend calls this when the user types/leaves the username field.
+    """
+    username = str(payload.get("username", "")).strip()
+
+    if not username:
+        return util.err("Please enter a username.")
+    if len(username) < 3:
+        return util.err("Username must be at least 3 characters.")
+    if len(username) > 30:
+        return util.err("Username must be 30 characters or less.")
+    if not username.replace("_", "").replace(".", "").isalnum():
+        return util.err("Username can only contain letters, numbers, underscores, and dots.")
+
+    result = rds.get_user_by_identifier(username)
+    if not result["success"]:
+        return util.err("Could not check username availability. Try again.", 500)
+
+    if result["data"]:
+        return util.ok({"available": False, "message": "Username already taken. Please choose another one."})
+
+    return util.ok({"available": True, "message": "Username is available!"})
+
+
 def RegisterUserDetails(event, payload):
     token, session = _get_or_create_session(event)
     pending_mobile = session.get("pending_signup_mobile")
@@ -485,6 +512,7 @@ ACTION_REGISTRY = {
     "VerifyMobileOtp":         VerifyMobileOtp,
     "LoginWithPassword":       LoginWithPassword,
     "ForgotPasswordRequest":   ForgotPasswordRequest,
+    "CheckUsername":           CheckUsername,
     "RegisterUserDetails":     RegisterUserDetails,
     "CompleteProfileSetup":    CompleteProfileSetup,
     "SendAadhaarOtp":          SendAadhaarOtp,

@@ -97,5 +97,5 @@ def lambda_handler(event, context):
     try:
         return handler(event, merged_params, query_params, body)
     except Exception as exc:
-        log("error", "events", f"Unhandled error in {handler.__name__}: {exc}")
+        util.log("error", "events", f"Unhandled error in {handler.__name__}: {exc}")
         return util.err("An internal error occurred.", 500)
