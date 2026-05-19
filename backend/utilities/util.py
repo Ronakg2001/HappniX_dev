@@ -251,22 +251,41 @@ def format_public_profile(user_row: dict, following_count: int = 0,
     """
     if not user_row:
         return {}
+    user_id = user_row.get("userID")
+    username = user_row.get("userName")
+    full_name = user_row.get("displayName") or username
+    profile_picture_url = user_row.get("profilePictureUrl") or ""
+    privacy_mode = user_row.get("privacyMode") or "public"
+    is_private = privacy_mode == "private"
+    is_verified = bool(user_row.get("adharVerified"))
     return {
         "userID": user_row.get("userID"),
+        "sql_user_id": user_id,
         "cognitoSub": user_row.get("cognitoSub"),
-        "username": user_row.get("userName"),
-        "fullName": user_row.get("displayName") or user_row.get("userName"),
+        "cognito_sub": user_row.get("cognitoSub"),
+        "username": username,
+        "fullName": full_name,
+        "full_name": full_name,
         "email": user_row.get("emailAddress") or "",
         "mobile": user_row.get("phoneNumber") or "",
         "dateOfBirth": str(user_row.get("dateOfBirth") or ""),
+        "date_of_birth": str(user_row.get("dateOfBirth") or ""),
+        "sex": user_row.get("sex") or "",
         "bio": user_row.get("bio") or "",
-        "profilePictureUrl": user_row.get("profilePictureUrl") or "",
-        "isVerified": bool(user_row.get("adharVerified")),
-        "privacyMode": user_row.get("privacyMode") or "public",
-        "isPrivate": (user_row.get("privacyMode") or "public") == "private",
+        "profilePictureUrl": profile_picture_url,
+        "profile_picture_url": profile_picture_url,
+        "isVerified": is_verified,
+        "gov_id_verified": is_verified,
+        "privacyMode": privacy_mode,
+        "privacy_mode": privacy_mode,
+        "isPrivate": is_private,
+        "is_private": is_private,
         "followingCount": following_count,
+        "following_count": following_count,
         "followersCount": followers_count,
+        "followers_count": followers_count,
         "isFollowing": is_following,
+        "is_following": is_following,
     }
 
 

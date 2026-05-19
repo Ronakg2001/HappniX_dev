@@ -100,7 +100,7 @@ Parameters:
     Description: Enable Home Page Lambda (feed, profile, social graph, settings).
   EnableMessagingApi:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: [ "true", "false" ]
     Description: Enable Messaging Lambda (DMs, group chat).
   EnableGroupChatApi:
@@ -497,6 +497,84 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/home/nearby
             Method: GET
+        LiveEventsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/events/live
+            Method: GET
+        NearbyEventsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/events/nearby
+            Method: GET
+        MyEventsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/events/mine
+            Method: GET
+        DeleteEventForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/events/{id}
+            Method: DELETE
+        TicketsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets
+            Method: GET
+        BookTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/book
+            Method: POST
+        UpdateTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/{id}/{action}
+            Method: POST
+        DeleteTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/{id}/delete
+            Method: DELETE
+        NotificationsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications
+            Method: GET
+        MarkNotificationsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications
+            Method: POST
+        NotificationActivityForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications/activity
+            Method: POST
+        GuestInvitesForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/guest-invites
+            Method: POST
+        UpdateGuestInviteForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/guest-invites/{token}/{action}
+            Method: POST
         MyProfile:
           Type: Api
           Properties:
@@ -742,6 +820,13 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/messages/conversations/{id}/messages
             Method: GET
+        SendConversationMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations/{id}/messages
+            Method: POST
         MarkRead:
           Type: Api
           Properties:
@@ -776,6 +861,34 @@ Resources:
             RestApiId:
               Ref: HappnixDevApi
             Path: /api/messages/messages/{id}/unsend
+            Method: POST
+        CreateGroupConversation:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/create
+            Method: POST
+        GroupConversationMessages:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/messages
+            Method: GET
+        UpdateGroupConversation:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/groups/{id}/{action}
+            Method: POST
+        UpdateGroupMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/group-messages/{id}/{action}
             Method: POST
 
   GroupChatApi:

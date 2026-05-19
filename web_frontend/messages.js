@@ -184,21 +184,29 @@
     return parts.length === 2 ? parts.pop().split(";").shift() : "";
   }
 
+  function apiUrl(path) {
+    const cfg = window.HAPPNIX_RUNTIME_CONFIG || {};
+    if (typeof cfg.buildApiUrl === "function") return cfg.buildApiUrl(path);
+    const base = String(cfg.apiBaseUrl || "").replace(/\/$/, "");
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return base ? `${base}${cleanPath}` : cleanPath;
+  }
+
   async function getJson(url) {
-    const response = await fetch(url, { credentials: "same-origin" });
+    const response = await fetch(apiUrl(url), { credentials: "include" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Request failed.");
     return data;
   }
 
   async function postJson(url, payload) {
-    const response = await fetch(url, {
+    const response = await fetch(apiUrl(url), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-CSRFToken": getCsrfToken(),
       },
-      credentials: "same-origin",
+      credentials: "include",
       body: JSON.stringify(payload || {}),
     });
     const data = await response.json().catch(() => ({}));
@@ -207,10 +215,10 @@
   }
 
   async function postMultipart(url, formData) {
-    const response = await fetch(url, {
+    const response = await fetch(apiUrl(url), {
       method: "POST",
       headers: { "X-CSRFToken": getCsrfToken() },
-      credentials: "same-origin",
+      credentials: "include",
       body: formData,
     });
     const data = await response.json().catch(() => ({}));
