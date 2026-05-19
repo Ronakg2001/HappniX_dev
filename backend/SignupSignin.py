@@ -1,206 +1,151 @@
-import json
+"""
+SignupSignin.py — Auth Lambda for HappniX.
+
+Handles all sign-up / sign-in flows via a single `actionItem` dispatcher.
+All shared utilities live in utilities/; this file is only action logic.
+
+Action Registry:
+  SendMobileOtp, ResendMobileOtp, VerifyMobileOtp
+  LoginWithPassword, ForgotPasswordRequest
+  RegisterUserDetails, CompleteProfileSetup
+  SendAadhaarOtp, VerifyAadhaarOtp
+  GetCurrentUser, GetSignupSessionDetails, Logout
+  GetDevAuthStatus, WipeDevUsers, GetDevAllUsers   (dev only)
+"""
+
 import os
-import random
-import re
-import traceback
 import uuid
-from email.utils import parseaddr
 
+import boto3
+
+import utilities.util as util        # ok, err, log, validators, formatters
+import utilities.rds as rds          # get_user_by_sub, upsert_user, ...
+import utilities.sessions as sessions # get_session, ensure_session, ...
+import utilities.dynamo as dynamo    # put_item, get_item, query_items, ...
+
+# ── Cognito client ────────────────────────────────────────────────────────────
 try:
-    from . import dev_store
-    from . import auth_db
-    from . import dynamo_db
-except ImportError:
-    import dev_store
-    import auth_db
-    import dynamo_db
+    _cognito = boto3.client("cognito-idp")
+except Exception:
+    _cognito = None
 
-try:
-    import boto3
-    cognito = boto3.client("cognito-idp")
-except ImportError:
-    boto3 = None
-    cognito = None
+_USERS_TABLE = os.environ.get("USERS_TABLE_NAME", "")
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Helpers (only shared utilities that are used by 2+ action methods)
-# ══════════════════════════════════════════════════════════════════════
+# ── Session shortcuts ─────────────────────────────────────────────────────────
 
-ENV = os.environ.get
-APP_ENV = lambda: ENV("APP_ENVIRONMENT", "dev").strip().lower()
-TEST_OTP = lambda: ENV("TEST_OTP_MODE", "false").strip().lower() == "true"
-
-
-def _JsonResponse(statusCode, payload, traceId=None):
-    headers = {"Content-Type": "application/json"}
-    if traceId:
-        headers["X-Happnix-Trace-Id"] = traceId
-    return {
-        "statusCode": statusCode,
-        "headers": headers,
-        "body": json.dumps(payload),
-    }
+def _get_or_create_session(event):
+    incoming = util.extract_session_token(event)
+    result = sessions.ensure_session(incoming)
+    if not result["success"]:
+        return None, {}
+    return result["data"]["token"], result["data"]["session"]
 
 
-def _Error(message, statusCode=400, traceId=None):
-    payload = {"message": message}
-    if traceId:
-        payload["traceId"] = traceId
-    return _JsonResponse(statusCode, payload, traceId=traceId)
-
-
-def _LogTrace(level, traceId, message, **extra):
-    logPayload = {"level": level, "traceId": traceId, "message": message}
-    if extra:
-        logPayload["extra"] = extra
-    print(json.dumps(logPayload, sort_keys=True))
-
-
-def _ExtractSessionToken(event):
-    headers = event.get("headers") or {}
-    cookieHeader = headers.get("Cookie") or headers.get("cookie") or ""
-    for chunk in cookieHeader.split(";"):
-        name, separator, value = chunk.strip().partition("=")
-        if separator and name == "happnix_session":
-            return value
-    return None
-
-
-def _FormatIndianMobile(mobile):
-    raw = str(mobile or "").strip()
-    if raw.startswith("+"):
-        return raw
-    return f"+91{raw}" if raw else ""
-
-
-def _GetOrCreateSession(event):
-    incomingToken = _ExtractSessionToken(event)
-    return dev_store.ensure_session(incomingToken)
-
-
-def _WithSession(statusCode, payload, sessionToken, traceId=None):
-    if traceId:
-        payload = {**payload, "traceId": traceId}
-    response = _JsonResponse(statusCode, payload, traceId=traceId)
-    if sessionToken:
-        response["headers"]["Set-Cookie"] = f"happnix_session={sessionToken}; Path=/; HttpOnly; SameSite=None; Secure"
-    return response
-
-
-def _IsValidEmail(email):
-    _, parsed = parseaddr(email)
-    return bool(parsed and "@" in parsed and "." in parsed.split("@")[-1])
-
-
-def _CurrentUser(event):
-    token = _ExtractSessionToken(event)
-    _, session = dev_store.get_session(token)
-    if not session:
+def _get_current_user(event):
+    token = util.extract_session_token(event)
+    result = sessions.get_session(token)
+    if not result["success"] or not result["data"]["session"]:
         return token, None, None
-    userId = session.get("authenticated_user_id")
-    if not userId:
+    session = result["data"]["session"]
+    user_id = session.get("authenticated_user_id")
+    if not user_id:
         return token, session, None
-    return token, session, auth_db.get_user_by_sub(userId)
+    user_result = rds.get_user_by_sub(user_id)
+    user = user_result["data"] if user_result["success"] else None
+    return token, session, user
 
 
-def _CanCreateOrJoinParties(user):
-    return bool(user and user.get("adharVerified"))
+def _save_session(token, session):
+    sessions.replace_session(token, session)
 
 
-def _SyncDynamoUserProfile(user_id, user_name, full_name, email, phone_number, gov_id=""):
-    """Mirror signup personal details into DynamoDB for the serverless profile store."""
-    return dynamo_db.put_user_profile(user_id, user_name, {
-        "fullName": full_name,
-        "email": email,
-        "phoneNumber": phone_number,
-        "address": "",
-        "aadharNumber": gov_id,
-    })
+def _session_response(status, body, token, trace_id=None):
+    response = util.ok(body, status, trace_id)
+    return util.with_session_cookie(response, token)
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Action Methods — each handles one actionItem from the frontend
-# ══════════════════════════════════════════════════════════════════════
+# ── Action Handlers ───────────────────────────────────────────────────────────
 
 def SendMobileOtp(event, payload):
-    """Send a 6-digit OTP to the provided mobile number."""
     mobile = str(payload.get("mobile", "")).strip()
-    if not mobile.isdigit() or len(mobile) != 10:
-        return _Error("Please enter a valid 10-digit mobile number.")
-    token, session = _GetOrCreateSession(event)
-    otp = "".join(str(random.randint(0, 9)) for _ in range(6))
+    if not util.is_valid_mobile(mobile):
+        return util.err("Please enter a valid 10-digit mobile number.")
+    token, session = _get_or_create_session(event)
+    otp = util.generate_otp()
     session.setdefault("mobile_otp_map", {})[mobile] = otp
     session["last_mobile"] = mobile
-    dev_store.replace_session(token, session)
-    responsePayload = {"message": f"OTP sent successfully to {mobile}."}
-    if TEST_OTP() and APP_ENV() in {"dev", "qa"}:
-        responsePayload["debugOtp"] = otp
-    return _WithSession(200, responsePayload, token)
+    _save_session(token, session)
+    body = {"success": True, "message": f"OTP sent successfully to {mobile}."}
+    if util.is_test_otp_mode() and util.app_env() in {"dev", "qa"}:
+        body["debugOtp"] = otp
+    return _session_response(200, body, token)
 
 
 def ResendMobileOtp(event, payload):
-    """Resend OTP to the same mobile number."""
     mobile = str(payload.get("mobile", "")).strip()
-    if not mobile.isdigit() or len(mobile) != 10:
-        return _Error("Please enter a valid 10-digit mobile number.")
-    token, session = _GetOrCreateSession(event)
-    otp = "".join(str(random.randint(0, 9)) for _ in range(6))
+    if not util.is_valid_mobile(mobile):
+        return util.err("Please enter a valid 10-digit mobile number.")
+    token, session = _get_or_create_session(event)
+    otp = util.generate_otp()
     session.setdefault("mobile_otp_map", {})[mobile] = otp
-    dev_store.replace_session(token, session)
-    responsePayload = {"message": f"OTP resent to {mobile}."}
-    if TEST_OTP() and APP_ENV() in {"dev", "qa"}:
-        responsePayload["debugOtp"] = otp
-    return _WithSession(200, responsePayload, token)
+    _save_session(token, session)
+    body = {"success": True, "message": f"OTP resent to {mobile}."}
+    if util.is_test_otp_mode() and util.app_env() in {"dev", "qa"}:
+        body["debugOtp"] = otp
+    return _session_response(200, body, token)
 
 
 def VerifyMobileOtp(event, payload):
-    """Verify OTP and determine if user is new or existing."""
     mobile = str(payload.get("mobile", "")).strip()
     otp = str(payload.get("otp", "")).strip()
     if not mobile or not otp:
-        return _Error("Mobile and OTP are required.")
-    token, session = _GetOrCreateSession(event)
-    mobileOtpMap = session.get("mobile_otp_map", {})
-    savedOtp = mobileOtpMap.get(mobile)
-    if not savedOtp:
-        return _WithSession(400, {"message": "OTP session expired. Please request a new OTP."}, token)
-    # Check OTP — allow 123456 in dev when test mode is on
-    fixedOtpAllowed = (
-        TEST_OTP()
-        and ENV("ALLOW_FIXED_TEST_OTP", "false").strip().lower() == "true"
-        and APP_ENV() != "prod"
+        return util.err("Mobile and OTP are required.")
+
+    token, session = _get_or_create_session(event)
+    saved_otp = session.get("mobile_otp_map", {}).get(mobile)
+    if not saved_otp:
+        return _session_response(400, {"success": False, "message": "OTP session expired. Please request a new OTP."}, token)
+
+    fixed_otp_allowed = (
+        util.is_test_otp_mode()
+        and util.env("ALLOW_FIXED_TEST_OTP", "false").strip().lower() == "true"
+        and util.app_env() != "prod"
     )
-    if savedOtp != otp and not (fixedOtpAllowed and otp == "123456"):
-        return _WithSession(400, {"message": "Invalid OTP."}, token)
-    formattedMobile = mobile if str(mobile).startswith("+") else f"+91{mobile}"
-    user = auth_db.get_user_by_mobile(formattedMobile)
-    mobileOtpMap.pop(mobile, None)
-    session["mobile_otp_map"] = mobileOtpMap
-    # Warning verification flow (device overlap)
+    if saved_otp != otp and not (fixed_otp_allowed and otp == "123456"):
+        return _session_response(400, {"success": False, "message": "Invalid OTP."}, token)
+
+    formatted = util.format_phone_in(mobile)
+    user_result = rds.get_user_by_mobile(formatted)
+    user = user_result["data"] if user_result["success"] else None
+
+    session.get("mobile_otp_map", {}).pop(mobile, None)
+
     if session.get("warning_verification_required"):
-        session["warning_verification_required"] = True
-        dev_store.replace_session(token, session)
-        return _WithSession(200, {
+        _save_session(token, session)
+        return _session_response(200, {
+            "success": True,
             "message": "Verification required before linking this device.",
             "loginStatus": "warning_verification_required",
-            "overlapType": session.get("warning_overlap_type", "phone"),
             "redirectUrl": "/auth/warning-verification/",
         }, token)
+
     if user:
         session["authenticated_user_id"] = user["cognitoSub"]
         session.pop("pending_signup_mobile", None)
-        dev_store.replace_session(token, session)
-        fullName = (user.get("userName") or "User").strip()
-        return _WithSession(200, {
-            "message": f"Welcome back, {fullName}! Mobile OTP verified.",
+        _save_session(token, session)
+        return _session_response(200, {
+            "success": True,
+            "message": f"Welcome back, {user.get('userName', 'User')}! Mobile OTP verified.",
             "userStatus": "existing",
-            "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
+            "canCreateOrJoinParties": util.can_create_or_join_parties(user),
             "redirectUrl": "/home_page.html",
         }, token)
+
     session["pending_signup_mobile"] = mobile
-    dev_store.replace_session(token, session)
-    return _WithSession(200, {
+    _save_session(token, session)
+    return _session_response(200, {
+        "success": True,
         "message": "Mobile OTP verified. User not found; continue sign up.",
         "userStatus": "new",
         "canCreateOrJoinParties": False,
@@ -209,60 +154,52 @@ def VerifyMobileOtp(event, payload):
 
 
 def LoginWithPassword(event, payload):
-    """Authenticate with username/email and password via Cognito."""
     identifier = str(payload.get("identifier", payload.get("username", ""))).strip()
     password = str(payload.get("password", "")).strip()
     if not identifier or not password:
-        return _Error("Username/email and password are required.")
-        
-    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
-    clientId = os.environ.get("COGNITO_USER_POOL_CLIENT_ID")
-    
-    fullName = "User"
+        return util.err("Username/email and password are required.")
+
+    pool_id = os.environ.get("COGNITO_USER_POOL_ID")
+    client_id = os.environ.get("COGNITO_USER_POOL_CLIENT_ID")
     user_id = None
-    
-    if cognito and userPoolId and clientId:
+    full_name = "User"
+
+    if _cognito and pool_id and client_id:
         try:
-            response = cognito.admin_initiate_auth(
-                UserPoolId=userPoolId,
-                ClientId=clientId,
-                AuthFlow='ADMIN_NO_SRP_AUTH',
-                AuthParameters={
-                    'USERNAME': identifier,
-                    'PASSWORD': password
-                }
+            _cognito.admin_initiate_auth(
+                UserPoolId=pool_id, ClientId=client_id,
+                AuthFlow="ADMIN_NO_SRP_AUTH",
+                AuthParameters={"USERNAME": identifier, "PASSWORD": password},
             )
-            # Fetch user details to get sub and name
-            user_info = cognito.admin_get_user(
-                UserPoolId=userPoolId,
-                Username=identifier
-            )
-            user_id = next((attr["Value"] for attr in user_info["UserAttributes"] if attr["Name"] == "sub"), None)
-            fullName = next((attr["Value"] for attr in user_info["UserAttributes"] if attr["Name"] == "name"), identifier)
-        except (cognito.exceptions.NotAuthorizedException, cognito.exceptions.UserNotFoundException):
-            return _JsonResponse(401, {"message": "Invalid username/email or password."})
-        except Exception as e:
-            return _Error(f"Login failed: {str(e)}", statusCode=500)
+            info = _cognito.admin_get_user(UserPoolId=pool_id, Username=identifier)
+            attrs = {a["Name"]: a["Value"] for a in info["UserAttributes"]}
+            user_id = attrs.get("sub")
+            full_name = attrs.get("name", identifier)
+        except (_cognito.exceptions.NotAuthorizedException,
+                _cognito.exceptions.UserNotFoundException):
+            return util.err("Invalid username/email or password.", 401)
+        except Exception as exc:
+            return util.err(f"Login failed: {exc}", 500)
     else:
-        # Fallback for local mock testing if Cognito isn't set up
-        user = auth_db.get_user_by_identifier(identifier)
+        result = rds.get_user_by_identifier(identifier)
+        user = result["data"] if result["success"] else None
         if not user:
-            return _JsonResponse(401, {"message": "Invalid username/email or password."})
+            return util.err("Invalid username/email or password.", 401)
         user_id = user["cognitoSub"]
-        fullName = (user.get("userName") or "User").strip()
+        full_name = user.get("userName", "User")
 
-    token, session = _GetOrCreateSession(event)
+    token, session = _get_or_create_session(event)
     session["authenticated_user_id"] = user_id
-    dev_store.replace_session(token, session)
-    
-    # Check if user has government ID verified for party creation
-    can_create = False
-    fallback_user = auth_db.get_user_by_identifier(identifier)
-    if fallback_user:
-        can_create = _CanCreateOrJoinParties(fallback_user)
+    _save_session(token, session)
 
-    return _WithSession(200, {
-        "message": f"Signed in successfully. Welcome, {fullName}.",
+    can_create = False
+    lookup = rds.get_user_by_identifier(identifier)
+    if lookup["success"] and lookup["data"]:
+        can_create = util.can_create_or_join_parties(lookup["data"])
+
+    return _session_response(200, {
+        "success": True,
+        "message": f"Signed in successfully. Welcome, {full_name}.",
         "userStatus": "existing",
         "canCreateOrJoinParties": can_create,
         "redirectUrl": "/home_page.html",
@@ -270,108 +207,115 @@ def LoginWithPassword(event, payload):
 
 
 def ForgotPasswordRequest(event, payload):
-    """Handle forgot password email request."""
     email = str(payload.get("email", "")).strip().lower()
     if not email:
-        return _Error("Please enter your email address.")
-    if not _IsValidEmail(email):
-        return _Error("Please enter a valid email address.")
-    if dev_store.email_exists(email):
-        message = "Verification email request accepted. Please check your inbox."
-    else:
-        message = "If this email is registered, verification instructions will be sent."
-    return _JsonResponse(200, {"message": message})
+        return util.err("Please enter your email address.")
+    if not util.is_valid_email(email):
+        return util.err("Please enter a valid email address.")
+    result = rds.get_user_by_identifier(email)
+    exists = result["success"] and result["data"] is not None
+    msg = (
+        "Verification email request accepted. Please check your inbox."
+        if exists
+        else "If this email is registered, verification instructions will be sent."
+    )
+    return util.ok({"success": True, "message": msg})
 
 
 def RegisterUserDetails(event, payload):
-    """Register new user with full details after OTP verification."""
-    token, session = _GetOrCreateSession(event)
-    pendingMobile = session.get("pending_signup_mobile")
-    if not pendingMobile:
-        return _WithSession(401, {"message": "Signup session expired. Verify mobile OTP again."}, token)
-    fullName = str(payload.get("fullName", "")).strip()
-    userName = str(payload.get("username", "")).strip()
-    password = str(payload.get("password", "")).strip()
-    sex = str(payload.get("sex", "")).strip().lower()
-    dobText = str(payload.get("dateOfBirth", "")).strip()
-    email = str(payload.get("email", "")).strip().lower()
-    govId = str(payload.get("govId", "")).strip()
-    if not all([fullName, userName, password, sex, dobText, email]):
-        return _WithSession(400, {"message": "All mandatory fields are required."}, token)
-    if len(fullName) < 3:
-        return _WithSession(400, {"message": "Please enter a valid full name."}, token)
+    token, session = _get_or_create_session(event)
+    pending_mobile = session.get("pending_signup_mobile")
+    if not pending_mobile:
+        return _session_response(401, {"success": False, "message": "Signup session expired. Verify mobile OTP again."}, token)
+
+    full_name = str(payload.get("fullName", "")).strip()
+    username  = str(payload.get("username", "")).strip()
+    password  = str(payload.get("password", "")).strip()
+    sex       = str(payload.get("sex", "")).strip().lower()
+    dob       = str(payload.get("dateOfBirth", "")).strip()
+    email     = str(payload.get("email", "")).strip().lower()
+    gov_id    = str(payload.get("govId", "")).strip()
+
+    if not all([full_name, username, password, sex, dob, email]):
+        return _session_response(400, {"success": False, "message": "All mandatory fields are required."}, token)
+    if len(full_name) < 3:
+        return _session_response(400, {"success": False, "message": "Please enter a valid full name."}, token)
     if sex not in {"mr.", "miss.", "mrs.", "other"}:
-        return _WithSession(400, {"message": "Select a valid sex option."}, token)
-    if not re.match(r"^\d{4}-\d{2}-\d{2}$", dobText):
-        return _WithSession(400, {"message": "Enter a valid date of birth."}, token)
-    if auth_db.get_user_by_identifier(userName):
-        return _WithSession(400, {"message": "Username already exists. Please choose another one."}, token)
-    if auth_db.get_user_by_identifier(email):
-        return _WithSession(400, {"message": "Email already registered. Please use another email."}, token)
-    if not _IsValidEmail(email):
-        return _WithSession(400, {"message": "Enter a valid email address."}, token)
-    if not re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$", password):
-        return _WithSession(400, {
-            "message": "Password must include uppercase, lowercase, number, special character, and minimum 8 characters."
-        }, token)
-    formattedMobile = _FormatIndianMobile(pendingMobile)
-    if auth_db.get_user_by_mobile(formattedMobile):
-        return _WithSession(400, {"message": "Mobile number already registered."}, token)
-        
-    userPoolId = os.environ.get("COGNITO_USER_POOL_ID")
+        return _session_response(400, {"success": False, "message": "Select a valid sex option."}, token)
+    if not util.is_valid_date(dob):
+        return _session_response(400, {"success": False, "message": "Enter a valid date of birth (YYYY-MM-DD)."}, token)
+    if not util.is_valid_email(email):
+        return _session_response(400, {"success": False, "message": "Enter a valid email address."}, token)
+    if not util.is_strong_password(password):
+        return _session_response(400, {"success": False, "message": "Password must include uppercase, lowercase, number, special character, and minimum 8 characters."}, token)
+    if rds.get_user_by_identifier(username)["data"]:
+        return _session_response(400, {"success": False, "message": "Username already exists. Please choose another one."}, token)
+    if rds.get_user_by_identifier(email)["data"]:
+        return _session_response(400, {"success": False, "message": "Email already registered. Please use another email."}, token)
+
+    formatted_mobile = util.format_phone_in(pending_mobile)
+    if rds.get_user_by_mobile(formatted_mobile)["data"]:
+        return _session_response(400, {"success": False, "message": "Mobile number already registered."}, token)
+
+    pool_id = os.environ.get("COGNITO_USER_POOL_ID")
     cognito_sub = None
-    
-    if cognito and userPoolId:
-        response = cognito.admin_create_user(
-            UserPoolId=userPoolId,
-            Username=userName,
-            UserAttributes=[
-                {"Name": "email", "Value": email},
-                {"Name": "phone_number", "Value": formattedMobile},
-                {"Name": "preferred_username", "Value": userName},
-                {"Name": "name", "Value": fullName},
-                {"Name": "custom:dateOfBirth", "Value": dobText},
-                {"Name": "custom:userType", "Value": "General"},
-                {"Name": "email_verified", "Value": "true"},
-                {"Name": "phone_number_verified", "Value": "true"}
-            ],
-            MessageAction="SUPPRESS"
-        )
-        cognito_sub = next((attr["Value"] for attr in response["User"]["Attributes"] if attr["Name"] == "sub"), None)
-        cognito.admin_set_user_password(
-            UserPoolId=userPoolId,
-            Username=userName,
-            Password=password,
-            Permanent=True
-        )
+
+    if _cognito and pool_id:
+        try:
+            resp = _cognito.admin_create_user(
+                UserPoolId=pool_id, Username=username,
+                UserAttributes=[
+                    {"Name": "email",                 "Value": email},
+                    {"Name": "phone_number",           "Value": formatted_mobile},
+                    {"Name": "preferred_username",     "Value": username},
+                    {"Name": "name",                   "Value": full_name},
+                    {"Name": "custom:dateOfBirth",     "Value": dob},
+                    {"Name": "custom:userType",        "Value": "General"},
+                    {"Name": "email_verified",         "Value": "true"},
+                    {"Name": "phone_number_verified",  "Value": "true"},
+                ],
+                MessageAction="SUPPRESS",
+            )
+            attrs = {a["Name"]: a["Value"] for a in resp["User"]["Attributes"]}
+            cognito_sub = attrs.get("sub")
+            _cognito.admin_set_user_password(
+                UserPoolId=pool_id, Username=username,
+                Password=password, Permanent=True,
+            )
+        except Exception as exc:
+            return _session_response(500, {"success": False, "message": f"Cognito registration failed: {exc}"}, token)
 
     if not cognito_sub:
         cognito_sub = f"mock-{uuid.uuid4().hex[:12]}"
 
-    # Generate 8-char unique User ID
-    user_id = "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(8))
+    user_id = util.new_user_id()
 
-    # 1. Save core auth identity to RDS (PostgreSQL)
-    auth_db.upsert_cognito_user({
-        "userID": user_id,
-        "cognitoSub": cognito_sub,
-        "userName": userName,
-        "emailAddress": email,
-        "userType": "General",
-        "phoneNumber": formattedMobile,
-        "emailVerified": True,
-        "isActive": True,
-        "dateOfBirth": dobText
+    rds_result = rds.upsert_user({
+        "userID": user_id, "cognitoSub": cognito_sub, "userName": username,
+        "emailAddress": email, "userType": "General", "phoneNumber": formatted_mobile,
+        "emailVerified": True, "isActive": True, "dateOfBirth": dob,
     })
+    if not rds_result["success"]:
+        return _session_response(500, {"success": False, "message": f"Failed to save user: {rds_result['error']}"}, token)
 
-    # 2. Save structured personal details to DynamoDB (using userID as PK)
-    _SyncDynamoUserProfile(user_id, userName, fullName, email, formattedMobile, govId)
+    if _USERS_TABLE:
+        dynamo.put_item(_USERS_TABLE, {
+            "userID": user_id, "userName": username,
+            "createdAt": util.now_iso(), "updatedAt": util.now_iso(),
+            "personalDetails": {
+                "fullName": full_name, "email": email,
+                "phoneNumber": formatted_mobile, "address": "",
+                "aadharNumber": gov_id,
+            },
+        })
 
     session.pop("pending_signup_mobile", None)
     session["pending_profile_setup"] = True
     session["authenticated_user_id"] = cognito_sub
-    dev_store.replace_session(token, session)
-    return _WithSession(200, {
+    _save_session(token, session)
+
+    return _session_response(200, {
+        "success": True,
         "message": "Details saved successfully. You can add profile details next.",
         "canCreateOrJoinParties": False,
         "redirectUrl": "/signup_profile_optional.html",
@@ -379,236 +323,204 @@ def RegisterUserDetails(event, payload):
 
 
 def CompleteProfileSetup(event, payload):
-    """Save optional profile details (bio, picture) or skip."""
-    token, session, user = _CurrentUser(event)
+    token, session, user = _get_current_user(event)
     if not user:
-        return _JsonResponse(401, {"message": "Please sign in first."})
+        return util.err("Please sign in first.", 401)
     if not session or not session.get("pending_profile_setup"):
-        return _WithSession(400, {"message": "Profile setup session not found."}, token)
+        return _session_response(400, {"success": False, "message": "Profile setup session not found."}, token)
+
     if not payload.get("skip", False):
         bio = str(payload.get("bio", "")).strip()
-        profilePictureUrl = str(payload.get("profilePictureUrl", "")).strip()
-        auth_db.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=profilePictureUrl)
-        user["bio"] = bio
-        user["profilePictureUrl"] = profilePictureUrl
+        pic = str(payload.get("profilePictureUrl", "")).strip()
+        result = rds.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=pic)
+        if result["success"]:
+            user = result["data"]
+
     session.pop("pending_profile_setup", None)
-    dev_store.replace_session(token, session)
-    return _WithSession(200, {
+    _save_session(token, session)
+    return _session_response(200, {
+        "success": True,
         "message": "Profile setup completed.",
-        "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
+        "canCreateOrJoinParties": util.can_create_or_join_parties(user),
         "redirectUrl": "/home_page.html",
     }, token)
 
 
 def SendAadhaarOtp(event, payload):
-    """Send OTP for Aadhaar verification."""
-    token, session, user = _CurrentUser(event)
+    token, session, user = _get_current_user(event)
     if not user:
-        return _JsonResponse(401, {"message": "Please sign in first."})
-    aadhaarNumber = str(payload.get("aadhaarNumber", "")).strip()
-    currentAadhaar = user.get("profile", {}).get("gov_id_number", "")
-    if aadhaarNumber:
-        if not aadhaarNumber.isdigit() or len(aadhaarNumber) != 12:
-            return _WithSession(400, {"message": "Please enter a valid 12-digit Aadhaar number."}, token)
-        dev_store.update_user_profile(user["id"], gov_id_number=aadhaarNumber)
-        currentAadhaar = aadhaarNumber
-    elif not currentAadhaar:
-        return _WithSession(400, {"message": "Please provide an Aadhaar number."}, token)
-    session["aadhaar_client_id"] = f"demo-{currentAadhaar[-4:]}"
-    dev_store.replace_session(token, session)
-    return _WithSession(200, {
-        "message": f"OTP sent successfully to mobile linked with Aadhaar ending in {currentAadhaar[-4:]}."
+        return util.err("Please sign in first.", 401)
+    aadhaar = str(payload.get("aadhaarNumber", "")).strip()
+    if aadhaar:
+        if not aadhaar.isdigit() or len(aadhaar) != 12:
+            return _session_response(400, {"success": False, "message": "Please enter a valid 12-digit Aadhaar number."}, token)
+        current_aadhaar = aadhaar
+    else:
+        current_aadhaar = user.get("profile", {}).get("gov_id_number", "")
+        if not current_aadhaar:
+            return _session_response(400, {"success": False, "message": "Please provide an Aadhaar number."}, token)
+    session["aadhaar_client_id"] = f"demo-{current_aadhaar[-4:]}"
+    _save_session(token, session)
+    return _session_response(200, {
+        "success": True,
+        "message": f"OTP sent successfully to mobile linked with Aadhaar ending in {current_aadhaar[-4:]}.",
     }, token)
 
 
 def VerifyAadhaarOtp(event, payload):
-    """Verify Aadhaar OTP and mark user as gov ID verified."""
-    token, session, user = _CurrentUser(event)
+    token, session, user = _get_current_user(event)
     if not user:
-        return _JsonResponse(401, {"message": "Please sign in first."})
+        return util.err("Please sign in first.", 401)
     if not session or not session.get("aadhaar_client_id"):
-        return _WithSession(400, {"message": "Session expired. Please request OTP again."}, token)
+        return _session_response(400, {"success": False, "message": "Session expired. Please request OTP again."}, token)
     otp = str(payload.get("otp", "")).strip()
     if not otp:
-        return _WithSession(400, {"message": "Please enter the OTP."}, token)
+        return _session_response(400, {"success": False, "message": "Please enter the OTP."}, token)
     if otp != "123456":
-        return _WithSession(400, {"message": "Invalid OTP. Please try again."}, token)
-    user = dev_store.update_user_profile(user["id"], gov_id_verified=True)
+        return _session_response(400, {"success": False, "message": "Invalid OTP. Please try again."}, token)
     session.pop("aadhaar_client_id", None)
-    dev_store.replace_session(token, session)
-    return _WithSession(200, {
+    _save_session(token, session)
+    return _session_response(200, {
+        "success": True,
         "message": "Aadhaar verified successfully! You can now host and join parties.",
         "isVerified": True,
-        "canCreateOrJoinParties": _CanCreateOrJoinParties(user),
+        "canCreateOrJoinParties": True,
     }, token)
 
 
-def GetDevAuthStatus(event, payload):
-    """Return dev environment status — schema health, Cognito config."""
-    if APP_ENV() != "dev":
-        return _JsonResponse(404, {"message": "Route not found."})
-    usersReady = auth_db.table_exists("users")
-    devicesReady = auth_db.table_exists("user_devices")
-    return _JsonResponse(200, {
-        "apiStatus": "ok",
-        "environment": APP_ENV(),
-        "cognitoRegion": ENV("COGNITO_REGION", ""),
-        "cognitoUserPoolId": ENV("COGNITO_USER_POOL_ID", ""),
-        "cognitoUserPoolClientId": ENV("COGNITO_USER_POOL_CLIENT_ID", ""),
-        "databaseEndpoint": ENV("AUTH_DB_HOST", ""),
-        "databasePort": ENV("AUTH_DB_PORT", ""),
-        "databasePassword": ENV("AUTH_DB_PASSWORD", "PASSWORD_NOT_FOUND"),
-        "tables": {"users": usersReady, "user_devices": devicesReady},
-    })
-
-
-def WipeDevUsers(event, payload):
-    """Temporary dev endpoint to wipe all users from RDS."""
-    if APP_ENV() != "dev":
-        return _JsonResponse(403, {"message": "Forbidden outside of dev."})
-    try:
-        auth_db.execute_sql_script("DELETE FROM user_devices; DELETE FROM users;")
-        return _JsonResponse(200, {"message": "All users and devices deleted from RDS successfully!"})
-    except Exception as e:
-        return _Error(f"Failed to wipe users: {e}", statusCode=500)
-
-
-def GetDevAllUsers(event, payload):
-    """Temporary dev endpoint to fetch all users from RDS."""
-    if APP_ENV() != "dev":
-        return _JsonResponse(403, {"message": "Forbidden outside of dev."})
-    try:
-        users = auth_db.get_all_users()
-        return _JsonResponse(200, {"users": users})
-    except Exception as e:
-        return _Error(f"Failed to fetch users: {e}", statusCode=500)
-
-
 def GetCurrentUser(event, payload):
-    """Return the currently authenticated user's profile for the home page."""
-    token, session, user = _CurrentUser(event)
+    token, session, user = _get_current_user(event)
     if not user:
-        return _JsonResponse(401, {"message": "Not authenticated."})
-    return _WithSession(200, {
-        "userID": user.get("userID") or "",
-        "userName": user.get("userName") or user.get("username") or "",
-        "email": user.get("emailAddress") or "",
-        "mobile": user.get("phoneNumber") or "",
-        "profilePictureUrl": user.get("profilePictureUrl") or "",
-        "isVerified": bool(user.get("adharVerified") or user.get("gov_id_verified")),
-        "bio": user.get("bio") or "",
+        return util.err("Not authenticated.", 401)
+    return _session_response(200, {
+        "success": True,
+        "userID":            user.get("userID", ""),
+        "userName":          user.get("userName", ""),
+        "email":             user.get("emailAddress", ""),
+        "mobile":            user.get("phoneNumber", ""),
+        "profilePictureUrl": user.get("profilePictureUrl", ""),
+        "isVerified":        bool(user.get("adharVerified")),
+        "bio":               user.get("bio", ""),
     }, token)
 
 
 def GetSignupSessionDetails(event, payload):
-    """Return the verified signup mobile number for the details form."""
-    token, session = _GetOrCreateSession(event)
+    token, session = _get_or_create_session(event)
     pending_mobile = str(session.get("pending_signup_mobile") or "").strip()
     if not pending_mobile:
-        return _WithSession(401, {"message": "Signup session expired. Verify mobile OTP again."}, token)
-    return _WithSession(200, {
+        return _session_response(401, {"success": False, "message": "Signup session expired. Verify mobile OTP again."}, token)
+    return _session_response(200, {
+        "success": True,
         "mobile": pending_mobile,
-        "formattedMobile": _FormatIndianMobile(pending_mobile),
+        "formattedMobile": util.format_phone_in(pending_mobile),
     }, token)
 
 
 def Logout(event, payload):
-    """Clear the browser cookie and remove server-side session state."""
-    token = _ExtractSessionToken(event)
+    token = util.extract_session_token(event)
     if token:
-        dev_store.delete_session(token)
-    response = _JsonResponse(200, {"message": "Signed out successfully."})
-    response["headers"]["Set-Cookie"] = (
-        "happnix_session=; Path=/; HttpOnly; SameSite=None; Secure; "
-        "Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    )
-    return response
+        sessions.delete_session(token)
+    response = util.ok({"success": True, "message": "Signed out successfully."})
+    return util.clear_session_cookie(response)
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Action Registry
-# ══════════════════════════════════════════════════════════════════════
+# ── Dev-only endpoints ────────────────────────────────────────────────────────
+
+def GetDevAuthStatus(event, payload):
+    if util.app_env() != "dev":
+        return util.err("Route not found.", 404)
+    users_ready   = rds.table_exists("users")
+    devices_ready = rds.table_exists("user_devices")
+    return util.ok({
+        "success": True,
+        "apiStatus": "ok",
+        "environment": util.app_env(),
+        "cognitoUserPoolId": util.env("COGNITO_USER_POOL_ID"),
+        "tables": {
+            "users":        users_ready["data"]   if users_ready["success"]   else False,
+            "user_devices": devices_ready["data"] if devices_ready["success"] else False,
+        },
+    })
+
+
+def WipeDevUsers(event, payload):
+    if util.app_env() != "dev":
+        return util.err("Forbidden outside of dev.", 403)
+    result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
+    if not result["success"]:
+        return util.err(f"Failed to wipe users: {result['error']}", 500)
+    return util.ok({"success": True, "message": "All users and devices deleted from RDS successfully!"})
+
+
+def GetDevAllUsers(event, payload):
+    if util.app_env() != "dev":
+        return util.err("Forbidden outside of dev.", 403)
+    result = rds.get_all_users()
+    if not result["success"]:
+        return util.err(f"Failed to fetch users: {result['error']}", 500)
+    return util.ok({"success": True, "users": result["data"]})
+
+
+# ── Action Registry ───────────────────────────────────────────────────────────
 
 ACTION_REGISTRY = {
-    "SendMobileOtp": SendMobileOtp,
-    "ResendMobileOtp": ResendMobileOtp,
-    "VerifyMobileOtp": VerifyMobileOtp,
-    "LoginWithPassword": LoginWithPassword,
-    "ForgotPasswordRequest": ForgotPasswordRequest,
-    "RegisterUserDetails": RegisterUserDetails,
-    "CompleteProfileSetup": CompleteProfileSetup,
-    "SendAadhaarOtp": SendAadhaarOtp,
-    "VerifyAadhaarOtp": VerifyAadhaarOtp,
-    "GetDevAuthStatus": GetDevAuthStatus,
-    "GetCurrentUser": GetCurrentUser,
+    "SendMobileOtp":           SendMobileOtp,
+    "ResendMobileOtp":         ResendMobileOtp,
+    "VerifyMobileOtp":         VerifyMobileOtp,
+    "LoginWithPassword":       LoginWithPassword,
+    "ForgotPasswordRequest":   ForgotPasswordRequest,
+    "RegisterUserDetails":     RegisterUserDetails,
+    "CompleteProfileSetup":    CompleteProfileSetup,
+    "SendAadhaarOtp":          SendAadhaarOtp,
+    "VerifyAadhaarOtp":        VerifyAadhaarOtp,
+    "GetCurrentUser":          GetCurrentUser,
     "GetSignupSessionDetails": GetSignupSessionDetails,
-    "Logout": Logout,
-    "WipeDevUsers": WipeDevUsers,
-    "GetDevAllUsers": GetDevAllUsers,
+    "Logout":                  Logout,
+    "GetDevAuthStatus":        GetDevAuthStatus,
+    "WipeDevUsers":            WipeDevUsers,
+    "GetDevAllUsers":          GetDevAllUsers,
 }
 
 
-# ══════════════════════════════════════════════════════════════════════
-# Lambda Entry Point
-# ══════════════════════════════════════════════════════════════════════
+# ── Lambda Entry Point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
-    try:
-        response = _lambda_handler_inner(event, context)
-    except Exception as exc:
-        response = _Error(f"Unhandled exception: {str(exc)}", statusCode=500)
-    
-    response.setdefault("headers", {})
-    headers = event.get("headers") or {}
-    origin = headers.get("origin") or headers.get("Origin") or "https://happnix-dev.ronakgo1.workers.dev"
-    response["headers"]["Access-Control-Allow-Origin"] = origin
-    response["headers"]["Access-Control-Allow-Credentials"] = "true"
-    return response
+    trace_id    = util.extract_trace_id(event)
+    http_method = event.get("httpMethod", "POST")
 
-def _lambda_handler_inner(event, context):
-    del context
-    requestContext = event.get("requestContext") or {}
-    traceId = requestContext.get("requestId") or uuid.uuid4().hex
+    if http_method == "OPTIONS":
+        return util.ok({}, 200)
 
-    try:
-        payload = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
-        return _Error("Invalid JSON body.", statusCode=400, traceId=traceId)
+    payload = util.parse_body(event)
+    action  = str(payload.get("actionItem", "")).strip()
 
-    actionItem = str(payload.get("actionItem", "")).strip()
-    _LogTrace("info", traceId, "Incoming request", actionItem=actionItem)
+    util.log("info", trace_id, "Incoming request", actionItem=action)
 
-    if not actionItem:
-        return _Error("Missing actionItem in request body.", statusCode=400, traceId=traceId)
+    if not action:
+        return util.err("Missing actionItem in request body.", 400, trace_id)
 
-    handler = ACTION_REGISTRY.get(actionItem)
+    handler = ACTION_REGISTRY.get(action)
     if handler is None:
-        _LogTrace("warning", traceId, "Unknown actionItem", actionItem=actionItem)
-        return _Error(
-            f"Unknown actionItem: {actionItem}. Available: {', '.join(sorted(ACTION_REGISTRY.keys()))}",
-            statusCode=400, traceId=traceId,
+        util.log("warning", trace_id, "Unknown actionItem", actionItem=action)
+        return util.err(
+            f"Unknown actionItem: '{action}'. Available: {', '.join(sorted(ACTION_REGISTRY))}",
+            400, trace_id,
         )
 
     try:
         response = handler(event, payload)
     except Exception as exc:
-        _LogTrace("error", traceId, "Unhandled exception",
-                  actionItem=actionItem, errorType=type(exc).__name__,
-                  errorMessage=str(exc), traceback=traceback.format_exc())
-        return _Error(f"Internal server error: {str(exc)}", statusCode=500, traceId=traceId)
+        util.log("error", trace_id, "Unhandled exception", actionItem=action,
+                 errorType=type(exc).__name__, error=str(exc))
+        return util.err(f"Internal server error: {exc}", 500, trace_id)
 
+    # Inject CORS origin from request header
+    headers = event.get("headers") or {}
+    origin   = headers.get("origin") or headers.get("Origin") or util.env("FRONTEND_URL", "https://happnix-dev.ronakgo1.workers.dev")
     response.setdefault("headers", {})
-    response["headers"].setdefault("X-Happnix-Trace-Id", traceId)
-    
-    # CORS headers are now injected by the lambda_handler wrapper
+    response["headers"]["Access-Control-Allow-Origin"]      = origin
+    response["headers"]["Access-Control-Allow-Credentials"] = "true"
+    response["headers"].setdefault("X-Happnix-Trace-Id", trace_id)
 
-    try:
-        bodyPayload = json.loads(response.get("body") or "{}")
-        if isinstance(bodyPayload, dict) and "traceId" not in bodyPayload:
-            bodyPayload["traceId"] = traceId
-            response["body"] = json.dumps(bodyPayload)
-    except (TypeError, json.JSONDecodeError):
-        pass
-    _LogTrace("info", traceId, "Request completed",
-              actionItem=actionItem, statusCode=response.get("statusCode"))
+    util.log("info", trace_id, "Request completed", actionItem=action, statusCode=response.get("statusCode"))
     return response

@@ -1,0 +1,467 @@
+"""
+home_page.py — Home Page Lambda for HappniX.
+
+This Lambda powers everything the user sees AFTER logging in.
+It handles all tab data across the home page in one place.
+
+Routes:
+  GET  /api/home/feed                   → GetFeed         (main feed: live + upcoming events)
+  GET  /api/home/live                   → GetLiveNow      (live now section)
+  GET  /api/home/nearby                 → GetNearby       (nearby events by location)
+
+  GET  /api/profile/me                  → GetMyProfile    (logged-in user's profile card)
+  POST /api/profile/update              → UpdateProfile
+  POST /api/profile/privacy             → SetPrivacy
+  GET  /api/profile/following           → GetFollowing
+  GET  /api/profile/followers           → GetFollowers
+  GET  /api/profile/follow-requests     → GetFollowRequests
+  POST /api/profile/follow-requests     → HandleFollowRequest
+
+  GET  /api/users/search?q=             → SearchUsers
+  POST /api/users/follow                → FollowUser
+  GET  /api/users/{id}/profile          → GetPublicProfile
+
+  GET  /api/settings/preferences        → GetPreferences
+  POST /api/settings/preferences        → SavePreferences
+  GET  /api/settings/people/{category}  → GetPeople
+  POST /api/settings/people/{category}  → AddPerson
+  DELETE /api/settings/people/{category}→ RemovePerson
+
+Performance notes:
+  - Auth check is a single DynamoDB session read (no RDS hit unless user data is needed).
+  - Feed and Live Now are read-only DynamoDB queries — no RDS involved.
+  - User lookups for social graph are parallelisable at the caller level.
+"""
+
+import os
+
+from boto3.dynamodb.conditions import Key, Attr
+
+import utilities.util as util
+import utilities.rds as rds
+import utilities.sessions as sessions
+import utilities.dynamo as dynamo
+
+# ── Table names (from env — injected by SAM/CloudFormation) ──────────────────
+_EVENTS_TABLE   = os.environ.get("EVENTS_TABLE_NAME",   "")
+_SOCIAL_TABLE   = os.environ.get("SOCIAL_TABLE_NAME",   "")
+_SETTINGS_TABLE = os.environ.get("SETTINGS_TABLE_NAME", "")
+
+
+# ── Auth helper ───────────────────────────────────────────────────────────────
+
+def _get_session_user(event):
+    """
+    Resolve the authenticated user from the session cookie.
+    Returns: (cognito_sub, user_dict) — both None if not authenticated.
+    Performance: One DynamoDB read for the session.
+    """
+    token = util.extract_session_token(event)
+    if not token:
+        return None, None
+    result = sessions.get_session(token)
+    if not result["success"] or not result["data"]["session"]:
+        return None, None
+    session = result["data"]["session"]
+    cognito_sub = session.get("authenticated_user_id") or session.get("cognitoSub")
+    if not cognito_sub:
+        return None, None
+    user_result = rds.get_user_by_sub(cognito_sub)
+    user = user_result["data"] if user_result["success"] else None
+    return cognito_sub, user
+
+
+def _get_session_sub(event):
+    """
+    Faster auth check — returns only the cognitoSub without hitting RDS.
+    Use when you only need to know WHO is asking, not their full profile.
+    """
+    token = util.extract_session_token(event)
+    if not token:
+        return None
+    result = sessions.get_session(token)
+    if not result["success"] or not result["data"]["session"]:
+        return None
+    return result["data"]["session"].get("authenticated_user_id")
+
+
+# ── Social graph helpers ──────────────────────────────────────────────────────
+
+def _list_following(sub):
+    r = dynamo.query_items(_SOCIAL_TABLE, Key("cognitoSub").eq(sub) & Key("relationKey").begins_with("FOLLOW#"))
+    return r["data"] if r["success"] else []
+
+def _list_followers(sub):
+    r = dynamo.query_items(_SOCIAL_TABLE, Key("targetSub").eq(sub), index_name="targetSub-index")
+    items = r["data"] if r["success"] else []
+    return [i for i in items if i.get("relationKey", "").startswith("FOLLOW#")]
+
+def _is_following(actor_sub, target_sub):
+    if not actor_sub or not target_sub:
+        return False
+    r = dynamo.get_item(_SOCIAL_TABLE, {"cognitoSub": actor_sub, "relationKey": f"FOLLOW#{target_sub}"})
+    item = r["data"] if r["success"] else None
+    return bool(item and item.get("status") == "active")
+
+def _list_follow_requests(sub):
+    r = dynamo.query_items(_SOCIAL_TABLE, Key("targetSub").eq(sub),
+                    filter_expression=Attr("status").eq("pending"),
+                    index_name="targetSub-index")
+    return r["data"] if r["success"] else []
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HOME PAGE TAB HANDLERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def GetFeed(event, path_params, query_params, body):
+    """
+    Main home feed — returns live events + upcoming events.
+    Does NOT require auth so unauthenticated users can browse.
+    """
+    limit = min(int(query_params.get("limit") or 20), 50)
+
+    live_result = query_items(
+        _EVENTS_TABLE,
+        Key("statusStartAt").begins_with("live#"),
+        index_name="status-startAt-index",
+        limit=limit,
+        scan_index_forward=False,
+    )
+    upcoming_result = query_items(
+        _EVENTS_TABLE,
+        Key("statusStartAt").begins_with("upcoming#"),
+        index_name="status-startAt-index",
+        limit=limit,
+        scan_index_forward=True,
+    )
+
+    return util.ok({
+        "success": True,
+        "liveEvents":     live_result["data"]     if live_result["success"]     else [],
+        "upcomingEvents": upcoming_result["data"]  if upcoming_result["success"] else [],
+    })
+
+
+def GetLiveNow(event, path_params, query_params, body):
+    """Live Now section — only live events, sorted newest first."""
+    limit = min(int(query_params.get("limit") or 10), 30)
+    result = query_items(
+        _EVENTS_TABLE,
+        Key("statusStartAt").begins_with("live#"),
+        index_name="status-startAt-index",
+        limit=limit,
+        scan_index_forward=False,
+    )
+    events = result["data"] if result["success"] else []
+    return util.ok({"success": True, "count": len(events), "events": events})
+
+
+def GetNearby(event, path_params, query_params, body):
+    """
+    Nearby events by geohash prefix.
+    Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
+    """
+    geohash = str(query_params.get("geohash") or "").strip()
+    if not geohash:
+        return util.err("geohash query param is required.", 400)
+    limit = min(int(query_params.get("limit") or 30), 50)
+    result = query_items(
+        _EVENTS_TABLE,
+        Key("geohash").begins_with(geohash),
+        index_name="geohash-index",
+        limit=limit,
+    )
+    events = result["data"] if result["success"] else []
+    return util.ok({"success": True, "geohash": geohash, "count": len(events), "events": events})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROFILE HANDLERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def GetMyProfile(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    following = _list_following(cognito_sub)
+    followers = _list_followers(cognito_sub)
+    prefs_r = get_item(_SETTINGS_TABLE, {"cognitoSub": cognito_sub, "settingKey": "PREFERENCES"})
+    prefs = (prefs_r["data"] or {}) if prefs_r["success"] else {}
+    return util.ok({
+        "success": True,
+        "profile": format_public_profile(user, len(following), len(followers)),
+        "preferences": prefs,
+    })
+
+
+def UpdateProfile(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    bio = str(body.get("bio") or "")[:280]
+    pic = str(body.get("profilePictureUrl") or "")[:500]
+    result = update_user_profile(cognito_sub, bio=bio, profile_picture_url=pic)
+    if not result["success"]:
+        return util.err(f"Update failed: {result['error']}", 500)
+    return util.ok({"success": True, "profile": format_public_profile(result["data"])})
+
+
+def SetPrivacy(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    mode = str(body.get("privacyMode") or "public").lower()
+    if mode not in ("public", "private"):
+        return util.err("privacyMode must be 'public' or 'private'.")
+    result = update_user_profile(cognito_sub, privacy_mode=mode)
+    if not result["success"]:
+        return util.err(f"Update failed: {result['error']}", 500)
+    return util.ok({"success": True, "privacyMode": mode, "profile": format_public_profile(result["data"])})
+
+
+def GetFollowing(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    items = _list_following(cognito_sub)
+    subs = [i["targetSub"] for i in items if i.get("status") == "active"]
+    users = []
+    for sub in subs:
+        r = get_user_by_sub(sub)
+        if r["success"] and r["data"]:
+            users.append(format_public_profile(r["data"]))
+    return util.ok({"success": True, "following": users})
+
+
+def GetFollowers(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    items = _list_followers(cognito_sub)
+    subs = [i["cognitoSub"] for i in items if i.get("status") == "active"]
+    users = []
+    for sub in subs:
+        r = get_user_by_sub(sub)
+        if r["success"] and r["data"]:
+            users.append(format_public_profile(r["data"]))
+    return util.ok({"success": True, "followers": users})
+
+
+def GetFollowRequests(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    requests = _list_follow_requests(cognito_sub)
+    result = []
+    for req in requests:
+        r = get_user_by_sub(req["cognitoSub"])
+        if r["success"] and r["data"]:
+            result.append({**format_public_profile(r["data"]), "requestedAt": req.get("createdAt")})
+    return util.ok({"success": True, "requests": result})
+
+
+def HandleFollowRequest(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    action = str(body.get("action") or "").lower()
+    requester_sub = str(body.get("requesterCognitoSub") or "").strip()
+    if not requester_sub or action not in ("accept", "reject"):
+        return util.err("Provide requesterCognitoSub and action (accept|reject).")
+    new_status = "active" if action == "accept" else "rejected"
+    update_item(_SOCIAL_TABLE,
+                {"cognitoSub": requester_sub, "relationKey": f"FOLLOW#{cognito_sub}"},
+                {"status": new_status})
+    return util.ok({"success": True, "action": action, "requesterCognitoSub": requester_sub})
+
+
+def SearchUsers(event, path_params, query_params, body):
+    cognito_sub = _get_session_sub(event)
+    if not cognito_sub:
+        return util.err("Not authenticated.", 401)
+    q = str(query_params.get("q") or "").strip()
+    limit = min(int(query_params.get("limit") or 20), 50)
+    if not q:
+        return util.ok({"success": True, "users": []})
+    result = search_users_by_username(q, limit=limit)
+    if not result["success"]:
+        return util.err(f"Search failed: {result['error']}", 500)
+    users = []
+    for row in result["data"]:
+        sub = row.get("cognitoSub")
+        following = _is_following(cognito_sub, sub) if sub else False
+        users.append({**format_public_profile(row), "isFollowing": following})
+    return util.ok({"success": True, "users": users})
+
+
+def FollowUser(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    target_sub = str(body.get("targetCognitoSub") or body.get("userId") or "").strip()
+    if not target_sub:
+        return util.err("Provide targetCognitoSub.")
+    target_r = get_user_by_sub(target_sub)
+    target_user = target_r["data"] if target_r["success"] else None
+    if not target_user:
+        return util.err("User not found.", 404)
+    action = str(body.get("action") or "follow").lower()
+    if action == "unfollow":
+        delete_item(_SOCIAL_TABLE, {"cognitoSub": cognito_sub, "relationKey": f"FOLLOW#{target_sub}"})
+        return util.ok({"success": True, "following": False, "targetCognitoSub": target_sub})
+    privacy = target_user.get("privacyMode") or "public"
+    status = "pending" if privacy == "private" else "active"
+    put_item(_SOCIAL_TABLE, {
+        "cognitoSub": cognito_sub, "relationKey": f"FOLLOW#{target_sub}",
+        "targetSub": target_sub, "relationType": "follow",
+        "status": status, "createdAt": now_iso(),
+    })
+    return util.ok({"success": True, "following": status == "active", "status": status, "targetCognitoSub": target_sub})
+
+
+def GetPublicProfile(event, path_params, query_params, body):
+    cognito_sub = _get_session_sub(event)  # viewer — may be None
+    user_id = str(path_params.get("id") or "").strip()
+    if not user_id:
+        return util.err("User ID required.", 400)
+    target_r = get_user_by_sub(user_id)
+    target_user = target_r["data"] if target_r["success"] else None
+    if not target_user:
+        return util.err("User not found.", 404)
+    target_sub = target_user.get("cognitoSub")
+    following = _list_following(target_sub)
+    followers = _list_followers(target_sub)
+    is_fol = _is_following(cognito_sub, target_sub) if cognito_sub else False
+    events_r = query_items(_EVENTS_TABLE,
+                           Key("cognitoSub").eq(target_sub) & Key("itemId").begins_with("EVENT#"))
+    events = events_r["data"] if events_r["success"] else []
+    return util.ok({
+        "success": True,
+        "profile": {
+            **format_public_profile(target_user, len(following), len(followers), is_fol),
+            "hostedEvents": events,
+        },
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SETTINGS HANDLERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def GetPreferences(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    r = get_item(_SETTINGS_TABLE, {"cognitoSub": cognito_sub, "settingKey": "PREFERENCES"})
+    prefs = (r["data"] or {}) if r["success"] else {}
+    return util.ok({"success": True, "preferences": prefs})
+
+
+def SavePreferences(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    item = {
+        "cognitoSub": cognito_sub, "settingKey": "PREFERENCES", "updatedAt": now_iso(),
+        **{k: v for k, v in body.items() if k not in ("cognitoSub", "settingKey")},
+    }
+    put_item(_SETTINGS_TABLE, item)
+    return util.ok({"success": True, "preferences": item})
+
+
+def GetPeople(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    category = str(path_params.get("category") or "").lower()
+    if category not in ("blocked", "muted"):
+        return util.err("Category must be 'blocked' or 'muted'.")
+    r = get_item(_SETTINGS_TABLE, {"cognitoSub": cognito_sub, "settingKey": category.upper()})
+    people = ((r["data"] or {}).get("people", [])) if r["success"] else []
+    return util.ok({"success": True, "category": category, "people": list(people)})
+
+
+def AddPerson(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    category = str(path_params.get("category") or "").lower()
+    target_sub = str(body.get("targetCognitoSub") or body.get("userId") or "").strip()
+    if not target_sub or category not in ("blocked", "muted"):
+        return util.err("Provide targetCognitoSub and valid category.")
+    add_to_set(_SETTINGS_TABLE, {"cognitoSub": cognito_sub, "settingKey": category.upper()}, "people", {target_sub})
+    return util.ok({"success": True, "category": category, "added": target_sub})
+
+
+def RemovePerson(event, path_params, query_params, body):
+    cognito_sub, user = _get_session_user(event)
+    if not user:
+        return util.err("Not authenticated.", 401)
+    category = str(path_params.get("category") or "").lower()
+    target_sub = str(body.get("targetCognitoSub") or body.get("userId") or "").strip()
+    if not target_sub or category not in ("blocked", "muted"):
+        return util.err("Provide targetCognitoSub and valid category.")
+    remove_from_set(_SETTINGS_TABLE, {"cognitoSub": cognito_sub, "settingKey": category.upper()}, "people", {target_sub})
+    return util.ok({"success": True, "category": category, "removed": target_sub})
+
+
+# ── Router ────────────────────────────────────────────────────────────────────
+
+def _resolve(method, path):
+    m = method.upper()
+    p = [s for s in path.split("/") if s]
+
+    # Home feed routes
+    if m == "GET" and p == ["api", "home", "feed"]:               return GetFeed, {}
+    if m == "GET" and p == ["api", "home", "live"]:               return GetLiveNow, {}
+    if m == "GET" and p == ["api", "home", "nearby"]:             return GetNearby, {}
+
+    # Profile routes
+    if m == "GET"  and p == ["api", "profile", "me"]:                                         return GetMyProfile, {}
+    if m == "POST" and p == ["api", "profile", "update"]:                                     return UpdateProfile, {}
+    if m == "POST" and p == ["api", "profile", "privacy"]:                                    return SetPrivacy, {}
+    if m == "GET"  and p == ["api", "profile", "following"]:                                  return GetFollowing, {}
+    if m == "GET"  and p == ["api", "profile", "followers"]:                                  return GetFollowers, {}
+    if m == "GET"  and p == ["api", "profile", "follow-requests"]:                            return GetFollowRequests, {}
+    if m == "POST" and p == ["api", "profile", "follow-requests"]:                            return HandleFollowRequest, {}
+
+    # User routes
+    if m == "GET"  and p == ["api", "users", "search"]:                                       return SearchUsers, {}
+    if m == "POST" and p == ["api", "users", "follow"]:                                       return FollowUser, {}
+    if m == "GET"  and len(p) == 4 and p[1] == "users" and p[3] == "profile":                return GetPublicProfile, {"id": p[2]}
+
+    # Settings routes
+    if m == "GET"  and p == ["api", "settings", "preferences"]:                               return GetPreferences, {}
+    if m == "POST" and p == ["api", "settings", "preferences"]:                               return SavePreferences, {}
+    if m == "GET"    and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return GetPeople, {"category": p[3]}
+    if m == "POST"   and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return AddPerson, {"category": p[3]}
+    if m == "DELETE" and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return RemovePerson, {"category": p[3]}
+
+    return None, {}
+
+
+# ── Lambda Entry Point ────────────────────────────────────────────────────────
+
+def lambda_handler(event, context):
+    http_method = event.get("httpMethod", "GET")
+    path = event.get("path", "/")
+
+    if http_method == "OPTIONS":
+        return util.ok({}, 200)
+
+    query_params = event.get("queryStringParameters") or {}
+    path_params  = event.get("pathParameters") or {}
+    body = parse_body(event)
+
+    handler, resolved_params = _resolve(http_method, path)
+    merged_params = {**path_params, **resolved_params}
+
+    if handler is None:
+        return util.err(f"Route not found: {http_method} {path}", 404)
+
+    try:
+        return handler(event, merged_params, query_params, body)
+    except Exception as exc:
+        util.log("error", "home_page", f"Unhandled error in {handler.__name__}: {exc}")
+        return util.err("An internal error occurred.", 500)

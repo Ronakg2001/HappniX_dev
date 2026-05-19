@@ -93,14 +93,21 @@ Parameters:
     Type: String
     Default: "false"
     AllowedValues: [ "true", "false" ]
-  EnableProfilesApi:
+  EnableHomePageApi:
     Type: String
     Default: "true"
     AllowedValues: [ "true", "false" ]
+    Description: Enable Home Page Lambda (feed, profile, social graph, settings).
+  EnableProfilesApi:
+    Type: String
+    Default: "false"
+    AllowedValues: [ "true", "false" ]
+    Description: Kept for backward-compat. HomePageApi replaces ProfilesApi.
   EnableMessagingApi:
     Type: String
     Default: "false"
     AllowedValues: [ "true", "false" ]
+    Description: Enable Messaging Lambda (DMs, group chat).
   EnableGroupChatApi:
     Type: String
     Default: "false"
@@ -126,6 +133,10 @@ Conditions:
   HasTicketsApi:
     Fn::Equals:
       - Ref: EnableTicketsApi
+      - "true"
+  HasHomePageApi:
+    Fn::Equals:
+      - Ref: EnableHomePageApi
       - "true"
   HasProfilesApi:
     Fn::Equals:
@@ -444,12 +455,147 @@ Resources:
   # These are STUBS — update Handler/CodeUri when your code is ready.
   # ══════════════════════════════════════════════════════════════════════
 
+  # ── Home Page Lambda (replaces ProfilesApi) ───────────────────────────────
+  HomePageApi:
+    Type: AWS::Serverless::Function
+    Condition: HasHomePageApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: home_page.lambda_handler
+      Description: Home page — feed, live events, profile, social graph, search, settings.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+      Events:
+        HomeFeed:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/feed
+            Method: GET
+        HomeLive:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/live
+            Method: GET
+        HomeNearby:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/nearby
+            Method: GET
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/me
+            Method: GET
+        UpdateProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/update
+            Method: POST
+        ProfilePrivacy:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/privacy
+            Method: POST
+        GetFollowing:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/following
+            Method: GET
+        GetFollowers:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/followers
+            Method: GET
+        FollowRequests:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/follow-requests
+            Method: GET
+        HandleFollowRequest:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/follow-requests
+            Method: POST
+        SearchUsers:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/search
+            Method: GET
+        FollowUser:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/follow
+            Method: POST
+        PublicProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/{id}/profile
+            Method: GET
+        GetPreferences:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/preferences
+            Method: GET
+        SavePreferences:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/preferences
+            Method: POST
+        GetPeople:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: GET
+        AddPerson:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: POST
+        RemovePerson:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: DELETE
+
   EventsApi:
     Type: AWS::Serverless::Function
     Condition: HasEventsApi
     Properties:
       CodeUri: ../../backend/
-      Handler: events_api.lambda_handler
+      Handler: events.lambda_handler
       Description: Events CRUD — create, list, discover, delete.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -571,8 +717,8 @@ Resources:
     Condition: HasProfilesApi
     Properties:
       CodeUri: ../../backend/
-      Handler: profiles_api.lambda_handler
-      Description: User profiles, follow system, search, settings.
+      Handler: home_page.lambda_handler
+      Description: Legacy — replaced by HomePageApi. Kept for backward compat.
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
@@ -674,7 +820,7 @@ Resources:
     Condition: HasMessagingApi
     Properties:
       CodeUri: ../../backend/
-      Handler: messaging_api.lambda_handler
+      Handler: messaging.lambda_handler
       Description: Direct messaging — conversations, messages, attachments.
       Policies:
         - AWSLambdaBasicExecutionRole

@@ -1,13 +1,26 @@
+"""
+CognitoPreToken.py — Cognito Pre-Token Generation trigger Lambda.
+
+Injects custom claims (userID, userType) into the Cognito JWT.
+Uses utilities/rds.py for the DB lookup.
+"""
+
 import json
 import os
 
-from . import auth_db
+from utilities.rds import get_user_claims_by_sub
 
 
 def lambda_handler(event, context):
-    del context
     sub = event["request"]["userAttributes"]["sub"]
-    claims = auth_db.fetch_user_claims_by_sub(sub)
+
+    result = get_user_claims_by_sub(sub)
+
+    if not result["success"]:
+        print(json.dumps({"level": "error", "message": "claims lookup failed", "error": result["error"], "sub": sub}))
+        return event
+
+    claims = result["data"]
     if not claims:
         print(json.dumps({"level": "warning", "message": "missing cognito mapping", "sub": sub}))
         return event
@@ -19,7 +32,7 @@ def lambda_handler(event, context):
 
     override = event.setdefault("response", {}).setdefault("claimsOverrideDetails", {})
     override["claimsToAddOrOverride"] = {
-        "userID": claims["userID"],
+        "userID":   claims["userID"],
         "userType": claims["userType"],
     }
     return event
