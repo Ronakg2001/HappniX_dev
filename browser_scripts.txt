@@ -71,3 +71,14 @@ fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
   console.log("RDS DB password:", data);
 });
 
+GET DynamoDB table names (needed for HomePage API)
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/home'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevTableNames' })
+}).then(r => r.json()).then(d => {
+  console.log("DynamoDB table names:", d);
+  window.HAPPNIX_RUNTIME_CONFIG.tables = d;
+});
+

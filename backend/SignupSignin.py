@@ -299,15 +299,31 @@ def RegisterUserDetails(event, payload):
         return _session_response(500, {"success": False, "message": f"Failed to save user: {rds_result['error']}"}, token)
 
     if _USERS_TABLE:
-        dynamo.put_item(_USERS_TABLE, {
-            "userID": user_id, "userName": username,
-            "createdAt": util.now_iso(), "updatedAt": util.now_iso(),
+        dynamo_result = dynamo.put_item(_USERS_TABLE, {
+            "userID":    user_id,
+            "userName":  username,
+            "cognitoSub": cognito_sub,
+            "createdAt": util.now_iso(),
+            "updatedAt": util.now_iso(),
             "personalDetails": {
-                "fullName": full_name, "email": email,
-                "phoneNumber": formatted_mobile, "address": "",
+                "fullName":    full_name,
+                "email":       email,
+                "phoneNumber": formatted_mobile,
+                "address":     "",
                 "aadharNumber": gov_id,
             },
         })
+        if not dynamo_result["success"]:
+            # Log the error but don't block signup — user is already in Cognito + RDS
+            util.log("error", "RegisterUserDetails",
+                     "DynamoDB put_item failed — user not written to userInfoTable",
+                     userID=user_id, table=_USERS_TABLE, error=dynamo_result["error"])
+        else:
+            util.log("info", "RegisterUserDetails",
+                     "DynamoDB write OK", userID=user_id, table=_USERS_TABLE)
+    else:
+        util.log("warning", "RegisterUserDetails",
+                 "USERS_TABLE_NAME env var is empty — DynamoDB write skipped")
 
     session.pop("pending_signup_mobile", None)
     session["pending_profile_setup"] = True
