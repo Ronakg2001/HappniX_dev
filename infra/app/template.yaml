@@ -98,11 +98,6 @@ Parameters:
     Default: "true"
     AllowedValues: [ "true", "false" ]
     Description: Enable Home Page Lambda (feed, profile, social graph, settings).
-  EnableProfilesApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-    Description: Kept for backward-compat. HomePageApi replaces ProfilesApi.
   EnableMessagingApi:
     Type: String
     Default: "false"
@@ -137,10 +132,6 @@ Conditions:
   HasHomePageApi:
     Fn::Equals:
       - Ref: EnableHomePageApi
-      - "true"
-  HasProfilesApi:
-    Fn::Equals:
-      - Ref: EnableProfilesApi
       - "true"
   HasMessagingApi:
     Fn::Equals:
@@ -209,11 +200,18 @@ Globals:
 
         NOTIFICATIONS_TABLE_NAME:
           Ref: NotificationsTableName
+
+        # ── Feature table names (used by HomePageApi, EventsApi etc.) ───────
+        SOCIAL_TABLE_NAME:
+          Fn::Sub: HappniX-social-${EnvironmentName}
+        EVENTS_TABLE_NAME:
+          Fn::Sub: HappniX-events-${EnvironmentName}
+        SETTINGS_TABLE_NAME:
+          Fn::Sub: HappniX-settings-${EnvironmentName}
+
         COGNITO_USER_POOL_ID:
-          # Moved here from SignupSignin
           Ref: HappnixUserPool
         COGNITO_USER_POOL_CLIENT_ID:
-          # Moved here from SignupSignin
           Ref: HappnixUserPoolClient
     VpcConfig:
       SecurityGroupIds:
@@ -711,109 +709,6 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/tickets/{id}/verify
             Method: POST
-
-  ProfilesApi:
-    Type: AWS::Serverless::Function
-    Condition: HasProfilesApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: home_page.lambda_handler
-      Description: Legacy — replaced by HomePageApi. Kept for backward compat.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        SearchUsers:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/search
-            Method: GET
-        FollowUser:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/follow
-            Method: POST
-        PublicProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/{id}/profile
-            Method: GET
-        MyProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/me
-            Method: GET
-        UpdateProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/update
-            Method: POST
-        ProfilePrivacy:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/privacy
-            Method: POST
-        FollowRequests:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/follow-requests
-            Method: GET
-        FollowGraph:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/{graph_type}
-            Method: GET
-        GetPreferences:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/settings/preferences
-            Method: GET
-        SavePreferences:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/settings/preferences
-            Method: POST
-        GetPeople:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/settings/people/{category}
-            Method: GET
-        AddPerson:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/settings/people/{category}
-            Method: POST
-        RemovePerson:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/settings/people/{category}
-            Method: DELETE
 
   MessagingApi:
     Type: AWS::Serverless::Function
