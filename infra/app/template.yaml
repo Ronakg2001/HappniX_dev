@@ -86,13 +86,9 @@ Parameters:
   # ─── Feature toggles (add Lambdas when ready) ─────────────────────
   EnableEventsApi:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: [ "true", "false" ]
-    Description: Enable Events Lambda. Set true when events_api.py is ready.
-  EnableTicketsApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
+    Description: Enable Events Lambda.
   EnableHomePageApi:
     Type: String
     Default: "true"
@@ -103,31 +99,16 @@ Parameters:
     Default: "true"
     AllowedValues: [ "true", "false" ]
     Description: Enable Messaging Lambda (DMs, group chat).
-  EnableGroupChatApi:
+  EnableProfileApi:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: [ "true", "false" ]
-  EnableGuestsApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableNotificationsApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableMediaApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
+    Description: Enable Profile Lambda.
 
 Conditions:
   HasEventsApi:
     Fn::Equals:
       - Ref: EnableEventsApi
-      - "true"
-  HasTicketsApi:
-    Fn::Equals:
-      - Ref: EnableTicketsApi
       - "true"
   HasHomePageApi:
     Fn::Equals:
@@ -137,21 +118,9 @@ Conditions:
     Fn::Equals:
       - Ref: EnableMessagingApi
       - "true"
-  HasGroupChatApi:
+  HasProfileApi:
     Fn::Equals:
-      - Ref: EnableGroupChatApi
-      - "true"
-  HasGuestsApi:
-    Fn::Equals:
-      - Ref: EnableGuestsApi
-      - "true"
-  HasNotificationsApi:
-    Fn::Equals:
-      - Ref: EnableNotificationsApi
-      - "true"
-  HasMediaApi:
-    Fn::Equals:
-      - Ref: EnableMediaApi
+      - Ref: EnableProfileApi
       - "true"
   HasUsersTable:
     Fn::Not:
@@ -497,30 +466,6 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/home/nearby
             Method: GET
-        LiveEventsForHome:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/events/live
-            Method: GET
-        NearbyEventsForHome:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/events/nearby
-            Method: GET
-        MyEventsForHome:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/events/mine
-            Method: GET
-        DeleteEventForHome:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/events/{id}
-            Method: DELETE
         TicketsForHome:
           Type: Api
           Properties:
@@ -676,6 +621,20 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
       Events:
         CreateEvent:
           Type: Api
@@ -720,74 +679,6 @@ Resources:
             Path: /api/events/{id}
             Method: DELETE
 
-  TicketsApi:
-    Type: AWS::Serverless::Function
-    Condition: HasTicketsApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: tickets_api.lambda_handler
-      Description: Ticket booking, payment, cancellation, group management.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        ListTickets:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets
-            Method: GET
-        BookTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/book
-            Method: POST
-        PayTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/pay
-            Method: POST
-        CancelTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/cancel
-            Method: POST
-        ArchiveTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/archive
-            Method: POST
-        DeleteTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/delete
-            Method: DELETE
-        GroupTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/group
-            Method: POST
-        VerifyTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/verify
-            Method: POST
-
   MessagingApi:
     Type: AWS::Serverless::Function
     Condition: HasMessagingApi
@@ -798,6 +689,20 @@ Resources:
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
       Events:
         ListConversations:
           Type: Api
@@ -891,172 +796,74 @@ Resources:
             Path: /api/messages/group-messages/{id}/{action}
             Method: POST
 
-  GroupChatApi:
+  ProfileApi:
     Type: AWS::Serverless::Function
-    Condition: HasGroupChatApi
+    Condition: HasProfileApi
     Properties:
       CodeUri: ../../backend/
-      Handler: group_chat_api.lambda_handler
-      Description: Group conversations — CRUD, members, messages.
+      Handler: profile.lambda_handler
+      Description: Deep profile operations — Aadhaar verification, settings, notifications.
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
       Events:
-        CreateGroup:
+        GetProfile:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/messages/groups/create
-            Method: POST
-        GroupDetails:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}
+            Path: /api/profile/{id}
             Method: GET
-        GroupMessages:
+        SendAadhaarOtp:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/messages
+            Path: /api/profile/verify/aadhaar/send
+            Method: POST
+        VerifyAadhaarOtp:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/verify/aadhaar/verify
+            Method: POST
+        UploadProfilePicture:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/picture/upload
+            Method: POST
+        GetNotifications:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/notifications
             Method: GET
-        AddMembers:
+        MarkNotificationsRead:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/members
-            Method: POST
-        LeaveGroup:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/leave
-            Method: POST
-        RenameGroup:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/rename
+            Path: /api/profile/notifications/read
             Method: POST
 
-  GuestsApi:
-    Type: AWS::Serverless::Function
-    Condition: HasGuestsApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: guests_api.lambda_handler
-      Description: Guest invite system — create, OTP, onboarding, payment.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        CreateInvite:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites
-            Method: POST
-        GuestSendOtp:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/send-mobile-otp
-            Method: POST
-        GuestVerifyOtp:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/verify-mobile-otp
-            Method: POST
-        GuestOnboarding:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/onboarding
-            Method: POST
-        GuestPay:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/pay
-            Method: POST
-        GuestCancel:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/cancel
-            Method: POST
-
-  NotificationsApi:
-    Type: AWS::Serverless::Function
-    Condition: HasNotificationsApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: notifications_api.lambda_handler
-      Description: Activity notifications — list, log, mark read.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        ListNotifications:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/notifications
-            Method: GET
-        LogActivity:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/notifications/activity
-            Method: POST
-        MarkRead:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/notifications/read
-            Method: POST
-
-  MediaApi:
-    Type: AWS::Serverless::Function
-    Condition: HasMediaApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: media_api.lambda_handler
-      Description: Media upload — presigned URL generation for R2.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        GetUploadUrl:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/media/upload-url
-            Method: POST
-        DeleteMedia:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/media/delete
-            Method: POST
 
 Outputs:
   HappnixApiUrl:
