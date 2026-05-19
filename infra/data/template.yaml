@@ -73,6 +73,23 @@ Parameters:
     AllowedValues: ["true", "false"]
     Description: DynamoDB notifications table.
 
+  # ─── Feature Table Toggles ─────────────────────────────────────────
+  EnableSocialTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Social graph (follows, follow-requests). Required by HomePageApi.
+  EnableEventsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Events table (live, upcoming, nearby). Required by HomePageApi.
+  EnableSettingsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: User preferences, blocked/muted lists. Required by HomePageApi.
+
 
 Conditions:
   HasRds:
@@ -102,6 +119,18 @@ Conditions:
   HasNotificationsTable:
     Fn::Equals:
       - Ref: EnableNotificationsTable
+      - "true"
+  HasSocialTable:
+    Fn::Equals:
+      - Ref: EnableSocialTable
+      - "true"
+  HasEventsTable:
+    Fn::Equals:
+      - Ref: EnableEventsTable
+      - "true"
+  HasSettingsTable:
+    Fn::Equals:
+      - Ref: EnableSettingsTable
       - "true"
 
 
@@ -296,7 +325,102 @@ Resources:
           Value:
             Fn::Sub: HappniX-notifications-${EnvironmentName}
 
+  # ─── Social Graph (follows, follow-requests) ───────────────────────
+  HappnixSocialTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasSocialTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-social-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: relationKey
+          AttributeType: S
+        - AttributeName: targetSub
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: relationKey
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: targetSub-index
+          KeySchema:
+            - AttributeName: targetSub
+              KeyType: HASH
+            - AttributeName: cognitoSub
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-social-${EnvironmentName}
 
+  # ─── Events (live, upcoming, geo) ──────────────────────────────────
+  HappnixEventsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasEventsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-events-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: statusStartAt
+          AttributeType: S
+        - AttributeName: geohash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: itemId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: status-startAt-index
+          KeySchema:
+            - AttributeName: statusStartAt
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: geohash-index
+          KeySchema:
+            - AttributeName: geohash
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-events-${EnvironmentName}
+
+  # ─── Settings (preferences, blocked, muted) ────────────────────────
+  HappnixSettingsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasSettingsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-settings-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: settingKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: settingKey
+          KeyType: RANGE
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-settings-${EnvironmentName}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -362,5 +486,18 @@ Outputs:
     Description: DynamoDB notifications table name.
     Value:
       Ref: HappnixNotificationsTable
-
-
+  SocialTableName:
+    Condition: HasSocialTable
+    Description: DynamoDB social graph table name.
+    Value:
+      Ref: HappnixSocialTable
+  EventsTableName:
+    Condition: HasEventsTable
+    Description: DynamoDB events table name.
+    Value:
+      Ref: HappnixEventsTable
+  SettingsTableName:
+    Condition: HasSettingsTable
+    Description: DynamoDB settings table name.
+    Value:
+      Ref: HappnixSettingsTable
