@@ -7077,7 +7077,14 @@ function switchTab(tabId) {
   document
     .querySelectorAll(".view-section")
     .forEach((el) => el.classList.remove("active"));
-  document.getElementById(`view-${tabId}`).classList.add("active");
+  const viewEl = document.getElementById(`view-${tabId}`);
+  if (viewEl) {
+    viewEl.classList.add("active");
+  } else {
+    // Fallback: show home if the target view element doesn't exist
+    const homeEl = document.getElementById("view-home");
+    if (homeEl) homeEl.classList.add("active");
+  }
 
   // Hide Mobile Header on Search/Add
   const header = document.getElementById("main-header");

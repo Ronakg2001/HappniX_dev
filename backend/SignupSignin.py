@@ -22,7 +22,7 @@ import utilities.util as util        # ok, err, log, validators, formatters
 import utilities.rds as rds          # get_user_by_sub, upsert_user, ...
 import utilities.sessions as sessions # get_session, ensure_session, ...
 import utilities.dynamo as dynamo    # put_item, get_item, query_items, ...
-from utilities.r2_helper import upload_profile_picture
+from utilities.r2_helper import upload_profile_picture, init_user_folder_structure
 
 # ── Cognito client ────────────────────────────────────────────────────────────
 try:
@@ -376,17 +376,37 @@ def CompleteProfileSetup(event, payload):
     if not payload.get("skip", False):
         bio = str(payload.get("bio", "")).strip()
         pic_input = str(payload.get("profilePictureUrl", "")).strip()
-        
+
+        # Upload to R2 if a base64 image was sent
         if pic_input.startswith("data:image/"):
             pic_url = upload_profile_picture(user["userID"], user["userName"], pic_input)
             pic_input = pic_url if pic_url else ""
-            
-        result = rds.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=pic_input)
-        if result["success"]:
-            user = result["data"]
+
+        # Save bio & profilePictureUrl to DynamoDB (not RDS)
+        if _USERS_TABLE:
+            dynamo_updates = {"updatedAt": util.now_iso()}
+            if bio:
+                dynamo_updates["bio"] = bio
+            if pic_input:
+                dynamo_updates["profilePictureUrl"] = pic_input
+            if dynamo_updates:
+                dynamo.update_item(_USERS_TABLE, {"userID": user["userID"]}, dynamo_updates)
+
+        # Reflect into local user dict for the session response
+        user["bio"] = bio
+        if pic_input:
+            user["profilePictureUrl"] = pic_input
 
     session.pop("pending_profile_setup", None)
     _save_session(token, session)
+
+    # Always initialise the user's R2 folder structure on signup completion
+    # (fires whether user saved a photo or skipped — non-fatal if R2 is not configured)
+    try:
+        init_user_folder_structure(user["userID"], user["userName"])
+    except Exception as _r2_err:
+        print(f"WARN: R2 folder init failed: {_r2_err}")
+
     return _session_response(200, {
         "success": True,
         "message": "Profile setup completed.",

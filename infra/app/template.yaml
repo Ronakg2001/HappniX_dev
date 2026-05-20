@@ -277,7 +277,8 @@ Resources:
       EnableTokenRevocation: true
       PreventUserExistenceErrors: ENABLED
       ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH # ← Email/Username + Password
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH # ← Server-side auth from Lambda (AdminInitiateAuth)
+        - ALLOW_USER_PASSWORD_AUTH # ← Email/Username + Password (client-side)
         - ALLOW_USER_SRP_AUTH # ← Secure Remote Password (client-side)
         - ALLOW_REFRESH_TOKEN_AUTH # ← Token refresh
         - ALLOW_CUSTOM_AUTH # ← Mobile + OTP (custom challenge)

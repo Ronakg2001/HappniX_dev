@@ -341,9 +341,11 @@ def update_user_profile(cognito_sub: str, bio: str = None,
                         profile_picture_url: str = None,
                         privacy_mode: str = None) -> dict:
     """
-    Update mutable profile fields for a user identified by cognitoSub.
+    Update mutable profile fields in RDS.
 
-    Only non-None arguments are included in the UPDATE statement.
+    NOTE: bio and profile_picture_url are intentionally NOT updated here —
+    they are now stored in DynamoDB (userInfoTable). Only privacy_mode
+    and other RDS-owned fields are updated here.
 
     Returns:
         {"success": True, "data": <updated user dict>}  or  {"success": False, "error": "..."}
@@ -351,12 +353,7 @@ def update_user_profile(cognito_sub: str, bio: str = None,
     try:
         updates = []
         params = []
-        if bio is not None:
-            updates.append('"bio" = %s')
-            params.append(bio)
-        if profile_picture_url is not None:
-            updates.append('"profilePictureUrl" = %s')
-            params.append(profile_picture_url)
+        # bio and profile_picture_url deliberately skipped — stored in DynamoDB
         if privacy_mode is not None:
             updates.append('"privacyMode" = %s')
             params.append(privacy_mode)
@@ -376,6 +373,7 @@ def update_user_profile(cognito_sub: str, bio: str = None,
         return _ok(row)
     except Exception as exc:
         return _fail(f"update_user_profile failed: {exc}")
+
 
 
 def update_user_active_status(cognito_sub: str, is_active: bool) -> dict:

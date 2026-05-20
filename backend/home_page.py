@@ -66,6 +66,7 @@ remove_from_set = dynamo.remove_from_set
 _EVENTS_TABLE   = os.environ.get("EVENTS_TABLE_NAME",   "")
 _SOCIAL_TABLE   = os.environ.get("SOCIAL_TABLE_NAME",   "")
 _SETTINGS_TABLE = os.environ.get("SETTINGS_TABLE_NAME", "")
+_USERS_TABLE    = os.environ.get("USERS_TABLE_NAME",    "")
 
 
 # ── Auth helper ───────────────────────────────────────────────────────────────
@@ -88,6 +89,13 @@ def _get_session_user(event):
         return None, None
     user_result = rds.get_user_by_sub(cognito_sub)
     user = user_result["data"] if user_result["success"] else None
+    if user and _USERS_TABLE:
+        # Merge DynamoDB profile fields (bio, profilePictureUrl) into the RDS user dict
+        dynamo_r = get_item(_USERS_TABLE, {"userID": user["userID"]})
+        if dynamo_r["success"] and dynamo_r["data"]:
+            d = dynamo_r["data"]
+            user["bio"] = d.get("bio") or user.get("bio") or ""
+            user["profilePictureUrl"] = d.get("profilePictureUrl") or user.get("profilePictureUrl") or ""
     return cognito_sub, user
 
 
@@ -240,19 +248,46 @@ def UpdateProfile(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
+
     bio = str(body.get("bio") or "")[:280]
     pic_input = str(body.get("profilePictureUrl") or "").strip()
-    
+
+    # Upload to R2 if a base64 image was sent
     if pic_input.startswith("data:image/"):
         pic_url = upload_profile_picture(user["userID"], user["userName"], pic_input)
         pic_input = pic_url if pic_url else ""
     else:
         pic_input = pic_input[:500]
-        
-    result = update_user_profile(cognito_sub, bio=bio, profile_picture_url=pic_input)
-    if not result["success"]:
-        return util.err(f"Update failed: {result['error']}", 500)
-    return util.ok({"success": True, "profile": format_public_profile(result["data"])})
+
+    # --- Save bio & profilePictureUrl to DynamoDB (not RDS) ---
+    if _USERS_TABLE:
+        dynamo_updates = {"updatedAt": util.now_iso()}
+        if bio is not None:
+            dynamo_updates["bio"] = bio
+        if pic_input:
+            dynamo_updates["profilePictureUrl"] = pic_input
+        update_item(
+            _USERS_TABLE,
+            {"userID": user["userID"]},
+            dynamo_updates,
+        )
+
+    # Reflect the new values into the user dict for the response
+    user["bio"] = bio
+    if pic_input:
+        user["profilePictureUrl"] = pic_input
+
+    # Privacy mode (still RDS — it drives access control queries)
+    privacy_mode = str(body.get("privacyMode") or "").lower() or None
+    if privacy_mode in ("public", "private"):
+        result = update_user_profile(cognito_sub, privacy_mode=privacy_mode)
+        if result["success"]:
+            user = {**user, **result["data"]}
+            user["bio"] = bio  # re-apply since RDS doesn't have it
+            if pic_input:
+                user["profilePictureUrl"] = pic_input
+
+    return util.ok({"success": True, "profile": format_public_profile(user)})
 
 
 def SetPrivacy(event, path_params, query_params, body):
