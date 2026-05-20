@@ -22,6 +22,7 @@ import utilities.util as util        # ok, err, log, validators, formatters
 import utilities.rds as rds          # get_user_by_sub, upsert_user, ...
 import utilities.sessions as sessions # get_session, ensure_session, ...
 import utilities.dynamo as dynamo    # put_item, get_item, query_items, ...
+from utilities.r2_helper import upload_profile_picture
 
 # ── Cognito client ────────────────────────────────────────────────────────────
 try:
@@ -374,8 +375,13 @@ def CompleteProfileSetup(event, payload):
 
     if not payload.get("skip", False):
         bio = str(payload.get("bio", "")).strip()
-        pic = str(payload.get("profilePictureUrl", "")).strip()
-        result = rds.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=pic)
+        pic_input = str(payload.get("profilePictureUrl", "")).strip()
+        
+        if pic_input.startswith("data:image/"):
+            pic_url = upload_profile_picture(user["userID"], user["userName"], pic_input)
+            pic_input = pic_url if pic_url else ""
+            
+        result = rds.update_user_profile(user["cognitoSub"], bio=bio, profile_picture_url=pic_input)
         if result["success"]:
             user = result["data"]
 

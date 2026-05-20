@@ -44,6 +44,7 @@ import utilities.util as util
 import utilities.rds as rds
 import utilities.sessions as sessions
 import utilities.dynamo as dynamo
+from utilities.r2_helper import upload_profile_picture
 
 parse_body = util.parse_body
 now_iso = util.now_iso
@@ -240,8 +241,15 @@ def UpdateProfile(event, path_params, query_params, body):
     if not user:
         return util.err("Not authenticated.", 401)
     bio = str(body.get("bio") or "")[:280]
-    pic = str(body.get("profilePictureUrl") or "")[:500]
-    result = update_user_profile(cognito_sub, bio=bio, profile_picture_url=pic)
+    pic_input = str(body.get("profilePictureUrl") or "").strip()
+    
+    if pic_input.startswith("data:image/"):
+        pic_url = upload_profile_picture(user["userID"], user["userName"], pic_input)
+        pic_input = pic_url if pic_url else ""
+    else:
+        pic_input = pic_input[:500]
+        
+    result = update_user_profile(cognito_sub, bio=bio, profile_picture_url=pic_input)
     if not result["success"]:
         return util.err(f"Update failed: {result['error']}", 500)
     return util.ok({"success": True, "profile": format_public_profile(result["data"])})
@@ -331,7 +339,13 @@ def SearchUsers(event, path_params, query_params, body):
     for row in result["data"]:
         sub = row.get("cognitoSub")
         following = _is_following(cognito_sub, sub) if sub else False
-        users.append({**format_public_profile(row), "isFollowing": following})
+        follows_you = _is_following(sub, cognito_sub) if sub else False
+        users.append({
+            **format_public_profile(row),
+            "is_following": following,
+            "follows_you": follows_you,
+            "follow_request_pending": False # Simplified for search results
+        })
     return util.ok({"success": True, "users": users})
 
 

@@ -934,19 +934,22 @@ async function saveProfileEditor() {
   state.profileEditor.saving = true;
   renderProfileEditorState();
   try {
-    const formData = new FormData();
-    formData.append("bio", state.profileEditor.bio || "");
-    formData.append(
-      "profilePictureUrl",
-      state.profileEditor.avatarUrl &&
-        !isPlaceholderAvatar(state.profileEditor.avatarUrl)
-        ? state.profileEditor.avatarUrl
-        : "",
-    );
+    const payload = {
+      bio: state.profileEditor.bio || "",
+      profilePictureUrl: state.profileEditor.avatarUrl && !isPlaceholderAvatar(state.profileEditor.avatarUrl) ? state.profileEditor.avatarUrl : ""
+    };
+    
     if (state.profileEditor.avatarFile) {
-      formData.append("profilePictureFile", state.profileEditor.avatarFile);
+      const base64Str = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(state.profileEditor.avatarFile);
+      });
+      payload.profilePictureUrl = base64Str;
     }
-    const data = await postFormData("/api/profile/update", formData);
+    
+    const data = await postJson("/api/profile/update", payload);
     state.currentUser.avatar =
       data?.profile?.profile_picture_url ||
       state.profileEditor.avatarUrl ||
@@ -6667,6 +6670,38 @@ function switchMyEventsTab(tabId) {
 // --- Interaction Logic ---
 
 function bindHomePageActions() {
+  const deleteBtn = document.getElementById("settings-delete-account-btn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      const confirmed = window.confirm("CAUTION: Are you sure you want to permanently delete your account? This action cannot be undone.");
+      if (!confirmed) return;
+      
+      const originalText = deleteBtn.textContent;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      
+      try {
+        if (typeof deleteJson === 'function') {
+           await deleteJson("/api/profile/delete");
+        } else {
+           const res = await fetch("/api/profile/delete", { method: "DELETE" });
+           if (!res.ok) throw new Error("Failed to delete account");
+        }
+        
+        alert("Account deleted successfully.");
+        if (typeof handleLogout === "function") {
+          handleLogout();
+        } else {
+          window.location.replace("/signup_signin.html");
+        }
+      } catch (err) {
+        alert("Error deleting account: " + err.message);
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = originalText;
+      }
+    });
+  }
+
   document.addEventListener("click", (event) => {
     const actionEl = event.target.closest("[data-action]");
     if (!actionEl) return;

@@ -1,4 +1,4 @@
-﻿const bootConfigEl = document.getElementById('signup-profile-optional-boot-config');
+const bootConfigEl = document.getElementById('signup-profile-optional-boot-config');
 let bootConfig = {};
 if (bootConfigEl) {
   try {
@@ -78,15 +78,30 @@ const profileForm = document.getElementById("profileForm");
 
     profileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      await submitProfile(
-        {
-          skip: false,
-          profilePictureUrl: document.getElementById("profilePictureUrl").value.trim(),
-          bio: document.getElementById("bio").value.trim()
-        },
-        "Saving...",
-        saveBtn
-      );
+      
+      const fileInput = document.getElementById("profilePicture");
+      const bioInput = document.getElementById("bio").value.trim();
+      let profilePictureUrl = "";
+      
+      if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          profilePictureUrl = e.target.result;
+          await submitProfile(
+            { skip: false, profilePictureUrl, bio: bioInput },
+            "Saving...",
+            saveBtn
+          );
+        };
+        reader.readAsDataURL(file);
+      } else {
+        await submitProfile(
+          { skip: false, profilePictureUrl: "", bio: bioInput },
+          "Saving...",
+          saveBtn
+        );
+      }
     });
 
     skipBtn.addEventListener("click", async () => {

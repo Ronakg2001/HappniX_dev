@@ -65,6 +65,47 @@ const form = document.getElementById("detailsForm");
 
     setDobMax();
 
+    const checkUsernameBtn = document.getElementById("checkUsernameBtn");
+    const usernameInput = document.getElementById("username");
+    const usernameStatus = document.getElementById("usernameStatus");
+
+    if (checkUsernameBtn) {
+      checkUsernameBtn.addEventListener("click", async () => {
+        const usernameVal = usernameInput.value.trim();
+        if (!usernameVal) {
+          usernameStatus.style.color = "var(--error-red, red)";
+          usernameStatus.textContent = "Please enter a username first.";
+          return;
+        }
+
+        const originalText = checkUsernameBtn.textContent;
+        checkUsernameBtn.disabled = true;
+        checkUsernameBtn.textContent = "...";
+        usernameStatus.textContent = "";
+
+        try {
+          const result = await callAuthAction("CheckUsername", { username: usernameVal });
+          if (result.available) {
+            usernameStatus.style.color = "var(--success-green, green)";
+            usernameStatus.textContent = "Username is available!";
+          } else {
+            usernameStatus.style.color = "var(--error-red, red)";
+            let msg = "Username is already taken.";
+            if (result.suggestions && result.suggestions.length > 0) {
+              msg += " Suggestions: " + result.suggestions.join(", ");
+            }
+            usernameStatus.textContent = msg;
+          }
+        } catch (err) {
+          usernameStatus.style.color = "var(--error-red, red)";
+          usernameStatus.textContent = err.message || "Failed to check username.";
+        } finally {
+          checkUsernameBtn.disabled = false;
+          checkUsernameBtn.textContent = originalText;
+        }
+      });
+    }
+
     async function hydrateVerifiedMobile() {
       const mobileInput = document.getElementById("mobile");
       if (!mobileInput) return;

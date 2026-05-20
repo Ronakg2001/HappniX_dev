@@ -4,13 +4,11 @@ The serverless architecture routes API Gateway calls to designated AWS Lambda fu
 
 | API Route(s) | Lambda Function | Backend Handler Path |
 | --- | --- | --- |
-| **POST** `/api/auth` (And Cognito hooks) | **`SignupSignin`** | `backend/SignupSignin.lambda_handler` |
-| **GET, POST, DELETE** `/api/events/*` | **`EventsApi`** | `backend/events_api.lambda_handler` |
-| **GET, POST, DELETE** `/api/tickets/*` | **`TicketsApi`** | `backend/tickets_api.lambda_handler` |
-| **GET, POST** `/api/users/*`<br>**GET, POST** `/api/profile/*`<br>**GET, POST** `/api/settings/*` | **`ProfilesApi`** | `backend/profiles_api.lambda_handler` |
-| **GET, POST** `/api/messages/conversations/*`<br>**POST** `/api/messages/messages/*` | **`MessagingApi`** | `backend/messaging_api.lambda_handler` |
-| **GET, POST** `/api/messages/groups/*` | **`GroupChatApi`** | `backend/group_chat_api.lambda_handler` |
-| **POST** `/api/guest-invites/*` | **`GuestsApi`** | `backend/guests_api.lambda_handler` |
+| **POST** `/api/auth/*`<br>**POST** `/api/signup/*` | **`SignupSignin`** | `backend/SignupSignin.lambda_handler` |
+| **GET, POST, DELETE** `/api/events/*`<br>**POST** `/api/tickets/*` | **`EventsApi`** | `backend/events.lambda_handler` |
+| **GET, POST, DELETE** `/api/home/*`<br>**GET, POST, DELETE** `/api/tickets/*`<br>**GET, POST** `/api/notifications/*`<br>**POST** `/api/guest-invites` | **`HomePageApi`** | `backend/home_page.lambda_handler` |
+| **GET, POST** `/api/messages/*` | **`MessagingApi`** | `backend/messaging.lambda_handler` |
+| **GET, POST** `/api/profile/*` | **`ProfileApi`** | `backend/profile.lambda_handler` |
 
 ### Internal / Auth Lifecycle Lambdas:
 - **`CognitoPostConfirmation`**: Triggered by Cognito to sync confirmed users into RDS PostgreSQL. (`CognitoPostConfirmation.lambda_handler`)

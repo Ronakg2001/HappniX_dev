@@ -16,7 +16,28 @@ TODO: Implement each handler when the feature is being built.
       The lambda_handler skeleton below is ready to deploy to AWS as-is.
 """
 
+import os
+import boto3
 import utilities.util as util
+import utilities.rds as rds
+import utilities.dynamo as dynamo
+import utilities.sessions as sessions
+
+_USER_INFO_TABLE = os.environ.get("USER_INFO_TABLE_NAME", "")
+_COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
+try:
+    _cognito = boto3.client("cognito-idp")
+except Exception:
+    _cognito = None
+
+def _get_session_sub(event):
+    token = util.extract_session_token(event)
+    if not token:
+        return None
+    result = sessions.get_session(token)
+    if not result["success"] or not result["data"]["session"]:
+        return None
+    return result["data"]["session"].get("authenticated_user_id")
 
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────
@@ -51,6 +72,38 @@ def MarkNotificationsRead(event, path_params, query_params, body):
     return util.err("MarkNotificationsRead not implemented yet.", 501)
 
 
+def DeleteAccount(event, path_params, query_params, body):
+    cognito_sub = _get_session_sub(event)
+    if not cognito_sub:
+        return util.err("Unauthorized.", 401)
+
+    try:
+        # Delete from Cognito
+        if _cognito and _COGNITO_USER_POOL_ID:
+            _cognito.admin_delete_user(
+                UserPoolId=_COGNITO_USER_POOL_ID,
+                Username=cognito_sub
+            )
+            
+        # Delete from DynamoDB
+        if _USER_INFO_TABLE:
+            # We need the userID to delete from DynamoDB, fetch from RDS first
+            user_result = rds.get_user_by_sub(cognito_sub)
+            if user_result["success"] and user_result["data"]:
+                user_id = user_result["data"].get("userID")
+                user_name = user_result["data"].get("userName")
+                if user_id and user_name:
+                    dynamo.delete_item(_USER_INFO_TABLE, {"userID": user_id, "userName": user_name})
+
+        # Delete from RDS
+        rds.delete_user_hard(cognito_sub)
+
+        return util.ok({"success": True, "message": "Account successfully deleted."})
+    except Exception as exc:
+        util.log("error", "profile", f"DeleteAccount failed: {exc}")
+        return util.err("Failed to delete account.", 500)
+
+
 # ── Router ────────────────────────────────────────────────────────────────────
 
 def _resolve(method, path):
@@ -63,6 +116,8 @@ def _resolve(method, path):
     if m == "POST" and p == ["api", "profile", "picture", "upload"]:                       return UploadProfilePicture, {}
     if m == "GET"  and p == ["api", "profile", "notifications"]:                           return GetNotifications, {}
     if m == "POST" and p == ["api", "profile", "notifications", "read"]:                   return MarkNotificationsRead, {}
+    if m == "DELETE" and p == ["api", "profile", "delete"]:                                return DeleteAccount, {}
+    if m == "POST" and p == ["api", "profile", "delete"]:                                  return DeleteAccount, {}
 
     return None, {}
 

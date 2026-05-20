@@ -378,6 +378,41 @@ def update_user_profile(cognito_sub: str, bio: str = None,
         return _fail(f"update_user_profile failed: {exc}")
 
 
+def update_user_active_status(cognito_sub: str, is_active: bool) -> dict:
+    """
+    Update the isActive status of a user.
+    """
+    try:
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'UPDATE users SET "isActive" = %s, "updatedAt" = CURRENT_TIMESTAMP WHERE "cognitoSub" = %s',
+                    (is_active, cognito_sub)
+                )
+            conn.commit()
+        return _ok(None)
+    except Exception as exc:
+        return _fail(f"update_user_active_status failed: {exc}")
+
+
+def delete_user_hard(cognito_sub: str) -> dict:
+    """
+    Hard delete a user from the database.
+    (Due to ON DELETE CASCADE, this will also drop their related records like profiles, events hosted, etc.)
+    """
+    try:
+        with _connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'DELETE FROM users WHERE "cognitoSub" = %s',
+                    (cognito_sub,)
+                )
+            conn.commit()
+        return _ok(None)
+    except Exception as exc:
+        return _fail(f"delete_user_hard failed: {exc}")
+
+
 def execute_raw_sql(sql: str) -> dict:
     """
     Execute a raw SQL statement (dev/admin use only — DELETE, TRUNCATE, etc.).

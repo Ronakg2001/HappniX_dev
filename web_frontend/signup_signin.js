@@ -147,6 +147,20 @@ const views = {
       const message = result.message || "Authentication successful.";
       successTextTarget.textContent = message;
 
+      if (result.justActivated) {
+        const modal = document.getElementById("activationModal");
+        const enjoyBtn = document.getElementById("activationEnjoyBtn");
+        if (modal && enjoyBtn) {
+          modal.style.display = "block";
+          enjoyBtn.onclick = () => {
+            window.location.replace("/home_page.html");
+          };
+        } else {
+          window.location.replace("/home_page.html");
+        }
+        return;
+      }
+
       if (result.redirectUrl) {
         window.location.replace(result.redirectUrl);
         return;

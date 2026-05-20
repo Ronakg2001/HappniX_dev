@@ -16,7 +16,11 @@
       <input id="fullName" type="text" placeholder="Enter your full name" required />
 
       <label for="username">Username (unique)</label>
-      <input id="username" type="text" placeholder="Choose a username" required />
+      <div style="display: flex; gap: 8px;">
+        <input id="username" type="text" placeholder="Choose a username" required style="flex-grow: 1;" />
+        <button type="button" id="checkUsernameBtn" style="white-space: nowrap; padding: 0 16px; font-size: 14px;">Check</button>
+      </div>
+      <p id="usernameStatus" class="sub" style="margin-top:-8px; font-weight: 500;"></p>
 
       <label for="password">Password</label>
       <input id="password" type="password" placeholder="Create a password" required />
