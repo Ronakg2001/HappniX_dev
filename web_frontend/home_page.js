@@ -3871,16 +3871,21 @@ function goToHomeTabAndRefresh() {
 }
 
 async function handleLogout() {
+  const sessionId = localStorage.getItem("happnix_session_id");
   try {
-    await postJson("/api/auth", { actionItem: "Logout" });
+    await postJson("/api/auth", {
+      actionItem: "Logout",
+      sessionId: sessionId || undefined
+    });
   } catch (_error) {
     // Redirect anyway so the user is not trapped in the signed-in UI.
   }
-  try {
-    localStorage.removeItem("happnix_active_tab");
-  } catch (_error) {
-    // Ignore storage cleanup failures.
-  }
+  // Clear all auth tokens so the auto-login guard doesn't bounce them back in
+  localStorage.removeItem("happnix_access_token");
+  localStorage.removeItem("happnix_refresh_token");
+  localStorage.removeItem("happnix_session_id");
+  localStorage.removeItem("happnix_preauth_token");
+  localStorage.removeItem("happnix_active_tab");
   window.location.replace("/signup_signin.html");
 }
 
