@@ -842,7 +842,50 @@ function _apiUrl(path) {
 
 async function getJson(url) {
   const resolved = _apiUrl(url);
-  const response = await fetch(resolved, { credentials: "include" });
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  
+  const response = await fetch(resolved, { 
+    headers,
+    credentials: "include" 
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed.");
+  }
+  return data;
+}
+
+async function postFormData(url, formData) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(_apiUrl(url), {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: formData,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed.");
+  }
+  return data;
+}
+
+async function deleteJson(url, body = null) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(_apiUrl(url), {
+    method: "DELETE",
+    headers,
+    credentials: "include",
+    body: body ? JSON.stringify(body) : null,
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -851,6 +894,10 @@ async function getJson(url) {
 }
 
 async function postJson(url, payload) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const response = await fetch(_apiUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

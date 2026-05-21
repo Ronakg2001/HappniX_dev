@@ -311,6 +311,9 @@ def LoginWithPassword(event, payload):
             return util.err("Invalid username/email or password.", 401)
         cognito_sub = user["cognitoSub"]
         full_name   = user.get("userName", "User")
+        access_token  = f"mock-jwt-{cognito_sub}"
+        refresh_token = f"mock-refresh-{cognito_sub}"
+        id_token      = "mock-id-token"
 
     # Persist the refresh token in the JWT sessions table
     session_id = None

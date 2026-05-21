@@ -206,6 +206,13 @@ def verify_cognito_token(access_token: str) -> tuple:
         if not sub:
             return util.err("Unauthorized.", 401)
     """
+    if access_token and access_token.startswith("mock-jwt-"):
+        # Local development fallback
+        if app_env() == "prod":
+            return None, None
+        cognito_sub = access_token.replace("mock-jwt-", "")
+        return cognito_sub, {"sub": cognito_sub}
+
     if not access_token or not _cognito_client:
         return None, None
     try:

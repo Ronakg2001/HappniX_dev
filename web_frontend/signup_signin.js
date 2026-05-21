@@ -40,6 +40,45 @@ const views = {
     // ─── Single API endpoint — all auth actions go here ─────────────
     const AUTH_ENDPOINT = "/api/auth";
 
+    // ─── Pre-auth token storage ───────────────────────────────────────
+    // Carries OTP session state between SendMobileOtp → VerifyMobileOtp
+    // → RegisterUserDetails. Stored in memory only; sent via header.
+    let _preAuthToken = null;
+
+    function savePreAuthToken(token) {
+      if (token) _preAuthToken = token;
+    }
+
+    function getPreAuthToken() {
+      return _preAuthToken || null;
+    }
+
+    function clearPreAuthToken() {
+      _preAuthToken = null;
+    }
+
+    // ─── JWT token storage (post-login) ──────────────────────────────
+    // Stored in localStorage so they survive page refreshes.
+    const TOKEN_KEY     = "happnix_access_token";
+    const REFRESH_KEY   = "happnix_refresh_token";
+    const SESSION_KEY   = "happnix_session_id";
+
+    function saveTokens({ accessToken, refreshToken, sessionId }) {
+      if (accessToken)  localStorage.setItem(TOKEN_KEY,   accessToken);
+      if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+      if (sessionId)    localStorage.setItem(SESSION_KEY, sessionId);
+    }
+
+    function getAccessToken() {
+      return localStorage.getItem(TOKEN_KEY) || null;
+    }
+
+    function clearTokens() {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(SESSION_KEY);
+    }
+
     document.addEventListener('click', (event) => {
       const actionEl = event.target.closest('[data-action]');
       if (!actionEl) return;
@@ -81,15 +120,35 @@ const views = {
 
     /**
      * Send a request to the auth Lambda with an actionItem.
-     * All auth operations go through this single function.
+     *
+     * Pre-auth token (OTP/signup flow):
+     *   Automatically attached as X-HappniX-PreAuth header if we have one in memory.
+     *   The response's preAuthToken is saved back into memory automatically.
+     *
+     * JWT token (post-login authenticated calls):
+     *   Automatically attached as Authorization: Bearer header if present in localStorage.
      */
     async function callAuthAction(actionItem, data = {}) {
+      const headers = {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      };
+
+      // Attach pre-auth token if we have one (OTP/signup flow)
+      const preAuth = getPreAuthToken();
+      if (preAuth) {
+        headers["X-HappniX-PreAuth"] = preAuth;
+      }
+
+      // Attach JWT Bearer token if we have one (post-login calls)
+      const jwt = getAccessToken();
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({ actionItem, ...data })
       });
@@ -101,8 +160,26 @@ const views = {
         body = {};
       }
 
+      // Save any pre-auth token returned in the response body
+      if (body.preAuthToken) {
+        savePreAuthToken(body.preAuthToken);
+      }
+
+      // Save JWT tokens returned by LoginWithPassword
+      if (body.accessToken || body.refreshToken) {
+        saveTokens({
+          accessToken:  body.accessToken,
+          refreshToken: body.refreshToken,
+          sessionId:    body.sessionId
+        });
+      }
+
       if (!response.ok) {
-        throw new Error(body.message || "Request failed. Please try again.");
+        // Bug 3 fix: surface the status code so callers can react to 401 specifically
+        const err = new Error(body.message || "Request failed. Please try again.");
+        err.status = response.status;
+        err.body   = body;
+        throw err;
       }
 
       return body;
@@ -142,34 +219,74 @@ const views = {
       resetMessages();
     }
 
+    /**
+     * Navigate to the Sign-in with Username/Email view.
+     * Used when an existing user has been identified via OTP — they must now
+     * complete login with their password to get a JWT token.
+     *
+     * Shows an informational message so the user understands why they were redirected.
+     */
+    function redirectToPasswordLogin(message) {
+      showView("userPassForm");
+      if (message) {
+        // Show the message in the userPass success area so it's clearly visible
+        userPassSuccess.textContent = message;
+      }
+    }
+
+    /**
+     * Handle an auth result from the backend.
+     *
+     * IMPORTANT — does NOT blindly follow redirectUrl for existing users.
+     * Instead:
+     *   - existing user identified via OTP → stay on page, switch to password form
+     *   - new user after OTP → follow redirectUrl to signup details page
+     *   - successful LoginWithPassword → follow redirectUrl to home page
+     *   - any other redirectUrl → follow it
+     */
     function handleAuthResult(result, successTextTarget) {
-      const nextStatus = result.userStatus || result.next || "";
       const message = result.message || "Authentication successful.";
-      successTextTarget.textContent = message;
+      if (successTextTarget) successTextTarget.textContent = message;
+
+      // Existing user identified via OTP: do NOT redirect away.
+      // Switch to the password login form on this page instead.
+      if (result.userStatus === "existing" && !result.accessToken) {
+        // No JWT means we came from OTP verify, not from LoginWithPassword.
+        // Clear the pre-auth token (no longer needed) and ask them to log in.
+        clearPreAuthToken();
+        redirectToPasswordLogin(
+          "✅ Mobile verified. Please sign in with your username or email and password."
+        );
+        return;
+      }
+
+      // Successful JWT login — only now do we go to home page.
+      if (result.accessToken && result.redirectUrl) {
+        window.location.replace(result.redirectUrl);
+        return;
+      }
+
+      // New user after OTP — follow redirectUrl to signup details.
+      if (result.userStatus === "new" && result.redirectUrl) {
+        window.location.replace(result.redirectUrl);
+        return;
+      }
+
+      // Generic redirect (profile setup complete, etc.)
+      if (result.redirectUrl) {
+        window.location.replace(result.redirectUrl);
+        return;
+      }
 
       if (result.justActivated) {
         const modal = document.getElementById("activationModal");
         const enjoyBtn = document.getElementById("activationEnjoyBtn");
         if (modal && enjoyBtn) {
           modal.style.display = "block";
-          enjoyBtn.onclick = () => {
-            window.location.replace("/home_page.html");
-          };
+          enjoyBtn.onclick = () => window.location.replace("/home_page.html");
         } else {
           window.location.replace("/home_page.html");
         }
-        return;
-      }
-
-      if (result.redirectUrl) {
-        window.location.replace(result.redirectUrl);
-        return;
-      }
-
-      if (nextStatus === "new") {
-        successTextTarget.textContent = `${message} New user flow triggered.`;
-      } else if (nextStatus === "existing") {
-        successTextTarget.textContent = `${message} Existing user flow triggered.`;
       }
     }
 
@@ -215,9 +332,17 @@ const views = {
         const result = await callAuthAction("SendMobileOtp", {
           mobile: normalizeMobile(mobile)
         });
+        // preAuthToken is saved automatically inside callAuthAction
         renderDevJson(authApiResponse, result);
         openMobileOtpView(mobile);
         mobileOtpSuccess.textContent = "OTP sent successfully.";
+
+        // Show debug OTP if backend returned one (dev/qa only)
+        if (result.debugOtp) {
+          mobileOtpSuccess.textContent += ` (Debug OTP: ${result.debugOtp})`;
+          // Auto-fill the OTP input for convenience in development
+          if (mobileOtpCode) mobileOtpCode.value = result.debugOtp;
+        }
       } catch (error) {
         mobileError.textContent = error.message;
         renderDevJson(authApiResponse, { message: error.message });
@@ -249,11 +374,17 @@ const views = {
           mobile: mobileContext.mobile,
           otp
         });
+        // preAuthToken updated automatically inside callAuthAction
         renderDevJson(authApiResponse, result);
         handleAuthResult(result, mobileOtpSuccess);
       } catch (error) {
-        mobileOtpError.textContent = error.message;
-        renderDevJson(authApiResponse, { message: error.message });
+        // Bug 3 fix: if unauthorized, show the message and DO NOT redirect
+        if (error.status === 401) {
+          mobileOtpError.textContent = "Unauthorized. Please try again.";
+        } else {
+          mobileOtpError.textContent = error.message;
+        }
+        renderDevJson(authApiResponse, { message: error.message, status: error.status });
       } finally {
         setButtonLoading(mobileVerifyBtn, false, "Verify OTP", "Verifying...");
       }
@@ -273,8 +404,14 @@ const views = {
         const result = await callAuthAction("ResendMobileOtp", {
           mobile: mobileContext.mobile
         });
+        // preAuthToken updated automatically inside callAuthAction
         renderDevJson(authApiResponse, result);
         mobileOtpSuccess.textContent = `OTP resent to ${mobileContext.mobile}.`;
+
+        if (result.debugOtp) {
+          mobileOtpSuccess.textContent += ` (Debug OTP: ${result.debugOtp})`;
+          if (mobileOtpCode) mobileOtpCode.value = result.debugOtp;
+        }
       } catch (error) {
         mobileOtpError.textContent = error.message;
         renderDevJson(authApiResponse, { message: error.message });
@@ -300,13 +437,21 @@ const views = {
       try {
         const result = await callAuthAction("LoginWithPassword", {
           identifier: usernameValue,
-          password: passwordValue
+          password:   passwordValue
         });
+        // JWT tokens are saved automatically inside callAuthAction.
+        // handleAuthResult checks for accessToken before redirecting to home.
         renderDevJson(authApiResponse, result);
         handleAuthResult(result, userPassSuccess);
       } catch (error) {
-        userPassError.textContent = error.message;
-        renderDevJson(authApiResponse, { message: error.message });
+        // Bug 3 fix: 401 = invalid credentials, show error, stay on page
+        if (error.status === 401) {
+          userPassError.textContent = "Unauthorized. Invalid username/email or password.";
+          clearTokens(); // defensive — clear any partial token state
+        } else {
+          userPassError.textContent = error.message;
+        }
+        renderDevJson(authApiResponse, { message: error.message, status: error.status });
         if (error.message && error.message.toLowerCase().includes("invalid username/email or password")) {
           newUserPrompt.style.display = "flex";
         }

@@ -193,19 +193,30 @@
   }
 
   async function getJson(url) {
-    const response = await fetch(apiUrl(url), { credentials: "include" });
+    const token = localStorage.getItem("happnix_access_token");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(apiUrl(url), { 
+      headers,
+      credentials: "include" 
+    });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Request failed.");
     return data;
   }
 
   async function postJson(url, payload) {
+    const token = localStorage.getItem("happnix_access_token");
+    const headers = {
+      "Content-Type": "application/json",
+      "X-CSRFToken": getCsrfToken(),
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const response = await fetch(apiUrl(url), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCsrfToken(),
-      },
+      headers,
       credentials: "include",
       body: JSON.stringify(payload || {}),
     });
@@ -215,9 +226,13 @@
   }
 
   async function postMultipart(url, formData) {
+    const token = localStorage.getItem("happnix_access_token");
+    const headers = { "X-CSRFToken": getCsrfToken() };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const response = await fetch(apiUrl(url), {
       method: "POST",
-      headers: { "X-CSRFToken": getCsrfToken() },
+      headers,
       credentials: "include",
       body: formData,
     });
