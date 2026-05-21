@@ -498,5 +498,10 @@ const views = {
       };
 
       window.addEventListener("hashchange", openHashTarget);
-      window.addEventListener("DOMContentLoaded", openHashTarget);
+      window.addEventListener("DOMContentLoaded", () => {
+        openHashTarget();
+        if (localStorage.getItem("happnix_refresh_token")) {
+          window.location.href = "/home_page.html";
+        }
+      });
     })();

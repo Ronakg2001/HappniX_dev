@@ -192,7 +192,35 @@
     return base ? `${base}${cleanPath}` : cleanPath;
   }
 
-  async function getJson(url) {
+  async function _handleTokenRefresh() {
+    const refreshToken = localStorage.getItem("happnix_refresh_token");
+    const sessionId = localStorage.getItem("happnix_session_id");
+    if (!refreshToken || !sessionId) return false;
+
+    try {
+      const res = await fetch(apiUrl("/api/auth"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ actionItem: "RefreshToken", refreshToken, sessionId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.accessToken) {
+        localStorage.setItem("happnix_access_token", data.accessToken);
+        return true;
+      }
+    } catch (e) {
+      console.error("Silent refresh failed", e);
+    }
+    
+    localStorage.removeItem("happnix_access_token");
+    localStorage.removeItem("happnix_refresh_token");
+    localStorage.removeItem("happnix_session_id");
+    window.location.href = "/signup_signin.html";
+    return false;
+  }
+
+  async function getJson(url, isRetry = false) {
     const token = localStorage.getItem("happnix_access_token");
     const headers = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -201,12 +229,18 @@
       headers,
       credentials: "include" 
     });
+    
+    if (response.status === 401 && !isRetry) {
+      const refreshed = await _handleTokenRefresh();
+      if (refreshed) return getJson(url, true);
+    }
+    
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Request failed.");
     return data;
   }
 
-  async function postJson(url, payload) {
+  async function postJson(url, payload, isRetry = false) {
     const token = localStorage.getItem("happnix_access_token");
     const headers = {
       "Content-Type": "application/json",
@@ -220,12 +254,18 @@
       credentials: "include",
       body: JSON.stringify(payload || {}),
     });
+    
+    if (response.status === 401 && !isRetry) {
+      const refreshed = await _handleTokenRefresh();
+      if (refreshed) return postJson(url, payload, true);
+    }
+    
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Request failed.");
     return data;
   }
 
-  async function postMultipart(url, formData) {
+  async function postMultipart(url, formData, isRetry = false) {
     const token = localStorage.getItem("happnix_access_token");
     const headers = { "X-CSRFToken": getCsrfToken() };
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -236,6 +276,12 @@
       credentials: "include",
       body: formData,
     });
+    
+    if (response.status === 401 && !isRetry) {
+      const refreshed = await _handleTokenRefresh();
+      if (refreshed) return postMultipart(url, formData, true);
+    }
+    
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Request failed.");
     return data;

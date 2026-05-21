@@ -840,7 +840,36 @@ function _apiUrl(path) {
   return base ? `${base}${cleanPath}` : cleanPath;
 }
 
-async function getJson(url) {
+async function _handleTokenRefresh() {
+  const refreshToken = localStorage.getItem("happnix_refresh_token");
+  const sessionId = localStorage.getItem("happnix_session_id");
+  if (!refreshToken || !sessionId) return false;
+
+  try {
+    const res = await fetch(_apiUrl("/api/auth"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ actionItem: "RefreshToken", refreshToken, sessionId })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.accessToken) {
+      localStorage.setItem("happnix_access_token", data.accessToken);
+      return true;
+    }
+  } catch (e) {
+    console.error("Silent refresh failed", e);
+  }
+  
+  // If refresh failed (e.g. 7 days inactive), clear tokens and force login
+  localStorage.removeItem("happnix_access_token");
+  localStorage.removeItem("happnix_refresh_token");
+  localStorage.removeItem("happnix_session_id");
+  window.location.href = "/signup_signin.html";
+  return false;
+}
+
+async function getJson(url, isRetry = false) {
   const resolved = _apiUrl(url);
   const token = localStorage.getItem("happnix_access_token");
   const headers = {};
@@ -850,6 +879,12 @@ async function getJson(url) {
     headers,
     credentials: "include" 
   });
+  
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return getJson(url, true);
+  }
+  
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -857,7 +892,7 @@ async function getJson(url) {
   return data;
 }
 
-async function postFormData(url, formData) {
+async function postFormData(url, formData, isRetry = false) {
   const token = localStorage.getItem("happnix_access_token");
   const headers = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -871,11 +906,18 @@ async function postFormData(url, formData) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return postFormData(url, formData, true);
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed.");
   }
   return data;
 }
 
-async function deleteJson(url, body = null) {
+async function deleteJson(url, body = null, isRetry = false) {
   const token = localStorage.getItem("happnix_access_token");
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -886,6 +928,10 @@ async function deleteJson(url, body = null) {
     credentials: "include",
     body: body ? JSON.stringify(body) : null,
   });
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return deleteJson(url, body, true);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -893,7 +939,7 @@ async function deleteJson(url, body = null) {
   return data;
 }
 
-async function postJson(url, payload) {
+async function postJson(url, payload, isRetry = false) {
   const token = localStorage.getItem("happnix_access_token");
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -904,6 +950,10 @@ async function postJson(url, payload) {
     credentials: "include",
     body: JSON.stringify(payload),
   });
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return postJson(url, payload, true);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");

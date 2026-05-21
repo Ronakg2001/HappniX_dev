@@ -36,6 +36,7 @@ Action Registry:
 
 import os
 import uuid
+from datetime import datetime, timezone
 
 import boto3
 
@@ -382,11 +383,28 @@ def RefreshToken(event, payload):
     except Exception as exc:
         return util.err(f"Token refresh failed: {exc}", 500)
 
-    # Update lastUsedAt on the session record if we have a sessionId
+    # Enforce 7-day inactivity window and update lastUsedAt
     if session_id:
-        # We need cognito_sub to update the session — extract from new access token
         sub, _ = util.verify_cognito_token(new_access)
-        if sub and session_id:
+        if sub:
+            session_resp = jwt_sessions.get_session(sub, session_id)
+            if not session_resp["success"] or not session_resp["data"]:
+                # If session isn't in DynamoDB, it was revoked or expired
+                return util.err("Session is invalid or expired. Please log in again.", 401)
+            
+            session_data = session_resp["data"]
+            last_used_str = session_data.get("lastUsedAt")
+            if last_used_str:
+                try:
+                    # Parse ISO 8601 string
+                    last_used = datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                    days_inactive = (datetime.now(timezone.utc) - last_used).days
+                    if days_inactive >= 7:
+                        jwt_sessions.delete_session(sub, session_id)
+                        return util.err("Session expired due to inactivity. Please log in again.", 401)
+                except Exception as e:
+                    util.log(f"Error parsing lastUsedAt: {e}")
+                    
             jwt_sessions.refresh_session(sub, session_id)
 
     return util.ok({
