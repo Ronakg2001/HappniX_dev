@@ -68,42 +68,14 @@ _SETTINGS_TABLE = os.environ.get("SETTINGS_TABLE_NAME", "")
 _USERS_TABLE    = os.environ.get("USERS_TABLE_NAME",    "")
 
 
-# ── Auth helpers (JWT Bearer token) ──────────────────────────────────────────
+# ── Auth helpers — delegate to util to avoid duplication ────────────────────
 
 def _get_jwt_user(event):
-    """
-    Resolve the authenticated user from the Authorization: Bearer JWT header.
-    Returns: (cognito_sub, user_dict) — both None if not authenticated.
-    Performance: One Cognito API call (get_user) + one RDS read.
-    """
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None, None
-    sub, _ = util.verify_cognito_token(token)
-    if not sub:
-        return None, None
-    user_result = rds.get_user_by_sub(sub)
-    user = user_result["data"] if user_result["success"] else None
-    if user and _USERS_TABLE:
-        # Merge DynamoDB profile fields (bio, profilePictureUrl) into the RDS user dict
-        dynamo_r = get_item(_USERS_TABLE, {"userID": user["userID"]})
-        if dynamo_r["success"] and dynamo_r["data"]:
-            d = dynamo_r["data"]
-            user["bio"] = d.get("bio") or user.get("bio") or ""
-            user["profilePictureUrl"] = d.get("profilePictureUrl") or user.get("profilePictureUrl") or ""
-    return sub, user
+    return util.get_jwt_user(event, _USERS_TABLE, dynamo, rds)
 
 
 def _get_jwt_sub(event):
-    """
-    Faster auth check — returns only cognitoSub without hitting RDS.
-    Use when you only need to know WHO is asking, not their full profile.
-    """
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None
-    sub, _ = util.verify_cognito_token(token)
-    return sub
+    return util.get_jwt_sub(event)
 
 
 # ── Social graph helpers ──────────────────────────────────────────────────────

@@ -224,6 +224,72 @@ def verify_cognito_token(access_token: str) -> tuple:
         return None, None
 
 
+def get_jwt_sub(event: dict) -> str | None:
+    """
+    Extract the authenticated user's Cognito sub ID from the Bearer JWT token.
+
+    Use this for lightweight auth checks when you only need to confirm WHO is
+    making the request without loading their full profile from RDS.
+
+    Args:
+        event: Lambda event dict containing the HTTP headers.
+
+    Returns:
+        cognito_sub string on success, None if not authenticated.
+
+    Usage:
+        sub = util.get_jwt_sub(event)
+        if not sub:
+            return util.err("Not authenticated.", 401)
+    """
+    token = extract_bearer_token(event)
+    if not token:
+        return None
+    sub, _ = verify_cognito_token(token)
+    return sub
+
+
+def get_jwt_user(event: dict, users_table: str = "", dynamo_module=None, rds_module=None):
+    """
+    Resolve the authenticated user from the Authorization: Bearer JWT header.
+
+    Fetches both the Cognito sub AND the full user profile from RDS,
+    optionally merging in DynamoDB fields (bio, profilePictureUrl).
+
+    Args:
+        event:        Lambda event dict containing the HTTP headers.
+        users_table:  DynamoDB USERS_TABLE_NAME (pass if you want DynamoDB merge).
+        dynamo_module: utilities.dynamo module (pass if you want DynamoDB merge).
+        rds_module:   utilities.rds module (required).
+
+    Returns:
+        (cognito_sub: str, user: dict) on success.
+        (None, None) if not authenticated or user not found in DB.
+
+    Usage:
+        sub, user = util.get_jwt_user(event, _USERS_TABLE, dynamo, rds)
+        if not user:
+            return util.err("Not authenticated.", 401)
+    """
+    token = extract_bearer_token(event)
+    if not token:
+        return None, None
+    sub, _ = verify_cognito_token(token)
+    if not sub:
+        return None, None
+    if rds_module is None:
+        return sub, None
+    user_result = rds_module.get_user_by_sub(sub)
+    user = user_result["data"] if user_result["success"] else None
+    if user and users_table and dynamo_module:
+        dynamo_r = dynamo_module.get_item(users_table, {"userID": user["userID"]})
+        if dynamo_r["success"] and dynamo_r["data"]:
+            d = dynamo_r["data"]
+            user["bio"] = d.get("bio") or user.get("bio") or ""
+            user["profilePictureUrl"] = d.get("profilePictureUrl") or user.get("profilePictureUrl") or ""
+    return sub, user
+
+
 def extract_trace_id(event: dict) -> str:
     """
     Extract or generate a trace ID for structured logging.

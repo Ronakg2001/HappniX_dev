@@ -500,8 +500,7 @@ const views = {
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", () => {
         openHashTarget();
-        if (localStorage.getItem("happnix_refresh_token")) {
-          window.location.href = "/home_page.html";
-        }
+        // If user is already logged in, skip the login page entirely
+        if (window.HappniXAuth && window.HappniXAuth.redirectIfLoggedIn()) return;
       });
     })();

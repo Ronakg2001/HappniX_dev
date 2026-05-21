@@ -101,34 +101,15 @@ def _preauth_response(status, body, token):
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# JWT HELPERS  (post-login)
+# JWT HELPERS  — delegate to util to avoid duplication across all Lambdas
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def _get_jwt_user(event):
-    """
-    Resolve the authenticated user from the Bearer JWT token.
-
-    Returns: (cognito_sub, user_dict)
-             Both are None if the token is missing, invalid, or expired.
-    """
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None, None
-    sub, _ = util.verify_cognito_token(token)
-    if not sub:
-        return None, None
-    result = rds.get_user_by_sub(sub)
-    user = result["data"] if result["success"] else None
-    return sub, user
+    return util.get_jwt_user(event, _USERS_TABLE, dynamo, rds)
 
 
 def _get_jwt_sub(event):
-    """Faster auth check — returns only cognitoSub without hitting RDS."""
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None
-    sub, _ = util.verify_cognito_token(token)
-    return sub
+    return util.get_jwt_sub(event)
 
 
 def _device_info(event) -> str:
@@ -391,7 +372,7 @@ def RefreshToken(event, payload):
             if not session_resp["success"] or not session_resp["data"]:
                 # If session isn't in DynamoDB, it was revoked or expired
                 return util.err("Session is invalid or expired. Please log in again.", 401)
-            
+
             session_data = session_resp["data"]
             last_used_str = session_data.get("lastUsedAt")
             if last_used_str:
@@ -404,7 +385,7 @@ def RefreshToken(event, payload):
                         return util.err("Session expired due to inactivity. Please log in again.", 401)
                 except Exception as e:
                     util.log(f"Error parsing lastUsedAt: {e}")
-                    
+
             jwt_sessions.refresh_session(sub, session_id)
 
     return util.ok({
@@ -812,19 +793,19 @@ def lambda_handler(event, context):
         return util.err("Request timed out. Please try again.", 503, trace_id)
 
     payload = util.parse_body(event)
-    action  = str(payload.get("actionItem", "")).strip()
+    actionItem  = str(payload.get("actionItem", "")).strip()
 
     util.log("info", trace_id, "Incoming request",
-             actionItem=action, functionName=context.function_name)
+             actionItem=actionItem, functionName=context.function_name)
 
-    if not action:
+    if not actionItem:
         return util.err("Missing actionItem in request body.", 400, trace_id)
 
-    handler = ACTION_REGISTRY.get(action)
+    handler = ACTION_REGISTRY.get(actionItem)
     if handler is None:
-        util.log("warning", trace_id, "Unknown actionItem", actionItem=action)
+        util.log("warning", trace_id, "Unknown actionItem", actionItem=actionItem)
         return util.err(
-            f"Unknown actionItem: '{action}'. Available: {', '.join(sorted(ACTION_REGISTRY))}",
+            f"Unknown actionItem: '{actionItem}'. Available: {', '.join(sorted(ACTION_REGISTRY))}",
             400, trace_id,
         )
 
@@ -832,7 +813,7 @@ def lambda_handler(event, context):
         response = handler(event, payload)
     except Exception as exc:
         util.log("error", trace_id, "Unhandled exception",
-                 actionItem=action, errorType=type(exc).__name__,
+                 actionItem=actionItem, errorType=type(exc).__name__,
                  error=str(exc), functionName=context.function_name)
         return util.err(f"Internal server error: {exc}", 500, trace_id)
 
@@ -846,5 +827,5 @@ def lambda_handler(event, context):
     response["headers"].setdefault("X-Happnix-Trace-Id", trace_id)
 
     util.log("info", trace_id, "Request completed",
-             actionItem=action, statusCode=response.get("statusCode"))
+             actionItem=actionItem, statusCode=response.get("statusCode"))
     return response

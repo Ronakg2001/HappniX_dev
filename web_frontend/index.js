@@ -64,12 +64,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Wait just a split second for the flash to cover the screen, then redirect
     setTimeout(() => {
-      const hasToken = localStorage.getItem("happnix_refresh_token");
-      if (hasToken) {
-        window.location.href = "home_page.html";
-      } else {
-        window.location.href = "signup_signin.html";
-      }
+      // If user is already logged in, skip the login page entirely
+      if (window.HappniXAuth && window.HappniXAuth.redirectIfLoggedIn()) return;
+      window.location.href = "signup_signin.html";
     }, 200);
   }, 2800);
 });

@@ -10,17 +10,8 @@ except ImportError:
 _EVENTS_TABLE = os.environ.get("EVENTS_TABLE_NAME", "")
 
 
-# ── Auth helper (JWT Bearer token) ──────────────────────────────────────────
-
-def _get_jwt_sub(event):
-    """
-    Extract the authenticated user's Cognito sub ID from the Bearer JWT token.
-    """
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None
-    sub, _ = util.verify_cognito_token(token)
-    return sub
+# ── Auth helper — use util.get_jwt_sub instead of duplicating here ────────────
+_get_jwt_sub = util.get_jwt_sub
 
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────

@@ -17,27 +17,15 @@ TODO: Implement each handler when the feature is being built.
 """
 
 import os
-import boto3
 import utilities.util as util
 import utilities.rds as rds
 import utilities.dynamo as dynamo
 
 _USER_INFO_TABLE = os.environ.get("USER_INFO_TABLE_NAME", "")
 _COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
-try:
-    _cognito = boto3.client("cognito-idp")
-except Exception:
-    _cognito = None
 
-def _get_jwt_sub(event):
-    """
-    Extract the authenticated user's Cognito sub ID from the Bearer JWT token.
-    """
-    token = util.extract_bearer_token(event)
-    if not token:
-        return None
-    sub, _ = util.verify_cognito_token(token)
-    return sub
+# ── Auth helper — use util.get_jwt_sub instead of duplicating here ────────────
+_get_jwt_sub = util.get_jwt_sub
 
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────
