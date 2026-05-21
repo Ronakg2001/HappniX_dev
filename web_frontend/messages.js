@@ -195,6 +195,8 @@
   async function _handleTokenRefresh() {
     const refreshToken = localStorage.getItem("happnix_refresh_token");
     const sessionId = localStorage.getItem("happnix_session_id");
+
+    // No credentials at all — user was never logged in, don't redirect
     if (!refreshToken || !sessionId) return false;
 
     try {
@@ -209,14 +211,19 @@
         localStorage.setItem("happnix_access_token", data.accessToken);
         return true;
       }
+      // Only force logout on explicit session-expired 401 from the refresh endpoint
+      if (res.status === 401) {
+        localStorage.removeItem("happnix_access_token");
+        localStorage.removeItem("happnix_refresh_token");
+        localStorage.removeItem("happnix_session_id");
+        window.location.href = "/signup_signin.html";
+        return false;
+      }
     } catch (e) {
-      console.error("Silent refresh failed", e);
+      // Network error — don't redirect, just fail silently
+      console.error("Silent refresh failed (network error)", e);
     }
-    
-    localStorage.removeItem("happnix_access_token");
-    localStorage.removeItem("happnix_refresh_token");
-    localStorage.removeItem("happnix_session_id");
-    window.location.href = "/signup_signin.html";
+
     return false;
   }
 
