@@ -1744,7 +1744,10 @@
           fetch(`${api}/api/auth`, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign(
+              { 'Content-Type': 'application/json' },
+              localStorage.getItem("happnix_access_token") ? { 'Authorization': `Bearer ${localStorage.getItem("happnix_access_token")}` } : {}
+            ),
             body: JSON.stringify({ actionItem: 'GetCurrentUser' }),
           })
             .then(r => r.json())
