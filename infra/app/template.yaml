@@ -182,6 +182,9 @@ Globals:
           Ref: HappnixUserPool
         COGNITO_USER_POOL_CLIENT_ID:
           Ref: HappnixUserPoolClient
+        # JWT sessions table — stores one refresh token per user-device (30-day TTL)
+        JWT_SESSIONS_TABLE_NAME:
+          Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
     VpcConfig:
       SecurityGroupIds:
         - Ref: LambdaSecurityGroupId
@@ -204,8 +207,7 @@ Resources:
       EndpointConfiguration: REGIONAL
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happn\
-          ix-Trace-Id'"
+        AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happnix-Trace-Id,X-HappniX-PreAuth'"
         AllowOrigin:
           Fn::Sub: "'${FrontendUrl}'"
         AllowCredentials: true
@@ -319,6 +321,8 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:ListUsers
                 - cognito-idp:AdminInitiateAuth
+                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GlobalSignOut    # Logout action
               Resource:
                 Fn::GetAtt:
                   - HappnixUserPool
@@ -448,6 +452,10 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+              Resource: "*"
       Events:
         HomeFeed:
           Type: Api
@@ -636,6 +644,10 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+              Resource: "*"
       Events:
         CreateEvent:
           Type: Api
@@ -704,6 +716,10 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+              Resource: "*"
       Events:
         ListConversations:
           Type: Api
@@ -821,6 +837,14 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+                - cognito-idp:AdminDeleteUser  # DeleteAccount action
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
       Events:
         GetProfile:
           Type: Api

@@ -17,6 +17,19 @@ TODO: Implement each handler when the feature is being built.
 import utilities.util as util
 
 
+# ── Auth helper (JWT Bearer token) ──────────────────────────────────────────
+
+def _get_jwt_sub(event):
+    """
+    Extract the authenticated user's Cognito sub ID from the Bearer JWT token.
+    """
+    token = util.extract_bearer_token(event)
+    if not token:
+        return None
+    sub, _ = util.verify_cognito_token(token)
+    return sub
+
+
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 
 def StartConversation(event, path_params, query_params, body):
@@ -112,11 +125,20 @@ def _resolve(method, path):
 # ── Lambda Entry Point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
+    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
+
     http_method = event.get("httpMethod", "GET")
     path = event.get("path", "/")
 
     if http_method == "OPTIONS":
         return util.ok({}, 200)
+
+    # ── Timeout guard ────────────────────────────────────────────────────────
+    if context.get_remaining_time_in_millis() < 1500:
+        util.log("warning", trace_id, "Lambda near timeout — returning 503",
+                 functionName=context.function_name)
+        return util.err("Request timed out. Please try again.", 503)
 
     query_params = event.get("queryStringParameters") or {}
     path_params  = event.get("pathParameters") or {}
@@ -131,5 +153,6 @@ def lambda_handler(event, context):
     try:
         return handler(event, merged_params, query_params, body)
     except Exception as exc:
-        util.log("error", "messaging", f"Unhandled error in {handler.__name__}: {exc}")
+        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
+                 functionName=context.function_name)
         return util.err("An internal error occurred.", 500)

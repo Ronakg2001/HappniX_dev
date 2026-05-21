@@ -89,6 +89,11 @@ Parameters:
     Default: "true"
     AllowedValues: ["true", "false"]
     Description: User preferences, blocked/muted lists. Required by HomePageApi.
+  EnableJwtSessionsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: JWT refresh-token session store (one row per user-device, 30-day TTL).
 
 
 Conditions:
@@ -131,6 +136,10 @@ Conditions:
   HasSettingsTable:
     Fn::Equals:
       - Ref: EnableSettingsTable
+      - "true"
+  HasJwtSessionsTable:
+    Fn::Equals:
+      - Ref: EnableJwtSessionsTable
       - "true"
 
 
@@ -422,6 +431,34 @@ Resources:
           Value:
             Fn::Sub: HappniX-settings-${EnvironmentName}
 
+  # ─── JWT Sessions (refresh-token store, one row per user-device) ──────────
+  # PK: cognitoSub   SK: sessionId
+  # TTL: expiresAt   (30 days — mirrors Cognito refresh-token lifetime)
+  HappnixJwtSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasJwtSessionsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: sessionId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
+
 
 # ══════════════════════════════════════════════════════════════════════
 # Outputs — conditional so they only appear when the resource exists
@@ -501,3 +538,8 @@ Outputs:
     Description: DynamoDB settings table name.
     Value:
       Ref: HappnixSettingsTable
+  JwtSessionsTableName:
+    Condition: HasJwtSessionsTable
+    Description: DynamoDB JWT sessions table name (refresh-token store).
+    Value:
+      Ref: HappnixJwtSessionsTable

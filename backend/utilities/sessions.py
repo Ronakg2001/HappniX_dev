@@ -1,15 +1,19 @@
 """
-utilities/sessions.py — Session management for HappniX backend.
+utilities/sessions.py — Pre-auth session management for HappniX.
 
-Replaces dev_store.py. Handles server-side session state stored either in
-DynamoDB (production) or a local JSON file (local dev / unit tests).
+Post-JWT-migration, this module is used ONLY for the short-lived pre-auth
+tokens that carry OTP state and pending-signup state between:
+  SendMobileOtp → VerifyMobileOtp → RegisterUserDetails → CompleteProfileSetup
+
+The pre-auth token is returned in the response body (not a cookie) and sent
+back by the frontend in the X-HappniX-PreAuth header. This is fully
+cross-browser compatible and bypasses Safari ITP cookie restrictions.
+
+For authenticated JWT sessions (post-login), see utilities/jwt_sessions.py.
 
 Every function returns a standard response envelope:
   {"success": True,  "data": <result>}
   {"success": False, "error": "<message>"}
-
-Import example:
-    from utilities.sessions import get_session, replace_session, delete_session
 """
 
 import json
@@ -28,7 +32,12 @@ except ImportError:
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
-SESSION_TTL_SECONDS = 86_400   # 24 hours
+# 30 minutes — pre-auth tokens are short-lived by design.
+# Users have 30 minutes to complete the OTP → signup flow before the token expires.
+PREAUTH_TTL_SECONDS = 1_800   # 30 minutes
+
+# Keep the old name as an alias so any existing references don't break.
+SESSION_TTL_SECONDS = PREAUTH_TTL_SECONDS
 
 
 def _ok(data):

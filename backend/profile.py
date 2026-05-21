@@ -21,7 +21,6 @@ import boto3
 import utilities.util as util
 import utilities.rds as rds
 import utilities.dynamo as dynamo
-import utilities.sessions as sessions
 
 _USER_INFO_TABLE = os.environ.get("USER_INFO_TABLE_NAME", "")
 _COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
@@ -30,14 +29,15 @@ try:
 except Exception:
     _cognito = None
 
-def _get_session_sub(event):
-    token = util.extract_session_token(event)
+def _get_jwt_sub(event):
+    """
+    Extract the authenticated user's Cognito sub ID from the Bearer JWT token.
+    """
+    token = util.extract_bearer_token(event)
     if not token:
         return None
-    result = sessions.get_session(token)
-    if not result["success"] or not result["data"]["session"]:
-        return None
-    return result["data"]["session"].get("authenticated_user_id")
+    sub, _ = util.verify_cognito_token(token)
+    return sub
 
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ def MarkNotificationsRead(event, path_params, query_params, body):
 
 
 def DeleteAccount(event, path_params, query_params, body):
-    cognito_sub = _get_session_sub(event)
+    cognito_sub = _get_jwt_sub(event)
     if not cognito_sub:
         return util.err("Unauthorized.", 401)
 
@@ -125,11 +125,20 @@ def _resolve(method, path):
 # ── Lambda Entry Point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
+    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
+
     http_method = event.get("httpMethod", "GET")
     path = event.get("path", "/")
 
     if http_method == "OPTIONS":
         return util.ok({}, 200)
+
+    # ── Timeout guard ────────────────────────────────────────────────────────
+    if context.get_remaining_time_in_millis() < 1500:
+        util.log("warning", trace_id, "Lambda near timeout — returning 503",
+                 functionName=context.function_name)
+        return util.err("Request timed out. Please try again.", 503)
 
     query_params = event.get("queryStringParameters") or {}
     path_params  = event.get("pathParameters") or {}
@@ -144,5 +153,6 @@ def lambda_handler(event, context):
     try:
         return handler(event, merged_params, query_params, body)
     except Exception as exc:
-        util.log("error", "profile", f"Unhandled error in {handler.__name__}: {exc}")
+        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
+                 functionName=context.function_name)
         return util.err("An internal error occurred.", 500)

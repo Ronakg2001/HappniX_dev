@@ -42,7 +42,6 @@ except ImportError:  # Allows local contract tests without boto3 installed.
 
 import utilities.util as util
 import utilities.rds as rds
-import utilities.sessions as sessions
 import utilities.dynamo as dynamo
 from utilities.r2_helper import upload_profile_picture
 
@@ -69,25 +68,21 @@ _SETTINGS_TABLE = os.environ.get("SETTINGS_TABLE_NAME", "")
 _USERS_TABLE    = os.environ.get("USERS_TABLE_NAME",    "")
 
 
-# ── Auth helper ───────────────────────────────────────────────────────────────
+# ── Auth helpers (JWT Bearer token) ──────────────────────────────────────────
 
-def _get_session_user(event):
+def _get_jwt_user(event):
     """
-    Resolve the authenticated user from the session cookie.
+    Resolve the authenticated user from the Authorization: Bearer JWT header.
     Returns: (cognito_sub, user_dict) — both None if not authenticated.
-    Performance: One DynamoDB read for the session.
+    Performance: One Cognito API call (get_user) + one RDS read.
     """
-    token = util.extract_session_token(event)
+    token = util.extract_bearer_token(event)
     if not token:
         return None, None
-    result = sessions.get_session(token)
-    if not result["success"] or not result["data"]["session"]:
+    sub, _ = util.verify_cognito_token(token)
+    if not sub:
         return None, None
-    session = result["data"]["session"]
-    cognito_sub = session.get("authenticated_user_id") or session.get("cognitoSub")
-    if not cognito_sub:
-        return None, None
-    user_result = rds.get_user_by_sub(cognito_sub)
+    user_result = rds.get_user_by_sub(sub)
     user = user_result["data"] if user_result["success"] else None
     if user and _USERS_TABLE:
         # Merge DynamoDB profile fields (bio, profilePictureUrl) into the RDS user dict
@@ -96,21 +91,19 @@ def _get_session_user(event):
             d = dynamo_r["data"]
             user["bio"] = d.get("bio") or user.get("bio") or ""
             user["profilePictureUrl"] = d.get("profilePictureUrl") or user.get("profilePictureUrl") or ""
-    return cognito_sub, user
+    return sub, user
 
 
-def _get_session_sub(event):
+def _get_jwt_sub(event):
     """
-    Faster auth check — returns only the cognitoSub without hitting RDS.
+    Faster auth check — returns only cognitoSub without hitting RDS.
     Use when you only need to know WHO is asking, not their full profile.
     """
-    token = util.extract_session_token(event)
+    token = util.extract_bearer_token(event)
     if not token:
         return None
-    result = sessions.get_session(token)
-    if not result["success"] or not result["data"]["session"]:
-        return None
-    return result["data"]["session"].get("authenticated_user_id")
+    sub, _ = util.verify_cognito_token(token)
+    return sub
 
 
 # ── Social graph helpers ──────────────────────────────────────────────────────
@@ -213,7 +206,7 @@ def GetNearby(event, path_params, query_params, body):
 
 def GetMyEvents(event, path_params, query_params, body):
     """Hosted events placeholder/query for the home page My Events tab."""
-    cognito_sub = _get_session_sub(event)
+    cognito_sub = _get_jwt_sub(event)
     if not cognito_sub:
         return util.ok({"success": True, "count": 0, "events": []})
     result = query_items(
@@ -230,7 +223,7 @@ def GetMyEvents(event, path_params, query_params, body):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def GetMyProfile(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     following = _list_following(cognito_sub)
@@ -245,7 +238,7 @@ def GetMyProfile(event, path_params, query_params, body):
 
 
 def UpdateProfile(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
 
@@ -291,7 +284,7 @@ def UpdateProfile(event, path_params, query_params, body):
 
 
 def SetPrivacy(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     mode = str(body.get("privacyMode") or "public").lower()
@@ -304,7 +297,7 @@ def SetPrivacy(event, path_params, query_params, body):
 
 
 def GetFollowing(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     items = _list_following(cognito_sub)
@@ -318,7 +311,7 @@ def GetFollowing(event, path_params, query_params, body):
 
 
 def GetFollowers(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     items = _list_followers(cognito_sub)
@@ -332,7 +325,7 @@ def GetFollowers(event, path_params, query_params, body):
 
 
 def GetFollowRequests(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     requests = _list_follow_requests(cognito_sub)
@@ -345,7 +338,7 @@ def GetFollowRequests(event, path_params, query_params, body):
 
 
 def HandleFollowRequest(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     action = str(body.get("action") or "").lower()
@@ -360,7 +353,7 @@ def HandleFollowRequest(event, path_params, query_params, body):
 
 
 def SearchUsers(event, path_params, query_params, body):
-    cognito_sub = _get_session_sub(event)
+    cognito_sub = _get_jwt_sub(event)
     if not cognito_sub:
         return util.err("Not authenticated.", 401)
     q = str(query_params.get("q") or "").strip()
@@ -385,7 +378,7 @@ def SearchUsers(event, path_params, query_params, body):
 
 
 def FollowUser(event, path_params, query_params, body):
-    cognito_sub, user = _get_session_user(event)
+    cognito_sub, user = _get_jwt_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
     target_sub = str(body.get("targetCognitoSub") or body.get("userId") or "").strip()
@@ -410,7 +403,7 @@ def FollowUser(event, path_params, query_params, body):
 
 
 def GetPublicProfile(event, path_params, query_params, body):
-    cognito_sub = _get_session_sub(event)  # viewer — may be None
+    cognito_sub = _get_jwt_sub(event)  # viewer — may be None
     user_id = str(path_params.get("id") or "").strip()
     if not user_id:
         return util.err("User ID required.", 400)
@@ -612,11 +605,20 @@ def _resolve(method, path):
 # ── Lambda Entry Point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
+    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
+
     http_method = event.get("httpMethod", "GET")
     path = event.get("path", "/")
 
     if http_method == "OPTIONS":
         return util.ok({}, 200)
+
+    # ── Timeout guard ────────────────────────────────────────────────────────
+    if context.get_remaining_time_in_millis() < 1500:
+        util.log("warning", trace_id, "Lambda near timeout — returning 503",
+                 functionName=context.function_name)
+        return util.err("Request timed out. Please try again.", 503)
 
     query_params = event.get("queryStringParameters") or {}
     path_params  = event.get("pathParameters") or {}
@@ -631,5 +633,6 @@ def lambda_handler(event, context):
     try:
         return handler(event, merged_params, query_params, body)
     except Exception as exc:
-        util.log("error", "home_page", f"Unhandled error in {handler.__name__}: {exc}")
+        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
+                 functionName=context.function_name)
         return util.err("An internal error occurred.", 500)

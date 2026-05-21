@@ -3,10 +3,14 @@ utilities/util.py — Shared helper functions for all HappniX Lambda functions.
 
 Import from here instead of duplicating logic in each Lambda:
 
-    from utilities.util import ok, err, get_session_user, format_phone_in
+    from utilities.util import ok, err, extract_bearer_token, verify_cognito_token
 
 All functions are stateless and pure — no side effects, no DB calls.
-DB-touching helpers live in rds.py and sessions.py.
+DB-touching helpers live in rds.py, sessions.py (pre-auth), and jwt_sessions.py (JWT).
+
+Auth model (post-migration):
+  • Pre-auth tokens  → X-HappniX-PreAuth header  (OTP/signup flow only)
+  • JWT access token → Authorization: Bearer <token> (all authenticated API calls)
 """
 
 import json
@@ -17,6 +21,12 @@ import random
 import string
 from datetime import datetime, timezone
 from email.utils import parseaddr
+
+try:
+    import boto3
+    _cognito_client = boto3.client("cognito-idp")
+except Exception:
+    _cognito_client = None
 
 
 # ── Environment ───────────────────────────────────────────────────────────────
@@ -44,7 +54,10 @@ def _cors_headers() -> dict:
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": env("FRONTEND_URL", "https://happnix-dev.ronakgo1.workers.dev"),
         "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRFToken",
+        # X-HappniX-PreAuth — carries pre-auth token during OTP/signup flow
+        # Authorization    — carries Cognito JWT Bearer token for authenticated calls
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRFToken,X-HappniX-PreAuth",
+        "Access-Control-Expose-Headers": "X-Happnix-Trace-Id",
     }
 
 
@@ -97,30 +110,17 @@ def err(message: str, status: int = 400, trace_id: str = None) -> dict:
 
 def with_session_cookie(response: dict, session_token: str) -> dict:
     """
-    Attach a Set-Cookie header to an existing response dict.
-
-    Args:
-        response:      Lambda response dict (mutated in-place and returned).
-        session_token: Value for the happnix_session cookie.
-
-    Returns:
-        The same response dict with the cookie header added.
+    DEPRECATED — no longer used post-JWT migration.
+    Kept to avoid import errors during transition; safe to remove later.
     """
-    if session_token:
-        response.setdefault("headers", {})
-        response["headers"]["Set-Cookie"] = (
-            f"happnix_session={session_token}; Path=/; HttpOnly; SameSite=None; Secure"
-        )
     return response
 
 
 def clear_session_cookie(response: dict) -> dict:
-    """Expire the happnix_session cookie (used on logout)."""
-    response.setdefault("headers", {})
-    response["headers"]["Set-Cookie"] = (
-        "happnix_session=; Path=/; HttpOnly; SameSite=None; Secure; "
-        "Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    )
+    """
+    DEPRECATED — no longer used post-JWT migration.
+    Kept to avoid import errors during transition; safe to remove later.
+    """
     return response
 
 
@@ -140,9 +140,9 @@ def parse_body(event: dict) -> dict:
 
 def extract_session_token(event: dict) -> str | None:
     """
-    Extract the happnix_session cookie value from the request headers.
-
-    Returns the token string or None if not present.
+    DEPRECATED — reads happnix_session cookie. No longer used post-JWT migration.
+    Kept to avoid import errors during transition. Use extract_preauth_token or
+    extract_bearer_token instead.
     """
     headers = event.get("headers") or {}
     cookie_header = headers.get("Cookie") or headers.get("cookie") or ""
@@ -151,6 +151,70 @@ def extract_session_token(event: dict) -> str | None:
         if sep and name == "happnix_session":
             return value.strip()
     return None
+
+
+def extract_preauth_token(event: dict) -> str | None:
+    """
+    Extract the pre-auth token from the X-HappniX-PreAuth request header.
+
+    This token is used ONLY during the OTP verification and signup flow.
+    It is returned in the response body by SendMobileOtp/VerifyMobileOtp and
+    sent back by the frontend in this header on subsequent signup steps.
+
+    Returns the token string or None if not present.
+    """
+    headers = event.get("headers") or {}
+    return (
+        headers.get("X-HappniX-PreAuth")
+        or headers.get("x-happnix-preauth")
+        or headers.get("X-Happnix-Preauth")
+        or None
+    )
+
+
+def extract_bearer_token(event: dict) -> str | None:
+    """
+    Extract the JWT access token from the Authorization: Bearer <token> header.
+
+    Returns the raw token string or None if the header is absent or malformed.
+    """
+    headers = event.get("headers") or {}
+    auth = headers.get("Authorization") or headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        return token if token else None
+    return None
+
+
+def verify_cognito_token(access_token: str) -> tuple:
+    """
+    Verify a Cognito access token by calling cognito.get_user().
+
+    This is the dev-friendly verification strategy: one Cognito API call per
+    request confirms the token is valid and returns the user's attributes.
+    For production at scale, replace with local JWKS verification.
+
+    Args:
+        access_token: The raw JWT access token string.
+
+    Returns:
+        (cognito_sub: str, attributes: dict) on success.
+        (None, None) if the token is invalid, expired, or Cognito is unavailable.
+
+    Usage:
+        sub, attrs = verify_cognito_token(token)
+        if not sub:
+            return util.err("Unauthorized.", 401)
+    """
+    if not access_token or not _cognito_client:
+        return None, None
+    try:
+        resp = _cognito_client.get_user(AccessToken=access_token)
+        attrs = {a["Name"]: a["Value"] for a in resp.get("UserAttributes", [])}
+        cognito_sub = attrs.get("sub")
+        return cognito_sub, attrs
+    except Exception:
+        return None, None
 
 
 def extract_trace_id(event: dict) -> str:
