@@ -33,6 +33,10 @@ def CreateEvent(event, path_params, query_params, body):
 
 def GetLiveEvents(event, path_params, query_params, body):
     """Live Now section — only live events, sorted newest first."""
+    sub = _get_jwt_sub(event)
+    if not sub:
+        return util.err("Not authenticated.", 401)
+        
     limit = min(int(query_params.get("limit") or 10), 30)
     result = dynamo.query_items(
         _EVENTS_TABLE,
@@ -50,6 +54,10 @@ def GetNearbyEvents(event, path_params, query_params, body):
     Nearby events by geohash prefix.
     Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
     """
+    sub = _get_jwt_sub(event)
+    if not sub:
+        return util.err("Not authenticated.", 401)
+        
     geohash = str(query_params.get("geohash") or "").strip()
     if not geohash:
         radius_km = query_params.get("radiusKm") or query_params.get("radius_km")

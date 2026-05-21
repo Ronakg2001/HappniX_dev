@@ -42,19 +42,17 @@ const views = {
 
     // ─── Pre-auth token storage ───────────────────────────────────────
     // Carries OTP session state between SendMobileOtp → VerifyMobileOtp
-    // → RegisterUserDetails. Stored in memory only; sent via header.
-    let _preAuthToken = null;
-
+    // → RegisterUserDetails.
     function savePreAuthToken(token) {
-      if (token) _preAuthToken = token;
+      if (token) localStorage.setItem("happnix_preauth_token", token);
     }
 
     function getPreAuthToken() {
-      return _preAuthToken || null;
+      return localStorage.getItem("happnix_preauth_token");
     }
 
     function clearPreAuthToken() {
-      _preAuthToken = null;
+      localStorage.removeItem("happnix_preauth_token");
     }
 
     // ─── JWT token storage (post-login) ──────────────────────────────
