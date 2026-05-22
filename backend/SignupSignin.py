@@ -104,12 +104,19 @@ def _preauth_response(status, body, token):
 # JWT HELPERS  — delegate to util to avoid duplication across all Lambdas
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def _get_jwt_user(event):
-    return util.get_jwt_user(event, _USERS_TABLE, dynamo, rds)
-
-
-def _get_jwt_sub(event):
-    return util.get_jwt_sub(event)
+def _fetch_user_profile(sub):
+    """Fetch the full user profile (RDS + DynamoDB merge) using a validated sub."""
+    if not sub:
+        return None
+    r_res = rds.get_user_by_sub(sub)
+    if not r_res.get("success") or not r_res.get("data"):
+        return None
+    user = r_res["data"]
+    if _USERS_TABLE:
+        d_res = dynamo.get_item(_USERS_TABLE, {"userID": user["userID"]})
+        if d_res.get("success") and d_res.get("data"):
+            user.update(d_res["data"])
+    return user
 
 
 def _device_info(event) -> str:
@@ -611,7 +618,8 @@ def CompleteProfileSetup(event, payload):
 
 
 def SendAadhaarOtp(event, payload):
-    sub, user = _get_jwt_user(event)
+    sub = event.get("auth_sub")
+    user = _fetch_user_profile(sub)
     if not user:
         return util.err("Please sign in first.", 401)
     aadhaar = str(payload.get("aadhaarNumber", "")).strip()
@@ -630,7 +638,8 @@ def SendAadhaarOtp(event, payload):
 
 
 def VerifyAadhaarOtp(event, payload):
-    sub, user = _get_jwt_user(event)
+    sub = event.get("auth_sub")
+    user = _fetch_user_profile(sub)
     if not user:
         return util.err("Please sign in first.", 401)
     otp = str(payload.get("otp", "")).strip()
@@ -647,7 +656,8 @@ def VerifyAadhaarOtp(event, payload):
 
 
 def GetCurrentUser(event, payload):
-    sub, user = _get_jwt_user(event)
+    sub = event.get("auth_sub")
+    user = _fetch_user_profile(sub)
     if not user:
         return util.err("Not authenticated.", 401)
     return util.ok({
@@ -701,7 +711,7 @@ def Logout(event, payload):
 
     # Remove session record(s) from the JWT sessions table
     if access_token:
-        sub, _ = util.verify_cognito_token(access_token)
+        sub = event.get("auth_sub")
         if sub:
             if global_logout:
                 jwt_sessions.delete_all_sessions(sub)
@@ -801,6 +811,21 @@ def lambda_handler(event, context):
     if not actionItem:
         return util.err("Missing actionItem in request body.", 400, trace_id)
 
+    # ── Centralized JWT Authentication ───────────────────────────────────────
+    UNPROTECTED_ACTIONS = {
+        "SendMobileOtp", "VerifyMobileOtp", "LoginWithPassword",
+        "RefreshToken", "CheckUsername", "RegisterUserDetails",
+        "CompleteProfileSetup", "GetSignupSessionDetails",
+        "GetDevAuthStatus", "WipeDevUsers", "GetDevAllUsers"
+    }
+    
+    if actionItem not in UNPROTECTED_ACTIONS:
+        sub = util.get_jwt_sub(event)
+        if not sub:
+            util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", actionItem=actionItem)
+            return util.err("Not authenticated.", 401, trace_id)
+        event["auth_sub"] = sub
+        
     handler = ACTION_REGISTRY.get(actionItem)
     if handler is None:
         util.log("warning", trace_id, "Unknown actionItem", actionItem=actionItem)

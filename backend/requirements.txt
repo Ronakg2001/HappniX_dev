@@ -1,1 +1,17 @@
+# ── Database ──────────────────────────────────────────────────────────────────
+# PostgreSQL driver used by utilities/rds.py to connect to Amazon RDS.
+# Binary version bundles the libpq C library — no system libpq install needed.
 psycopg2-binary==2.9.9
+
+# ── AWS SDK ───────────────────────────────────────────────────────────────────
+# boto3  — AWS SDK: used for DynamoDB (dynamo.py), Cognito (SignupSignin.py,
+#           rds.py auto-heal), and S3-compatible R2 uploads (r2_helper.py).
+# botocore ships with boto3 but is pinned here so local installs stay consistent.
+boto3==1.34.162
+botocore==1.34.162
+
+# ── JWT Authentication ────────────────────────────────────────────────────────
+# python-jose — AWS recommended library for local JWT verification.
+# The [cryptography] extra pulls in the `cryptography` package which provides
+# the RSA backend needed to verify Cognito's RS256-signed tokens against JWKS.
+python-jose[cryptography]==3.3.0

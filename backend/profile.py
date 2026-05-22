@@ -24,10 +24,6 @@ import utilities.dynamo as dynamo
 _USER_INFO_TABLE = os.environ.get("USER_INFO_TABLE_NAME", "")
 _COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
 
-# ── Auth helper — use util.get_jwt_sub instead of duplicating here ────────────
-_get_jwt_sub = util.get_jwt_sub
-
-
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 
 def GetProfile(event, path_params, query_params, body):
@@ -61,9 +57,7 @@ def MarkNotificationsRead(event, path_params, query_params, body):
 
 
 def DeleteAccount(event, path_params, query_params, body):
-    cognito_sub = _get_jwt_sub(event)
-    if not cognito_sub:
-        return util.err("Unauthorized.", 401)
+    cognito_sub = event.get("auth_sub")
 
     try:
         # Delete from Cognito
@@ -137,6 +131,13 @@ def lambda_handler(event, context):
 
     if handler is None:
         return util.err(f"Route not found: {http_method} {path}", 404)
+
+    # ── Centralized JWT Authentication ────────────────────────────────────────
+    sub = util.get_jwt_sub(event)
+    if not sub:
+        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
+        return util.err("Not authenticated.", 401)
+    event["auth_sub"] = sub
 
     try:
         return handler(event, merged_params, query_params, body)

@@ -10,10 +10,6 @@ except ImportError:
 _EVENTS_TABLE = os.environ.get("EVENTS_TABLE_NAME", "")
 
 
-# ── Auth helper — use util.get_jwt_sub instead of duplicating here ────────────
-_get_jwt_sub = util.get_jwt_sub
-
-
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 # Replace each stubs with the actual implementation when building features.
 
@@ -24,9 +20,7 @@ def CreateEvent(event, path_params, query_params, body):
 
 def GetLiveEvents(event, path_params, query_params, body):
     """Live Now section — only live events, sorted newest first."""
-    sub = _get_jwt_sub(event)
-    if not sub:
-        return util.err("Not authenticated.", 401)
+    sub = event.get("auth_sub")
         
     limit = min(int(query_params.get("limit") or 10), 30)
     result = dynamo.query_items(
@@ -45,9 +39,7 @@ def GetNearbyEvents(event, path_params, query_params, body):
     Nearby events by geohash prefix.
     Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
     """
-    sub = _get_jwt_sub(event)
-    if not sub:
-        return util.err("Not authenticated.", 401)
+    sub = event.get("auth_sub")
         
     geohash = str(query_params.get("geohash") or "").strip()
     if not geohash:
@@ -72,7 +64,7 @@ def GetNearbyEvents(event, path_params, query_params, body):
 
 def GetMyEvents(event, path_params, query_params, body):
     """Hosted events for the current logged-in user."""
-    cognito_sub = _get_jwt_sub(event)
+    cognito_sub = event.get("auth_sub")
     if not cognito_sub:
         return util.ok({"success": True, "count": 0, "events": []})
     result = dynamo.query_items(
@@ -149,6 +141,14 @@ def lambda_handler(event, context):
 
     if handler is None:
         return util.err(f"Route not found: {http_method} {path}", 404)
+
+    # ── Centralized JWT Authentication ────────────────────────────────────────
+    # No public routes in events.py yet
+    sub = util.get_jwt_sub(event)
+    if not sub:
+        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
+        return util.err("Not authenticated.", 401)
+    event["auth_sub"] = sub
 
     try:
         return handler(event, merged_params, query_params, body)

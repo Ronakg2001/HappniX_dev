@@ -34,6 +34,7 @@ Performance notes:
 """
 
 import os
+import json
 
 try:
     from boto3.dynamodb.conditions import Key, Attr
@@ -70,12 +71,19 @@ _USERS_TABLE    = os.environ.get("USERS_TABLE_NAME",    "")
 
 # ── Auth helpers — delegate to util to avoid duplication ────────────────────
 
-def _get_jwt_user(event):
-    return util.get_jwt_user(event, _USERS_TABLE, dynamo, rds)
-
-
-def _get_jwt_sub(event):
-    return util.get_jwt_sub(event)
+def _fetch_user_profile(sub):
+    """Fetch the full user profile (RDS + DynamoDB merge) using a validated sub."""
+    if not sub:
+        return None
+    r_res = rds.get_user_by_sub(sub)
+    if not r_res.get("success") or not r_res.get("data"):
+        return None
+    user = r_res["data"]
+    if _USERS_TABLE:
+        d_res = dynamo.get_item(_USERS_TABLE, {"userID": user["userID"]})
+        if d_res.get("success") and d_res.get("data"):
+            user.update(d_res["data"])
+    return user
 
 
 # ── Social graph helpers ──────────────────────────────────────────────────────
@@ -112,10 +120,10 @@ def GetFeed(event, path_params, query_params, body):
     Main home feed — returns live events + upcoming events.
     Now strictly requires JWT authentication.
     """
-    sub = _get_jwt_sub(event)
+    sub = event.get("auth_sub")
     if not sub:
         return util.err("Not authenticated.", 401)
-        
+
     limit = min(int(query_params.get("limit") or 20), 50)
 
     live_result = query_items(
@@ -142,10 +150,10 @@ def GetFeed(event, path_params, query_params, body):
 
 def GetLiveNow(event, path_params, query_params, body):
     """Live Now section — only live events, sorted newest first."""
-    sub = _get_jwt_sub(event)
+    sub = event.get("auth_sub")
     if not sub:
         return util.err("Not authenticated.", 401)
-        
+
     limit = min(int(query_params.get("limit") or 10), 30)
     result = query_items(
         _EVENTS_TABLE,
@@ -163,10 +171,10 @@ def GetNearby(event, path_params, query_params, body):
     Nearby events by geohash prefix.
     Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
     """
-    sub = _get_jwt_sub(event)
+    sub = event.get("auth_sub")
     if not sub:
         return util.err("Not authenticated.", 401)
-        
+
     geohash = str(query_params.get("geohash") or "").strip()
     if not geohash:
         radius_km = query_params.get("radiusKm") or query_params.get("radius_km")
@@ -190,7 +198,7 @@ def GetNearby(event, path_params, query_params, body):
 
 def GetMyEvents(event, path_params, query_params, body):
     """Hosted events placeholder/query for the home page My Events tab."""
-    cognito_sub = _get_jwt_sub(event)
+    cognito_sub = event.get("auth_sub")
     if not cognito_sub:
         return util.ok({"success": True, "count": 0, "events": []})
     result = query_items(
@@ -207,7 +215,8 @@ def GetMyEvents(event, path_params, query_params, body):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def GetMyProfile(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     following = _list_following(cognito_sub)
@@ -222,7 +231,8 @@ def GetMyProfile(event, path_params, query_params, body):
 
 
 def UpdateProfile(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
 
@@ -268,7 +278,8 @@ def UpdateProfile(event, path_params, query_params, body):
 
 
 def SetPrivacy(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     mode = str(body.get("privacyMode") or "public").lower()
@@ -281,7 +292,8 @@ def SetPrivacy(event, path_params, query_params, body):
 
 
 def GetFollowing(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     items = _list_following(cognito_sub)
@@ -295,7 +307,8 @@ def GetFollowing(event, path_params, query_params, body):
 
 
 def GetFollowers(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     items = _list_followers(cognito_sub)
@@ -309,7 +322,8 @@ def GetFollowers(event, path_params, query_params, body):
 
 
 def GetFollowRequests(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     requests = _list_follow_requests(cognito_sub)
@@ -322,7 +336,8 @@ def GetFollowRequests(event, path_params, query_params, body):
 
 
 def HandleFollowRequest(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     action = str(body.get("action") or "").lower()
@@ -337,7 +352,7 @@ def HandleFollowRequest(event, path_params, query_params, body):
 
 
 def SearchUsers(event, path_params, query_params, body):
-    cognito_sub = _get_jwt_sub(event)
+    cognito_sub = event.get("auth_sub")
     if not cognito_sub:
         return util.err("Not authenticated.", 401)
     q = str(query_params.get("q") or "").strip()
@@ -362,7 +377,8 @@ def SearchUsers(event, path_params, query_params, body):
 
 
 def FollowUser(event, path_params, query_params, body):
-    cognito_sub, user = _get_jwt_user(event)
+    cognito_sub = event.get("auth_sub")
+    user = _fetch_user_profile(cognito_sub)
     if not user:
         return util.err("Not authenticated.", 401)
     target_sub = str(body.get("targetCognitoSub") or body.get("userId") or "").strip()
@@ -387,7 +403,8 @@ def FollowUser(event, path_params, query_params, body):
 
 
 def GetPublicProfile(event, path_params, query_params, body):
-    cognito_sub = _get_jwt_sub(event)  # viewer — may be None
+    cognito_sub = event.get("auth_sub")  # viewer - may be None
+    target_username = str(path_params.get("id") or "").strip()
     user_id = str(path_params.get("id") or "").strip()
     if not user_id:
         return util.err("User ID required.", 400)
@@ -589,6 +606,8 @@ def _resolve(method, path):
 # ── Lambda Entry Point ────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
+    print("=== EVENT ===")
+    print(json.dumps(event))
     # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
     trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
 
@@ -613,6 +632,15 @@ def lambda_handler(event, context):
 
     if handler is None:
         return util.err(f"Route not found: {http_method} {path}", 404)
+
+    # ── Centralized JWT Authentication ────────────────────────────────────────
+    UNPROTECTED_HANDLERS = {GetPublicProfile}
+    
+    sub = util.get_jwt_sub(event)
+    if not sub and handler not in UNPROTECTED_HANDLERS:
+        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
+        return util.err("Not authenticated.", 401)
+    event["auth_sub"] = sub
 
     try:
         return handler(event, merged_params, query_params, body)

@@ -11,6 +11,13 @@ DB-touching helpers live in rds.py, sessions.py (pre-auth), and jwt_sessions.py 
 Auth model (post-migration):
   • Pre-auth tokens  → X-HappniX-PreAuth header  (OTP/signup flow only)
   • JWT access token → Authorization: Bearer <token> (all authenticated API calls)
+
+JWT Verification Strategy (AWS recommended):
+  • Primary:  python-jose decodes and verifies the token locally using Cognito's
+              public JWKS (JSON Web Key Sets). JWKS is fetched ONCE on cold start
+              and cached in memory — zero network calls per request.
+  • Fallback: If JWKS is unavailable (local dev / network error), falls back to
+              boto3.cognito_idp.get_user() — one Cognito API call per request.
 """
 
 import json
@@ -22,11 +29,33 @@ import string
 from datetime import datetime, timezone
 from email.utils import parseaddr
 
+# ── python-jose (JWT local verification — AWS recommended best practice) ───────
+try:
+    from jose import jwt as _jose_jwt, jwk as _jose_jwk, JWTError as _JWTError
+    _JOSE_AVAILABLE = True
+except ImportError:
+    _JOSE_AVAILABLE = False
+
+# ── urllib for JWKS fetch (built-in, no extra dependency) ─────────────────────
+try:
+    from urllib.request import urlopen
+    from urllib.error import URLError
+except ImportError:
+    urlopen = None
+    URLError = Exception
+
+# ── boto3 — still used for all OTHER Cognito operations (login, refresh, etc.) ─
 try:
     import boto3
     _cognito_client = boto3.client("cognito-idp")
 except Exception:
     _cognito_client = None
+
+# ── JWKS cache (populated once on cold start, reused for the lifetime of the
+#    Lambda container — Lambda re-uses containers across requests in the same
+#    execution environment, so this is effectively a process-level cache) ───────
+_jwks_cache: dict | None = None   # raw JWKS dict from Cognito
+_jwks_keys_cache: list | None = None  # pre-parsed list of JWK key objects
 
 
 # ── Environment ───────────────────────────────────────────────────────────────
@@ -186,34 +215,121 @@ def extract_bearer_token(event: dict) -> str | None:
     return None
 
 
+def _get_jwks_keys() -> list | None:
+    """
+    Fetch and cache Cognito's public JWKS (JSON Web Key Set).
+
+    The JWKS is downloaded ONCE per Lambda cold start and reused for every
+    request in that container. Cognito rotates keys rarely, so this is safe.
+
+    Returns:
+        List of JWK key dicts, or None if unavailable.
+    """
+    global _jwks_cache, _jwks_keys_cache
+    if _jwks_keys_cache is not None:
+        return _jwks_keys_cache
+
+    pool_id = os.environ.get("COGNITO_USER_POOL_ID", "")
+    region  = (
+        os.environ.get("COGNITO_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or os.environ.get("AWS_REGION", "ap-south-1")
+    )
+
+    if not pool_id or not _JOSE_AVAILABLE or urlopen is None:
+        return None
+
+    jwks_url = (
+        f"https://cognito-idp.{region}.amazonaws.com/{pool_id}"
+        f"/.well-known/jwks.json"
+    )
+    try:
+        with urlopen(jwks_url, timeout=3) as resp:
+            _jwks_cache = json.loads(resp.read().decode("utf-8"))
+        _jwks_keys_cache = _jwks_cache.get("keys", [])
+        return _jwks_keys_cache
+    except Exception as exc:
+        # On any network failure, return None so we fall back to boto3 get_user()
+        print(json.dumps({"level": "warning", "message": f"JWKS fetch failed: {exc}"}))
+        return None
+
+
 def verify_cognito_token(access_token: str) -> tuple:
     """
-    Verify a Cognito access token by calling cognito.get_user().
+    Verify a Cognito access token.
 
-    This is the dev-friendly verification strategy: one Cognito API call per
-    request confirms the token is valid and returns the user's attributes.
-    For production at scale, replace with local JWKS verification.
+    Strategy (AWS recommended):
+      1. LOCAL (fast):  Use python-jose to verify the JWT signature, expiry,
+                        issuer, and token_use locally against Cognito's public
+                        JWKS. Zero network calls after the first cold-start fetch.
+      2. FALLBACK:      If JOSE is unavailable or JWKS can't be fetched (e.g.
+                        local dev without internet), fall back to boto3 get_user()
+                        — one Cognito API call that validates the token server-side.
 
     Args:
         access_token: The raw JWT access token string.
 
     Returns:
-        (cognito_sub: str, attributes: dict) on success.
+        (cognito_sub: str, claims: dict) on success.
         (None, None) if the token is invalid, expired, or Cognito is unavailable.
 
     Usage:
-        sub, attrs = verify_cognito_token(token)
+        sub, claims = verify_cognito_token(token)
         if not sub:
             return util.err("Unauthorized.", 401)
     """
-    if access_token and access_token.startswith("mock-jwt-"):
-        # Local development fallback
+    if not access_token:
+        return None, None
+
+    # ── Dev mock token shortcut (non-prod only) ────────────────────────────────
+    if access_token.startswith("mock-jwt-"):
         if app_env() == "prod":
             return None, None
         cognito_sub = access_token.replace("mock-jwt-", "")
-        return cognito_sub, {"sub": cognito_sub}
+        return cognito_sub, {"sub": cognito_sub, "token_use": "access"}
 
-    if not access_token or not _cognito_client:
+    # ── Primary: python-jose local verification ────────────────────────────────
+    if _JOSE_AVAILABLE:
+        pool_id = os.environ.get("COGNITO_USER_POOL_ID", "")
+        region  = (
+            os.environ.get("COGNITO_REGION")
+            or os.environ.get("AWS_DEFAULT_REGION")
+            or os.environ.get("AWS_REGION", "ap-south-1")
+        )
+        expected_issuer = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}"
+
+        keys = _get_jwks_keys()
+        if keys and pool_id:
+            try:
+                # Peek at the header to find the correct signing key by kid
+                header = _jose_jwt.get_unverified_header(access_token)
+                kid = header.get("kid")
+                # Find the matching key in the JWKS
+                signing_key = next(
+                    (k for k in keys if k.get("kid") == kid), None
+                )
+                if signing_key:
+                    claims = _jose_jwt.decode(
+                        access_token,
+                        signing_key,
+                        algorithms=["RS256"],
+                        options={"verify_aud": False},  # Cognito access tokens have no aud
+                    )
+                    # Validate issuer and token_use (access tokens only)
+                    if claims.get("iss") != expected_issuer:
+                        return None, None
+                    if claims.get("token_use") != "access":
+                        return None, None
+                    cognito_sub = claims.get("sub")
+                    return cognito_sub, claims
+            except _JWTError:
+                # Token is invalid or expired — do not fall back to boto3 for security
+                return None, None
+            except Exception:
+                pass  # Unexpected error — fall through to boto3 fallback
+
+    # ── Fallback: boto3 get_user() (local dev / JWKS unavailable) ─────────────
+    if not _cognito_client:
         return None, None
     try:
         resp = _cognito_client.get_user(AccessToken=access_token)

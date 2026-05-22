@@ -17,10 +17,6 @@ TODO: Implement each handler when the feature is being built.
 import utilities.util as util
 
 
-# ── Auth helper — use util.get_jwt_sub instead of duplicating here ────────────
-_get_jwt_sub = util.get_jwt_sub
-
-
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 
 def StartConversation(event, path_params, query_params, body):
@@ -140,6 +136,13 @@ def lambda_handler(event, context):
 
     if handler is None:
         return util.err(f"Route not found: {http_method} {path}", 404)
+
+    # ── Centralized JWT Authentication ────────────────────────────────────────
+    sub = util.get_jwt_sub(event)
+    if not sub:
+        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
+        return util.err("Not authenticated.", 401)
+    event["auth_sub"] = sub
 
     try:
         return handler(event, merged_params, query_params, body)
