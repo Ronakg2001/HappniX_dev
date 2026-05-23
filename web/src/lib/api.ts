@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
+const API_BASE = "";
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
