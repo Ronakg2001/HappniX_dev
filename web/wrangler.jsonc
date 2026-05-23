@@ -1,8 +1,12 @@
 {
   "name": "happnix-dev-new",
   "compatibility_date": "2026-04-15",
-  "main": ".vercel/output/static/_worker.js",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "main": ".open-next/worker.js",
   "assets": {
-    "directory": ".vercel/output/static"
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
   }
 }
