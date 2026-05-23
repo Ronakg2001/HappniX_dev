@@ -845,7 +845,7 @@ def lambda_handler(event, context):
     # Inject CORS origin from request header
     headers = event.get("headers") or {}
     origin  = (headers.get("origin") or headers.get("Origin")
-               or util.env("FRONTEND_URL", "https://happnix-dev.ronakgo1.workers.dev"))
+               or util.env("FRONTEND_URL", "https://happnix-dev-new.ronakgo1.workers.dev"))
     response.setdefault("headers", {})
     response["headers"]["Access-Control-Allow-Origin"]      = origin
     response["headers"]["Access-Control-Allow-Credentials"] = "true"

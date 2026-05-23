@@ -16,7 +16,7 @@ Parameters:
 
   FrontendUrl:
     Type: String
-    Default: "https://happnix-dev.ronakgo1.workers.dev"
+    Default: "https://happnix-dev-new.ronakgo1.workers.dev"
     Description: Frontend origin for CORS (cannot be '*' if using cookies).
 
   # ─── Network refs ───────────────────────────────────────────────────
