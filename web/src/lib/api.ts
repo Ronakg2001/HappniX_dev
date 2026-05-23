@@ -1,10 +1,9 @@
 import axios from "axios";
 
-const API_BASE = "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
-  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
