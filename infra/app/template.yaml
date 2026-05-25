@@ -288,7 +288,7 @@ Resources:
   # Core Auth Lambdas (always enabled)
   # Free Tier: 1M requests + 400K GB-seconds/month (always free)
   # ══════════════════════════════════════════════════════════════════════
-  signup_signin:
+  SignupSignin:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
