@@ -89,7 +89,7 @@ def _cors_headers() -> dict:
     }
 
 
-def ok(body: dict, status: int = 200, trace_id: str = None) -> dict:
+def success_response(body: dict, status: int = 200, trace_id: str = None) -> dict:
     """
     Build a successful Lambda HTTP response.
 
@@ -111,7 +111,7 @@ def ok(body: dict, status: int = 200, trace_id: str = None) -> dict:
     }
 
 
-def err(message: str, status: int = 400, trace_id: str = None) -> dict:
+def error_response(message: str, status: int = 400, trace_id: str = None) -> dict:
     """
     Build an error Lambda HTTP response.
 
@@ -163,7 +163,7 @@ def parse_body(event: dict) -> dict:
     try:
         return json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
-        return {}
+        return "400"
 
 
 def extract_session_token(event: dict) -> str | None:

@@ -37,10 +37,10 @@ Action Registry:
 import os
 import uuid
 from datetime import datetime, timezone
-
+import json
 import boto3
 
-import utilities.util as util           # ok, err, log, validators, formatters
+import utilities.util as util           # success, error, log, validators, formatters
 import utilities.rds as rds             # get_user_by_sub, upsert_user, ...
 import utilities.sessions as sessions   # pre-auth token storage (OTP/signup flow)
 import utilities.dynamo as dynamo       # put_item, get_item, query_items, ...
@@ -97,7 +97,7 @@ def _preauth_response(status, body, token):
     """
     if token:
         body["preAuthToken"] = token
-    return util.ok(body, status)
+    return util.success_response(body, status)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -143,7 +143,7 @@ def _device_info(event) -> str:
 def SendMobileOtp(event, payload):
     mobile = str(payload.get("mobile", "")).strip()
     if not util.is_valid_mobile(mobile):
-        return util.err("Please enter a valid 10-digit mobile number.")
+        return util.error_responseor_response("Please enter a valid 10-digit mobile number.")
 
     token, session = _get_or_create_preauth(event)
     otp = util.generate_otp()
@@ -160,7 +160,7 @@ def SendMobileOtp(event, payload):
 def ResendMobileOtp(event, payload):
     mobile = str(payload.get("mobile", "")).strip()
     if not util.is_valid_mobile(mobile):
-        return util.err("Please enter a valid 10-digit mobile number.")
+        return util.error_response("Please enter a valid 10-digit mobile number.")
 
     token, session = _get_or_create_preauth(event)
     otp = util.generate_otp()
@@ -177,7 +177,7 @@ def VerifyMobileOtp(event, payload):
     mobile = str(payload.get("mobile", "")).strip()
     otp    = str(payload.get("otp", "")).strip()
     if not mobile or not otp:
-        return util.err("Mobile and OTP are required.")
+        return util.error_response("Mobile and OTP are required.")
 
     token, session = _get_or_create_preauth(event)
     saved_otp = session.get("mobile_otp_map", {}).get(mobile)
@@ -223,7 +223,7 @@ def VerifyMobileOtp(event, payload):
         # Existing user — they must log in with username/password to get a JWT.
         # Do NOT issue a JWT here; drop the pre-auth session (no longer needed).
         sessions.delete_session(token)
-        return util.ok({
+        return util.success_response({
             "success": True,
             "message": f"Welcome back, {user.get('userName', 'User')}! Please sign in with your password.",
             "userStatus": "existing",
@@ -255,7 +255,7 @@ def LoginWithPassword(event, payload):
     identifier = str(payload.get("identifier", payload.get("username", ""))).strip()
     password   = str(payload.get("password", "")).strip()
     if not identifier or not password:
-        return util.err("Username/email and password are required.")
+        return util.error_response("Username/email and password are required.")
 
     pool_id   = os.environ.get("COGNITO_USER_POOL_ID")
     client_id = os.environ.get("COGNITO_USER_POOL_CLIENT_ID")
@@ -289,15 +289,15 @@ def LoginWithPassword(event, payload):
 
         except (_cognito.exceptions.NotAuthorizedException,
                 _cognito.exceptions.UserNotFoundException):
-            return util.err("Invalid username/email or password.", 401)
+            return util.error_response("Invalid username/email or password.", 401)
         except Exception as exc:
-            return util.err(f"Login failed: {exc}", 500)
+            return util.error_response(f"Login failed: {exc}", 500)
     else:
         # Cognito not configured — dev-only fallback via RDS lookup
         result = rds.get_user_by_identifier(identifier)
         user = result["data"] if result["success"] else None
         if not user:
-            return util.err("Invalid username/email or password.", 401)
+            return util.error_response("Invalid username/email or password.", 401)
         cognito_sub = user["cognitoSub"]
         full_name   = user.get("userName", "User")
         access_token  = f"mock-jwt-{cognito_sub}"
@@ -318,7 +318,7 @@ def LoginWithPassword(event, payload):
     if lookup["success"] and lookup["data"]:
         can_create = util.can_create_or_join_parties(lookup["data"])
 
-    return util.ok({
+    return util.success_response({
         "success":      True,
         "message":      f"Signed in successfully. Welcome, {full_name}.",
         "accessToken":  access_token,
@@ -346,14 +346,14 @@ def RefreshToken(event, payload):
     session_id    = str(payload.get("sessionId", "")).strip()
 
     if not refresh_token:
-        return util.err("refreshToken is required.", 400)
+        return util.error_response("refreshToken is required.", 400)
 
     # Verify with Cognito
     pool_id   = os.environ.get("COGNITO_USER_POOL_ID")
     client_id = os.environ.get("COGNITO_USER_POOL_CLIENT_ID")
 
     if not _cognito or not pool_id or not client_id:
-        return util.err("Token refresh not available in this environment.", 503)
+        return util.error_response("Token refresh not available in this environment.", 503)
 
     try:
         auth_resp = _cognito.admin_initiate_auth(
@@ -367,9 +367,9 @@ def RefreshToken(event, payload):
         expires_in  = result.get("ExpiresIn", 3600)
         new_id      = result.get("IdToken")
     except (_cognito.exceptions.NotAuthorizedException,):
-        return util.err("Refresh token is invalid or expired. Please log in again.", 401)
+        return util.error_response("Refresh token is invalid or expired. Please log in again.", 401)
     except Exception as exc:
-        return util.err(f"Token refresh failed: {exc}", 500)
+        return util.error_response(f"Token refresh failed: {exc}", 500)
 
     # Enforce 7-day inactivity window and update lastUsedAt
     if session_id:
@@ -378,7 +378,7 @@ def RefreshToken(event, payload):
             session_resp = jwt_sessions.get_session(sub, session_id)
             if not session_resp["success"] or not session_resp["data"]:
                 # If session isn't in DynamoDB, it was revoked or expired
-                return util.err("Session is invalid or expired. Please log in again.", 401)
+                return util.error_response("Session is invalid or expired. Please log in again.", 401)
 
             session_data = session_resp["data"]
             last_used_str = session_data.get("lastUsedAt")
@@ -389,13 +389,13 @@ def RefreshToken(event, payload):
                     days_inactive = (datetime.now(timezone.utc) - last_used).days
                     if days_inactive >= 7:
                         jwt_sessions.delete_session(sub, session_id)
-                        return util.err("Session expired due to inactivity. Please log in again.", 401)
+                        return util.error_response("Session expired due to inactivity. Please log in again.", 401)
                 except Exception as e:
                     util.log(f"Error parsing lastUsedAt: {e}")
 
             jwt_sessions.refresh_session(sub, session_id)
 
-    return util.ok({
+    return util.success_response({
         "success":     True,
         "accessToken": new_access,
         "idToken":     new_id,
@@ -407,9 +407,9 @@ def RefreshToken(event, payload):
 def ForgotPasswordRequest(event, payload):
     email = str(payload.get("email", "")).strip().lower()
     if not email:
-        return util.err("Please enter your email address.")
+        return util.error_response("Please enter your email address.")
     if not util.is_valid_email(email):
-        return util.err("Please enter a valid email address.")
+        return util.error_response("Please enter a valid email address.")
     result = rds.get_user_by_identifier(email)
     exists = result["success"] and result["data"] is not None
     msg = (
@@ -417,7 +417,7 @@ def ForgotPasswordRequest(event, payload):
         if exists
         else "If this email is registered, verification instructions will be sent."
     )
-    return util.ok({"success": True, "message": msg})
+    return util.success_response({"success": True, "message": msg})
 
 
 def CheckUsername(event, payload):
@@ -427,26 +427,26 @@ def CheckUsername(event, payload):
     """
     username = str(payload.get("username", "")).strip()
     if not username:
-        return util.err("Please enter a username.")
+        return util.error_response("Please enter a username.")
     if len(username) < 3:
-        return util.err("Username must be at least 3 characters.")
+        return util.error_response("Username must be at least 3 characters.")
     if len(username) > 30:
-        return util.err("Username must be 30 characters or less.")
+        return util.error_response("Username must be 30 characters or less.")
     if not username.replace("_", "").replace(".", "").isalnum():
-        return util.err("Username can only contain letters, numbers, underscores, and dots.")
+        return util.error_response("Username can only contain letters, numbers, underscores, and dots.")
 
     result = rds.get_user_by_identifier(username)
     if not result["success"]:
-        return util.err("Could not check username availability. Try again.", 500)
+        return util.error_response("Could not check username availability. Try again.", 500)
     if result["data"]:
-        return util.ok({"available": False, "message": "Username already taken. Please choose another one."})
-    return util.ok({"available": True, "message": "Username is available!"})
+        return util.success_response({"available": False, "message": "Username already taken. Please choose another one."})
+    return util.success_response({"available": True, "message": "Username is available!"})
 
 
 def RegisterUserDetails(event, payload):
     token, session = _get_preauth_session(event)
     if not session:
-        return util.err("Signup session expired. Please verify your mobile number again.", 401)
+        return util.error_response("Signup session expired. Please verify your mobile number again.", 401)
 
     pending_mobile = session.get("pending_signup_mobile")
     if not pending_mobile:
@@ -568,18 +568,18 @@ def RegisterUserDetails(event, payload):
 def CompleteProfileSetup(event, payload):
     token, session = _get_preauth_session(event)
     if not session:
-        return util.err("Profile setup session not found. Please sign in.", 401)
+        return util.error_response("Profile setup session not found. Please sign in.", 401)
 
     cognito_sub = session.get("authenticated_user_id")
     if not cognito_sub:
-        return util.err("Please sign in first.", 401)
+        return util.error_response("Please sign in first.", 401)
     if not session.get("pending_profile_setup"):
         return _preauth_response(400, {"success": False, "message": "Profile setup session not found."}, token)
 
     user_result = rds.get_user_by_sub(cognito_sub)
     user = user_result["data"] if user_result["success"] else None
     if not user:
-        return util.err("User not found.", 404)
+        return util.error_response("User not found.", 404)
 
     if not payload.get("skip", False):
         bio       = str(payload.get("bio", "")).strip()
@@ -610,7 +610,7 @@ def CompleteProfileSetup(event, payload):
     except Exception as _r2_err:
         print(f"WARN: R2 folder init failed: {_r2_err}")
 
-    return util.ok({
+    return util.success_response({
         "success":    True,
         "message":    "Profile setup completed. Please sign in to continue.",
         "redirectUrl": "/login.html",
@@ -621,17 +621,17 @@ def SendAadhaarOtp(event, payload):
     sub = event.get("auth_sub")
     user = _fetch_user_profile(sub)
     if not user:
-        return util.err("Please sign in first.", 401)
+        return util.error_response("Please sign in first.", 401)
     aadhaar = str(payload.get("aadhaarNumber", "")).strip()
     if aadhaar:
         if not aadhaar.isdigit() or len(aadhaar) != 12:
-            return util.err("Please enter a valid 12-digit Aadhaar number.", 400)
+            return util.error_response("Please enter a valid 12-digit Aadhaar number.", 400)
         current_aadhaar = aadhaar
     else:
         current_aadhaar = user.get("profile", {}).get("gov_id_number", "")
         if not current_aadhaar:
-            return util.err("Please provide an Aadhaar number.", 400)
-    return util.ok({
+            return util.error_response("Please provide an Aadhaar number.", 400)
+    return util.success_response({
         "success": True,
         "message": f"OTP sent successfully to mobile linked with Aadhaar ending in {current_aadhaar[-4:]}.",
     })
@@ -641,13 +641,13 @@ def VerifyAadhaarOtp(event, payload):
     sub = event.get("auth_sub")
     user = _fetch_user_profile(sub)
     if not user:
-        return util.err("Please sign in first.", 401)
+        return util.error_response("Please sign in first.", 401)
     otp = str(payload.get("otp", "")).strip()
     if not otp:
-        return util.err("Please enter the OTP.", 400)
+        return util.error_response("Please enter the OTP.", 400)
     if otp != "123456":
-        return util.err("Invalid OTP. Please try again.", 400)
-    return util.ok({
+        return util.error_response("Invalid OTP. Please try again.", 400)
+    return util.success_response({
         "success":              True,
         "message":             "Aadhaar verified successfully! You can now host and join parties.",
         "isVerified":          True,
@@ -659,8 +659,8 @@ def GetCurrentUser(event, payload):
     sub = event.get("auth_sub")
     user = _fetch_user_profile(sub)
     if not user:
-        return util.err("Not authenticated.", 401)
-    return util.ok({
+        return util.error_response("Not authenticated.", 401)
+    return util.success_response({
         "success":          True,
         "userID":           user.get("userID", ""),
         "userName":         user.get("userName", ""),
@@ -675,7 +675,7 @@ def GetCurrentUser(event, payload):
 def GetSignupSessionDetails(event, payload):
     token, session = _get_preauth_session(event)
     if not session:
-        return util.err("Signup session expired. Verify mobile OTP again.", 401)
+        return util.error_response("Signup session expired. Verify mobile OTP again.", 401)
     pending_mobile = str(session.get("pending_signup_mobile") or "").strip()
     if not pending_mobile:
         return _preauth_response(401, {
@@ -718,17 +718,17 @@ def Logout(event, payload):
             elif session_id:
                 jwt_sessions.delete_session(sub, session_id)
 
-    return util.ok({"success": True, "message": "Signed out successfully."})
+    return util.success_response({"success": True, "message": "Signed out successfully."})
 
 
 # ── Dev-only endpoints ─────────────────────────────────────────────────────────
 
 def GetDevAuthStatus(event, payload):
     if util.app_env() != "dev":
-        return util.err("Route not found.", 404)
+        return util.error_response("Route not found.", 404)
     users_ready   = rds.table_exists("users")
     devices_ready = rds.table_exists("user_devices")
-    return util.ok({
+    return util.success_response({
         "success": True,
         "apiStatus": "ok",
         "environment": util.app_env(),
@@ -742,25 +742,25 @@ def GetDevAuthStatus(event, payload):
 
 def WipeDevUsers(event, payload):
     if util.app_env() != "dev":
-        return util.err("Forbidden outside of dev.", 403)
+        return util.error_response("Forbidden outside of dev.", 403)
     result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
     if not result["success"]:
-        return util.err(f"Failed to wipe users: {result['error']}", 500)
-    return util.ok({"success": True, "message": "All users and devices deleted from RDS successfully!"})
+        return util.error_response(f"Failed to wipe users: {result['error']}", 500)
+    return util.success_response({"success": True, "message": "All users and devices deleted from RDS successfully!"})
 
 
 def GetDevAllUsers(event, payload):
     if util.app_env() != "dev":
-        return util.err("Forbidden outside of dev.", 403)
+        return util.error_response("Forbidden outside of dev.", 403)
     result = rds.get_all_users()
     if not result["success"]:
-        return util.err(f"Failed to fetch users: {result['error']}", 500)
-    return util.ok({"success": True, "users": result["data"]})
+        return util.error_response(f"Failed to fetch users: {result['error']}", 500)
+    return util.success_response({"success": True, "users": result["data"]})
 
 
 # ── Action Registry ────────────────────────────────────────────────────────────
 
-ACTION_REGISTRY = {
+action_handlers = {
     "SendMobileOtp":           SendMobileOtp,
     "ResendMobileOtp":         ResendMobileOtp,
     "VerifyMobileOtp":         VerifyMobileOtp,
@@ -780,72 +780,61 @@ ACTION_REGISTRY = {
     "GetDevAllUsers":          GetDevAllUsers,
 }
 
-
-# ── Lambda Entry Point ─────────────────────────────────────────────────────────
+import utilities.cognito_auth as auth
 
 def lambda_handler(event, context):
-    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
-    trace_id = (
-        context.aws_request_id                                    # unique per invocation
-        or (event.get("requestContext") or {}).get("requestId")   # API Gateway fallback
-        or util.extract_trace_id(event)                           # UUID fallback
-    )
-
-    http_method = event.get("httpMethod", "POST")
-
-    if http_method == "OPTIONS":
-        return util.ok({}, 200)
-
-    # ── Timeout guard: bail early if < 1.5 s remaining ──────────────────────
-    if context.get_remaining_time_in_millis() < 1500:
-        util.log("warning", trace_id, "Lambda near timeout — returning 503",
-                 functionName=context.function_name)
-        return util.err("Request timed out. Please try again.", 503, trace_id)
-
-    payload = util.parse_body(event)
-    actionItem  = str(payload.get("actionItem", "")).strip()
-
-    util.log("info", trace_id, "Incoming request",
-             actionItem=actionItem, functionName=context.function_name)
-
-    if not actionItem:
-        return util.err("Missing actionItem in request body.", 400, trace_id)
-
-    # ── Centralized JWT Authentication ───────────────────────────────────────
-    UNPROTECTED_ACTIONS = {
-        "SendMobileOtp", "VerifyMobileOtp", "LoginWithPassword",
-        "RefreshToken", "CheckUsername", "RegisterUserDetails",
-        "CompleteProfileSetup", "GetSignupSessionDetails",
-        "GetDevAuthStatus", "WipeDevUsers", "GetDevAllUsers"
-    }
-    
-    if actionItem not in UNPROTECTED_ACTIONS:
-        sub = util.get_jwt_sub(event)
-        if not sub:
-            util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", actionItem=actionItem)
-            return util.err("Not authenticated.", 401, trace_id)
-        event["auth_sub"] = sub
-        
-    handler = ACTION_REGISTRY.get(actionItem)
-    if handler is None:
-        util.log("warning", trace_id, "Unknown actionItem", actionItem=actionItem)
-        return util.err(
-            f"Unknown actionItem: '{actionItem}'. Available: {', '.join(sorted(ACTION_REGISTRY))}",
-            400, trace_id,
-        )
-
     try:
-        response = handler(event, payload)
-    except Exception as exc:
-        util.log("error", trace_id, "Unhandled exception",
-                 actionItem=actionItem, errorType=type(exc).__name__,
-                 error=str(exc), functionName=context.function_name)
-        return util.err(f"Internal server error: {exc}", 500, trace_id)
+        # A. Parse Request Body
+        body = util.parse_body(event)
+        if body=="400":
+            return util.error_responseor_response({"error": "Malformed JSON in request body"},\
+                                       400)
 
-    response.setdefault("headers", {})
-    response["headers"]["Access-Control-Allow-Origin"]      = "*"
-    response["headers"].setdefault("X-Happnix-Trace-Id", trace_id)
+        actionItem = body.get('actionItem')
+        if not actionItem:
+            return util.error_responseor_response({"error": "Missing 'actionItem' in payload"},\
+                                       400)
 
-    util.log("info", trace_id, "Request completed",
-             actionItem=actionItem, statusCode=response.get("statusCode"))
-    return response
+        # B. Verify Authorization (Skipped for public routes)
+        UNPROTECTED_ACTIONS = {
+            "SendMobileOtp", "ResendMobileOtp", "VerifyMobileOtp", "LoginWithPassword",
+            "RefreshToken", "CheckUsername", "RegisterUserDetails",
+            "CompleteProfileSetup", "GetSignupSessionDetails",
+            "GetDevAuthStatus", "WipeDevUsers", "GetDevAllUsers"
+        }
+        decoded_token = {}
+        if actionItem not in UNPROTECTED_ACTIONS:
+            headers = event.get('headers', {})
+            auth_header = headers.get('Authorization') or headers.get('authorization')
+            if not auth_header:
+                return util.error_responseor_response({"error": "Missing Authorization header"},\
+                                           401)
+            token = auth_header.replace('Bearer ', '').replace('bearer ', '')
+            try:
+                decoded_token = auth.verify_token(token)
+                event["auth_sub"] = decoded_token.get("sub")
+            except Exception as auth_error:
+                print(f"Token verification failed: {str(auth_error)}")
+                return auth.build_response(401, {"error": "Unauthorized: Invalid or expired token"})
+
+        # C. Route to the requested function
+        selected_action = action_handlers.get(actionItem)
+        if not selected_action:
+            return util.error_responseor_response({"error": f"Invalid actionItem: {actionItem}"},\
+                                       400)
+        # Separate payload from actionItem (optional, but requested by reference)
+        payload = {k: v for k, v in body.items() if k != 'actionItem'}
+
+        # D. Execute the function and pass the original event and payload
+        # Passing event instead of user_context as the existing functions heavily rely on event properties
+        result = selected_action(event, payload)
+
+        # Standardize response if the handler returned a raw dict instead of a full API Gateway response
+        if "statusCode" in result and "body" in result:
+            return result
+        return util.success_response(result,200)
+
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return util.error_responseor_response({"error": "Internal Server Error"},\
+                                   500)
