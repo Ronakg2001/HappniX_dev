@@ -87,22 +87,22 @@ Parameters:
   EnableEventsApi:
     Type: String
     Default: "true"
-    AllowedValues: [ "true", "false" ]
+    AllowedValues: ["true", "false"]
     Description: Enable Events Lambda.
   EnableHomePageApi:
     Type: String
     Default: "true"
-    AllowedValues: [ "true", "false" ]
+    AllowedValues: ["true", "false"]
     Description: Enable Home Page Lambda (feed, profile, social graph, settings).
   EnableMessagingApi:
     Type: String
     Default: "true"
-    AllowedValues: [ "true", "false" ]
+    AllowedValues: ["true", "false"]
     Description: Enable Messaging Lambda (DMs, group chat).
   EnableProfileApi:
     Type: String
     Default: "true"
-    AllowedValues: [ "true", "false" ]
+    AllowedValues: ["true", "false"]
     Description: Enable Profile Lambda.
 
 Conditions:
@@ -193,7 +193,6 @@ Globals:
         - Ref: PrivateSubnetBId
 
 Resources:
-
   # ══════════════════════════════════════════════════════════════════════
   # API Gateway — Free Tier: 1M REST API calls/month (12 months)
   # ══════════════════════════════════════════════════════════════════════
@@ -289,11 +288,11 @@ Resources:
   # Core Auth Lambdas (always enabled)
   # Free Tier: 1M requests + 400K GB-seconds/month (always free)
   # ══════════════════════════════════════════════════════════════════════
-  SignupSignin:
+  signup_signin:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: SignupSignin.lambda_handler
+      Handler: signup_signin.lambda_handler
       Description: HappniX signup and signin Lambda function.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -319,8 +318,8 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:ListUsers
                 - cognito-idp:AdminInitiateAuth
-                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
-                - cognito-idp:GlobalSignOut    # Logout action
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GlobalSignOut # Logout action
               Resource:
                 Fn::GetAtt:
                   - HappnixUserPool
@@ -345,7 +344,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: CognitoPostConfirmation.lambda_handler
+      Handler: cognito_post_confirmation.lambda_handler
       Description: Sync confirmed Cognito users into HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -359,7 +358,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: CognitoPreToken.lambda_handler
+      Handler: cognito_pre_token.lambda_handler
       Description: Inject userID and userType claims from HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -373,7 +372,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: AuthSchemaInit.lambda_handler
+      Handler: auth_schema_init.lambda_handler
       Description: Initialize HappniX auth schema in PostgreSQL during deploy.
       Timeout: 60
       Policies:
@@ -452,7 +451,7 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
             - Effect: Allow
               Action:
-                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
               Resource: "*"
       Events:
         HomeFeed:
@@ -644,7 +643,7 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
             - Effect: Allow
               Action:
-                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
               Resource: "*"
       Events:
         CreateEvent:
@@ -716,7 +715,7 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
             - Effect: Allow
               Action:
-                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
               Resource: "*"
       Events:
         ListConversations:
@@ -837,8 +836,8 @@ Resources:
                 - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
             - Effect: Allow
               Action:
-                - cognito-idp:GetUser          # verify_cognito_token (Bearer token validation)
-                - cognito-idp:AdminDeleteUser  # DeleteAccount action
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:AdminDeleteUser # DeleteAccount action
               Resource:
                 Fn::GetAtt:
                   - HappnixUserPool
@@ -887,12 +886,12 @@ Resources:
             Path: /api/profile/notifications/read
             Method: POST
 
-
 Outputs:
   HappnixApiUrl:
     Description: Invoke URL for the HappniX API.
     Value:
-      Fn::Sub: "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${E\
+      Fn::Sub:
+        "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${E\
         nvironmentName}"
   HappnixCognitoRegion:
     Description: Cognito region.

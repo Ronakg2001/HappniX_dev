@@ -115,7 +115,7 @@ def _list_follow_requests(sub):
 # HOME PAGE TAB HANDLERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def GetFeed(event, path_params, query_params, body):
+def get_feed(event, path_params, query_params, body):
     """
     Main home feed — returns live events + upcoming events.
     Now strictly requires JWT authentication.
@@ -148,7 +148,7 @@ def GetFeed(event, path_params, query_params, body):
     })
 
 
-def GetLiveNow(event, path_params, query_params, body):
+def get_live_now(event, path_params, query_params, body):
     """Live Now section — only live events, sorted newest first."""
     sub = event.get("auth_sub")
     if not sub:
@@ -166,7 +166,7 @@ def GetLiveNow(event, path_params, query_params, body):
     return util.ok({"success": True, "count": len(events), "events": events})
 
 
-def GetNearby(event, path_params, query_params, body):
+def get_nearby(event, path_params, query_params, body):
     """
     Nearby events by geohash prefix.
     Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
@@ -196,7 +196,7 @@ def GetNearby(event, path_params, query_params, body):
     return util.ok({"success": True, "geohash": geohash, "count": len(events), "events": events})
 
 
-def GetMyEvents(event, path_params, query_params, body):
+def get_my_events(event, path_params, query_params, body):
     """Hosted events placeholder/query for the home page My Events tab."""
     cognito_sub = event.get("auth_sub")
     if not cognito_sub:
@@ -214,7 +214,7 @@ def GetMyEvents(event, path_params, query_params, body):
 # PROFILE HANDLERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def GetMyProfile(event, path_params, query_params, body):
+def get_my_profile(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -230,7 +230,7 @@ def GetMyProfile(event, path_params, query_params, body):
     })
 
 
-def UpdateProfile(event, path_params, query_params, body):
+def update_profile(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -277,7 +277,7 @@ def UpdateProfile(event, path_params, query_params, body):
     return util.ok({"success": True, "profile": format_public_profile(user)})
 
 
-def SetPrivacy(event, path_params, query_params, body):
+def set_privacy(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -291,7 +291,7 @@ def SetPrivacy(event, path_params, query_params, body):
     return util.ok({"success": True, "privacyMode": mode, "profile": format_public_profile(result["data"])})
 
 
-def GetFollowing(event, path_params, query_params, body):
+def get_following(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -306,7 +306,7 @@ def GetFollowing(event, path_params, query_params, body):
     return util.ok({"success": True, "following": users})
 
 
-def GetFollowers(event, path_params, query_params, body):
+def get_followers(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -321,7 +321,7 @@ def GetFollowers(event, path_params, query_params, body):
     return util.ok({"success": True, "followers": users})
 
 
-def GetFollowRequests(event, path_params, query_params, body):
+def get_follow_requests(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -335,7 +335,7 @@ def GetFollowRequests(event, path_params, query_params, body):
     return util.ok({"success": True, "requests": result})
 
 
-def HandleFollowRequest(event, path_params, query_params, body):
+def handle_follow_request(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -351,7 +351,7 @@ def HandleFollowRequest(event, path_params, query_params, body):
     return util.ok({"success": True, "action": action, "requesterCognitoSub": requester_sub})
 
 
-def SearchUsers(event, path_params, query_params, body):
+def search_users(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     if not cognito_sub:
         return util.err("Not authenticated.", 401)
@@ -376,7 +376,7 @@ def SearchUsers(event, path_params, query_params, body):
     return util.ok({"success": True, "users": users})
 
 
-def FollowUser(event, path_params, query_params, body):
+def follow_user(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
     user = _fetch_user_profile(cognito_sub)
     if not user:
@@ -402,7 +402,7 @@ def FollowUser(event, path_params, query_params, body):
     return util.ok({"success": True, "following": status == "active", "status": status, "targetCognitoSub": target_sub})
 
 
-def GetPublicProfile(event, path_params, query_params, body):
+def get_public_profile(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")  # viewer - may be None
     target_username = str(path_params.get("id") or "").strip()
     user_id = str(path_params.get("id") or "").strip()
@@ -432,7 +432,7 @@ def GetPublicProfile(event, path_params, query_params, body):
 # SETTINGS HANDLERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def GetPreferences(event, path_params, query_params, body):
+def get_preferences(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
@@ -441,7 +441,7 @@ def GetPreferences(event, path_params, query_params, body):
     return util.ok({"success": True, "preferences": prefs})
 
 
-def SavePreferences(event, path_params, query_params, body):
+def save_preferences(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
@@ -453,7 +453,7 @@ def SavePreferences(event, path_params, query_params, body):
     return util.ok({"success": True, "preferences": item})
 
 
-def GetPeople(event, path_params, query_params, body):
+def get_people(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
@@ -465,7 +465,7 @@ def GetPeople(event, path_params, query_params, body):
     return util.ok({"success": True, "category": category, "people": list(people)})
 
 
-def AddPerson(event, path_params, query_params, body):
+def add_person(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
@@ -477,7 +477,7 @@ def AddPerson(event, path_params, query_params, body):
     return util.ok({"success": True, "category": category, "added": target_sub})
 
 
-def RemovePerson(event, path_params, query_params, body):
+def remove_person(event, path_params, query_params, body):
     cognito_sub, user = _get_session_user(event)
     if not user:
         return util.err("Not authenticated.", 401)
@@ -491,11 +491,11 @@ def RemovePerson(event, path_params, query_params, body):
 
 # ── Router ────────────────────────────────────────────────────────────────────
 
-def GetTickets(event, path_params, query_params, body):
+def get_tickets(event, path_params, query_params, body):
     return util.ok({"success": True, "tickets": []})
 
 
-def BookTicket(event, path_params, query_params, body):
+def book_ticket(event, path_params, query_params, body):
     ticket_id = body.get("ticketId") or body.get("id") or util.new_id(10)
     ticket = {
         "id": ticket_id,
@@ -506,7 +506,7 @@ def BookTicket(event, path_params, query_params, body):
     return util.ok({"success": True, "ticket": ticket})
 
 
-def UpdateTicket(event, path_params, query_params, body):
+def update_ticket(event, path_params, query_params, body):
     action = str(path_params.get("action") or "").strip()
     ticket_id = str(path_params.get("id") or body.get("ticketId") or "").strip()
     status = {
@@ -524,23 +524,23 @@ def UpdateTicket(event, path_params, query_params, body):
     })
 
 
-def DeleteEvent(event, path_params, query_params, body):
+def delete_event(event, path_params, query_params, body):
     return util.ok({"success": True, "deleted": True, "id": path_params.get("id")})
 
 
-def GetNotifications(event, path_params, query_params, body):
+def get_notifications(event, path_params, query_params, body):
     return util.ok({"success": True, "notifications": [], "unreadCount": 0})
 
 
-def MarkNotificationsRead(event, path_params, query_params, body):
+def mark_notifications_read(event, path_params, query_params, body):
     return util.ok({"success": True, "unreadCount": 0})
 
 
-def LogNotificationActivity(event, path_params, query_params, body):
+def log_notification_activity(event, path_params, query_params, body):
     return util.ok({"success": True})
 
 
-def CreateGuestInvite(event, path_params, query_params, body):
+def create_guest_invite(event, path_params, query_params, body):
     invite_token = body.get("inviteToken") or util.new_id(16)
     invite_link = f"/guest-invite.html?token={invite_token}"
     return util.ok({
@@ -551,100 +551,103 @@ def CreateGuestInvite(event, path_params, query_params, body):
     })
 
 
-def UpdateGuestInvite(event, path_params, query_params, body):
+def update_guest_invite(event, path_params, query_params, body):
     action = str(path_params.get("action") or "").strip()
     return util.ok({"success": True, "action": action, "inviteToken": path_params.get("token")})
 
 
-def _resolve(method, path):
-    m = method.upper()
-    p = [s for s in path.split("/") if s]
+ACTION_HANDLERS = {
+    "GET_FEED": get_feed,
+    "GET_LIVE_NOW": get_live_now,
+    "GET_NEARBY": get_nearby,
+    "GET_MY_EVENTS": get_my_events,
+    "DELETE_EVENT": delete_event,
+    
+    "GET_MY_PROFILE": get_my_profile,
+    "UPDATE_PROFILE": update_profile,
+    "SET_PRIVACY": set_privacy,
+    "GET_FOLLOWING": get_following,
+    "GET_FOLLOWERS": get_followers,
+    "GET_FOLLOW_REQUESTS": get_follow_requests,
+    "HANDLE_FOLLOW_REQUEST": handle_follow_request,
+    
+    "SEARCH_USERS": search_users,
+    "FOLLOW_USER": follow_user,
+    "GET_PUBLIC_PROFILE": get_public_profile,
+    
+    "GET_PREFERENCES": get_preferences,
+    "SAVE_PREFERENCES": save_preferences,
+    "GET_PEOPLE": get_people,
+    "ADD_PERSON": add_person,
+    "REMOVE_PERSON": remove_person,
+    
+    "GET_TICKETS": get_tickets,
+    "BOOK_TICKET": book_ticket,
+    "UPDATE_TICKET": update_ticket,
+    "GET_NOTIFICATIONS": get_notifications,
+    "MARK_NOTIFICATIONS_READ": mark_notifications_read,
+    "LOG_NOTIFICATION_ACTIVITY": log_notification_activity,
+    "CREATE_GUEST_INVITE": create_guest_invite,
+    "UPDATE_GUEST_INVITE": update_guest_invite,
+}
 
-    # Home feed routes
-    if m == "GET" and p == ["api", "home", "feed"]:               return GetFeed, {}
-    if m == "GET" and p == ["api", "home", "live"]:               return GetLiveNow, {}
-    if m == "GET" and p == ["api", "home", "nearby"]:             return GetNearby, {}
-    if m == "GET" and p == ["api", "events", "live"]:             return GetLiveNow, {}
-    if m == "GET" and p == ["api", "events", "nearby"]:           return GetNearby, {}
-    if m == "GET" and p == ["api", "events", "mine"]:             return GetMyEvents, {}
-    if m == "DELETE" and len(p) == 3 and p[:2] == ["api", "events"]: return DeleteEvent, {"id": p[2]}
-
-    # Profile routes
-    if m == "GET"  and p == ["api", "profile", "me"]:                                         return GetMyProfile, {}
-    if m == "POST" and p == ["api", "profile", "update"]:                                     return UpdateProfile, {}
-    if m == "POST" and p == ["api", "profile", "privacy"]:                                    return SetPrivacy, {}
-    if m == "GET"  and p == ["api", "profile", "following"]:                                  return GetFollowing, {}
-    if m == "GET"  and p == ["api", "profile", "followers"]:                                  return GetFollowers, {}
-    if m == "GET"  and p == ["api", "profile", "follow-requests"]:                            return GetFollowRequests, {}
-    if m == "POST" and p == ["api", "profile", "follow-requests"]:                            return HandleFollowRequest, {}
-
-    # User routes
-    if m == "GET"  and p == ["api", "users", "search"]:                                       return SearchUsers, {}
-    if m == "POST" and p == ["api", "users", "follow"]:                                       return FollowUser, {}
-    if m == "GET"  and len(p) == 4 and p[1] == "users" and p[3] == "profile":                return GetPublicProfile, {"id": p[2]}
-
-    # Settings routes
-    if m == "GET"  and p == ["api", "settings", "preferences"]:                               return GetPreferences, {}
-    if m == "POST" and p == ["api", "settings", "preferences"]:                               return SavePreferences, {}
-    if m == "GET"    and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return GetPeople, {"category": p[3]}
-    if m == "POST"   and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return AddPerson, {"category": p[3]}
-    if m == "DELETE" and len(p) == 4 and p[:3] == ["api", "settings", "people"]:             return RemovePerson, {"category": p[3]}
-
-    # Home page feature routes that are safe while their full services mature.
-    if m == "GET"  and p == ["api", "tickets"]:                                        return GetTickets, {}
-    if m == "POST" and p == ["api", "tickets", "book"]:                                return BookTicket, {}
-    if m in ("POST", "DELETE") and len(p) == 4 and p[:2] == ["api", "tickets"]:       return UpdateTicket, {"id": p[2], "action": p[3]}
-    if m == "GET"  and p == ["api", "notifications"]:                                  return GetNotifications, {}
-    if m == "POST" and p == ["api", "notifications"]:                                  return MarkNotificationsRead, {}
-    if m == "POST" and p == ["api", "notifications", "activity"]:                      return LogNotificationActivity, {}
-    if m == "POST" and p == ["api", "guest-invites"]:                                  return CreateGuestInvite, {}
-    if m == "POST" and len(p) == 4 and p[:2] == ["api", "guest-invites"]:             return UpdateGuestInvite, {"token": p[2], "action": p[3]}
-
-    return None, {}
-
-
-# ── Lambda Entry Point ────────────────────────────────────────────────────────
+import utilities.cognito_auth as auth
 
 def lambda_handler(event, context):
-    print("=== EVENT ===")
-    print(json.dumps(event))
-    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
-    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
-
-    http_method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
-
-    if http_method == "OPTIONS":
-        return util.ok({}, 200)
-
-    # ── Timeout guard ────────────────────────────────────────────────────────
-    if context.get_remaining_time_in_millis() < 1500:
-        util.log("warning", trace_id, "Lambda near timeout — returning 503",
-                 functionName=context.function_name)
-        return util.err("Request timed out. Please try again.", 503)
-
-    query_params = event.get("queryStringParameters") or {}
-    path_params  = event.get("pathParameters") or {}
-    body = parse_body(event)
-
-    handler, resolved_params = _resolve(http_method, path)
-    merged_params = {**path_params, **resolved_params}
-
-    if handler is None:
-        return util.err(f"Route not found: {http_method} {path}", 404)
-
-    # ── Centralized JWT Authentication ────────────────────────────────────────
-    UNPROTECTED_HANDLERS = {GetPublicProfile}
-    
-    sub = util.get_jwt_sub(event)
-    if not sub and handler not in UNPROTECTED_HANDLERS:
-        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
-        return util.err("Not authenticated.", 401)
-    event["auth_sub"] = sub
-
     try:
-        return handler(event, merged_params, query_params, body)
-    except Exception as exc:
-        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
-                 functionName=context.function_name)
-        return util.err("An internal error occurred.", 500)
+        # A. Parse Request Body
+        body_str = event.get('body')
+        if body_str:
+            try:
+                body = json.loads(body_str)
+            except json.JSONDecodeError:
+                return auth.build_response(400, {"error": "Malformed JSON in request body"})
+        else:
+            body = event.get('body') if isinstance(event.get('body'), dict) else {}
+            if not body:
+                body = event
+
+        action_item = body.get('actionItem')
+        if not action_item:
+            return auth.build_response(400, {"error": "Missing 'actionItem' in payload"})
+
+        # B. Verify Authorization
+        UNPROTECTED_ACTIONS = {"GET_PUBLIC_PROFILE"}
+        
+        decoded_token = {}
+        if action_item not in UNPROTECTED_ACTIONS:
+            headers = event.get('headers', {})
+            auth_header = headers.get('Authorization') or headers.get('authorization')
+            if not auth_header:
+                return auth.build_response(401, {"error": "Missing Authorization header"})
+
+            token = auth_header.replace('Bearer ', '').replace('bearer ', '')
+            try:
+                decoded_token = auth.verify_token(token)
+                event["auth_sub"] = decoded_token.get("sub")
+            except Exception as auth_error:
+                print(f"Token verification failed: {str(auth_error)}")
+                return auth.build_response(401, {"error": "Unauthorized: Invalid or expired token"})
+
+        # C. Route to the requested function
+        selected_action = ACTION_HANDLERS.get(action_item)
+        if not selected_action:
+            return auth.build_response(400, {"error": f"Invalid actionItem: {action_item}"})
+
+        # Separate payload from actionItem
+        payload = {k: v for k, v in body.items() if k != 'actionItem'}
+
+        # Backward compatibility for existing handlers that expect path_params/query_params
+        path_params = payload
+        query_params = payload
+
+        # D. Execute the function
+        result = selected_action(event, path_params, query_params, payload)
+
+        if "statusCode" in result and "body" in result:
+            return result
+        return auth.build_response(200, result)
+
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return auth.build_response(500, {"error": "Internal Server Error"})

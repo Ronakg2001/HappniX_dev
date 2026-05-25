@@ -26,37 +26,37 @@ _COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 
-def GetProfile(event, path_params, query_params, body):
+def get_profile(event, path_params, query_params, body):
     # TODO: Fetch full profile by userId from RDS + DynamoDB social counts
     return util.err("GetProfile not implemented yet.", 501)
 
 
-def SendAadhaarOtp(event, path_params, query_params, body):
+def send_aadhaar_otp(event, path_params, query_params, body):
     # TODO: Validate aadhaarNumber, create OTP session, trigger verification
     return util.err("SendAadhaarOtp not implemented yet.", 501)
 
 
-def VerifyAadhaarOtp(event, path_params, query_params, body):
+def verify_aadhaar_otp(event, path_params, query_params, body):
     # TODO: Validate OTP, update adharVerified=True in RDS
     return util.err("VerifyAadhaarOtp not implemented yet.", 501)
 
 
-def UploadProfilePicture(event, path_params, query_params, body):
+def upload_profile_picture(event, path_params, query_params, body):
     # TODO: Generate presigned S3 URL for client to upload directly to S3
     return util.err("UploadProfilePicture not implemented yet.", 501)
 
 
-def GetNotifications(event, path_params, query_params, body):
+def get_notifications(event, path_params, query_params, body):
     # TODO: query_items NOTIFICATIONS_TABLE by cognitoSub
     return util.err("GetNotifications not implemented yet.", 501)
 
 
-def MarkNotificationsRead(event, path_params, query_params, body):
+def mark_notifications_read(event, path_params, query_params, body):
     # TODO: batch_write updated notifications with isRead=True
     return util.err("MarkNotificationsRead not implemented yet.", 501)
 
 
-def DeleteAccount(event, path_params, query_params, body):
+def delete_account(event, path_params, query_params, body):
     cognito_sub = event.get("auth_sub")
 
     try:
@@ -86,62 +86,74 @@ def DeleteAccount(event, path_params, query_params, body):
         return util.err("Failed to delete account.", 500)
 
 
-# ── Router ────────────────────────────────────────────────────────────────────
+ACTION_HANDLERS = {
+    "GET_PROFILE": get_profile,
+    "SEND_AADHAAR_OTP": send_aadhaar_otp,
+    "VERIFY_AADHAAR_OTP": verify_aadhaar_otp,
+    "UPLOAD_PROFILE_PICTURE": upload_profile_picture,
+    "GET_NOTIFICATIONS": get_notifications,
+    "MARK_NOTIFICATIONS_READ": mark_notifications_read,
+    "DELETE_ACCOUNT": delete_account,
+}
 
-def _resolve(method, path):
-    m = method.upper()
-    p = [s for s in path.split("/") if s]
-
-    if m == "GET"  and len(p) == 3 and p[:2] == ["api", "profile"]:                        return GetProfile, {"id": p[2]}
-    if m == "POST" and p == ["api", "profile", "verify", "aadhaar", "send"]:               return SendAadhaarOtp, {}
-    if m == "POST" and p == ["api", "profile", "verify", "aadhaar", "verify"]:             return VerifyAadhaarOtp, {}
-    if m == "POST" and p == ["api", "profile", "picture", "upload"]:                       return UploadProfilePicture, {}
-    if m == "GET"  and p == ["api", "profile", "notifications"]:                           return GetNotifications, {}
-    if m == "POST" and p == ["api", "profile", "notifications", "read"]:                   return MarkNotificationsRead, {}
-    if m == "DELETE" and p == ["api", "profile", "delete"]:                                return DeleteAccount, {}
-    if m == "POST" and p == ["api", "profile", "delete"]:                                  return DeleteAccount, {}
-
-    return None, {}
-
-
-# ── Lambda Entry Point ────────────────────────────────────────────────────────
+import utilities.cognito_auth as auth
+import json
 
 def lambda_handler(event, context):
-    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
-    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
-
-    http_method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
-
-    if http_method == "OPTIONS":
-        return util.ok({}, 200)
-
-    # ── Timeout guard ────────────────────────────────────────────────────────
-    if context.get_remaining_time_in_millis() < 1500:
-        util.log("warning", trace_id, "Lambda near timeout — returning 503",
-                 functionName=context.function_name)
-        return util.err("Request timed out. Please try again.", 503)
-
-    query_params = event.get("queryStringParameters") or {}
-    path_params  = event.get("pathParameters") or {}
-    body = util.parse_body(event)
-
-    handler, resolved_params = _resolve(http_method, path)
-    merged_params = {**path_params, **resolved_params}
-
-    if handler is None:
-        return util.err(f"Route not found: {http_method} {path}", 404)
-
-    # ── Centralized JWT Authentication ────────────────────────────────────────
-    sub = util.get_jwt_sub(event)
-    if not sub:
-        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
-        return util.err("Not authenticated.", 401)
-    event["auth_sub"] = sub
-
     try:
-        return handler(event, merged_params, query_params, body)
-    except Exception as exc:
-        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
-                 functionName=context.function_name)
-        return util.err("An internal error occurred.", 500)
+        # A. Parse Request Body
+        body_str = event.get('body')
+        if body_str:
+            try:
+                body = json.loads(body_str)
+            except json.JSONDecodeError:
+                return auth.build_response(400, {"error": "Malformed JSON in request body"})
+        else:
+            body = event.get('body') if isinstance(event.get('body'), dict) else {}
+            if not body:
+                body = event
+
+        action_item = body.get('actionItem')
+        if not action_item:
+            return auth.build_response(400, {"error": "Missing 'actionItem' in payload"})
+
+        # B. Verify Authorization
+        UNPROTECTED_ACTIONS = set()
+        
+        decoded_token = {}
+        if action_item not in UNPROTECTED_ACTIONS:
+            headers = event.get('headers', {})
+            auth_header = headers.get('Authorization') or headers.get('authorization')
+            if not auth_header:
+                return auth.build_response(401, {"error": "Missing Authorization header"})
+
+            token = auth_header.replace('Bearer ', '').replace('bearer ', '')
+            try:
+                decoded_token = auth.verify_token(token)
+                event["auth_sub"] = decoded_token.get("sub")
+            except Exception as auth_error:
+                print(f"Token verification failed: {str(auth_error)}")
+                return auth.build_response(401, {"error": "Unauthorized: Invalid or expired token"})
+
+        # C. Route to the requested function
+        selected_action = ACTION_HANDLERS.get(action_item)
+        if not selected_action:
+            return auth.build_response(400, {"error": f"Invalid actionItem: {action_item}"})
+
+        # Separate payload from actionItem
+        payload = {k: v for k, v in body.items() if k != 'actionItem'}
+
+        # Backward compatibility for existing handlers that expect path_params/query_params
+        path_params = payload
+        query_params = payload
+
+        # D. Execute the function
+        result = selected_action(event, path_params, query_params, payload)
+
+        if "statusCode" in result and "body" in result:
+            return result
+        return auth.build_response(200, result)
+
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return auth.build_response(500, {"error": "Internal Server Error"})

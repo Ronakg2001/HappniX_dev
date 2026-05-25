@@ -891,7 +891,7 @@ def get_dev_all_users(event, payload):
 
 
 # ── Action Registry ────────────────────────────────────────────────────────────
-action_handlers = {
+ACTION_HANDLERS = {
     "SendMobileOtp":           send_mobile_otp,
     "ResendMobileOtp":         resend_mobile_otp,
     "VerifyMobileOtp":         verify_mobile_otp,
@@ -924,37 +924,37 @@ def lambda_handler(event, context):
                 400
             )
 
-        actionItem = body.get('actionItem')
-        if not actionItem:
+        action_item = body.get('actionItem')
+        if not action_item:
             return util.error_responseor_response(
                 {"error": "Missing 'actionItem' in payload"},
                 400
             )
 
         # B. Verify Authorization (Skipped for public routes)
-        unprotectedActions = {
+        unprotected_actions = {
             "SendMobileOtp", "ResendMobileOtp", "VerifyMobileOtp",
             "LoginWithPassword", "RefreshToken", "CheckUsername",
             "RegisterUserDetails", "CompleteProfileSetup",
             "GetSignupSessionDetails", "GetDevAuthStatus", "WipeDevUsers",
             "GetDevAllUsers"
         }
-        authorizationToken = {}
-        if actionItem not in unprotectedActions:
+        authorization_token = {}
+        if action_item not in unprotected_actions:
             headers = event.get('headers', {})
-            authHeader = headers.get(
+            auth_header = headers.get(
                 'Authorization') or headers.get('authorization')
-            if not authHeader:
+            if not auth_header:
                 return util.error_responseor_response(
                     {"error": "Unauthorized: Missing Authorization header"},
                     401
                 )
-            authorizationToken = authHeader.replace(
+            authorization_token = auth_header.replace(
                 'Bearer ', '').replace('bearer ', '')
             try:
-                authorizationToken = cognito_auth.verify_token(
-                    authorizationToken)
-                event["auth_sub"] = authorizationToken.get("sub")
+                authorization_token = cognito_auth.verify_token(
+                    authorization_token)
+                event["auth_sub"] = authorization_token.get("sub")
             except Exception as auth_error:
                 print(f"Token verification failed: {str(auth_error)}")
                 return util.error_response(
@@ -963,13 +963,13 @@ def lambda_handler(event, context):
                 )
 
         # C. Route to the requested function
-        selected_action = action_handlers.get(actionItem)
+        selected_action = ACTION_HANDLERS.get(action_item)
         if not selected_action:
             return util.error_responseor_response(
-                {"error": f"Invalid actionItem: {actionItem}"},
+                {"error": f"Invalid actionItem: {action_item}"},
                 400
             )
-        # Separate payload from actionItem (optional, but requested by reference)
+        # Separate payload from action_item (optional, but requested by reference)
         payload = {k: v for k, v in body.items() if k != 'actionItem'}
 
         # D. Execute the function and pass the original event and payload

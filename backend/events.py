@@ -13,12 +13,12 @@ _EVENTS_TABLE = os.environ.get("EVENTS_TABLE_NAME", "")
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 # Replace each stubs with the actual implementation when building features.
 
-def CreateEvent(event, path_params, query_params, body):
+def create_event(event, path_params, query_params, body):
     # TODO: Validate auth, validate fields, put_item to EVENTS_TABLE
     return util.err("CreateEvent not implemented yet.", 501)
 
 
-def GetLiveEvents(event, path_params, query_params, body):
+def get_live_events(event, path_params, query_params, body):
     """Live Now section — only live events, sorted newest first."""
     sub = event.get("auth_sub")
         
@@ -34,7 +34,7 @@ def GetLiveEvents(event, path_params, query_params, body):
     return util.ok({"success": True, "count": len(events), "events": events})
 
 
-def GetNearbyEvents(event, path_params, query_params, body):
+def get_nearby_events(event, path_params, query_params, body):
     """
     Nearby events by geohash prefix.
     Frontend sends ?geohash=<prefix> (first 4-5 chars ≈ 5 km radius).
@@ -62,7 +62,7 @@ def GetNearbyEvents(event, path_params, query_params, body):
     return util.ok({"success": True, "geohash": geohash, "count": len(events), "events": events})
 
 
-def GetMyEvents(event, path_params, query_params, body):
+def get_my_events(event, path_params, query_params, body):
     """Hosted events for the current logged-in user."""
     cognito_sub = event.get("auth_sub")
     if not cognito_sub:
@@ -76,83 +76,94 @@ def GetMyEvents(event, path_params, query_params, body):
     return util.ok({"success": True, "count": len(events), "events": events})
 
 
-def GetEvent(event, path_params, query_params, body):
+def get_event(event, path_params, query_params, body):
     # TODO: get_item EVENTS_TABLE by cognitoSub + itemId
     return util.err("GetEvent not implemented yet.", 501)
 
 
-def DeleteEvent(event, path_params, query_params, body):
+def delete_event(event, path_params, query_params, body):
     # TODO: Validate ownership, delete_item EVENTS_TABLE
     return util.err("DeleteEvent not implemented yet.", 501)
 
 
-def BookTicket(event, path_params, query_params, body):
+def book_ticket(event, path_params, query_params, body):
     # TODO: Validate auth + event, put_item TICKETS_TABLE
     return util.err("BookTicket not implemented yet.", 501)
 
 
-def PayTicket(event, path_params, query_params, body):
+def pay_ticket(event, path_params, query_params, body):
     # TODO: Validate auth + ticket, update_item TICKETS_TABLE status
     return util.err("PayTicket not implemented yet.", 501)
 
 
-# ── Router ────────────────────────────────────────────────────────────────────
+ACTION_HANDLERS = {
+    "CREATE_EVENT": create_event,
+    "GET_LIVE_EVENTS": get_live_events,
+    "GET_NEARBY_EVENTS": get_nearby_events,
+    "GET_MY_EVENTS": get_my_events,
+    "GET_EVENT": get_event,
+    "DELETE_EVENT": delete_event,
+    "BOOK_TICKET": book_ticket,
+    "PAY_TICKET": pay_ticket,
+}
 
-def _resolve(method, path):
-    m = method.upper()
-    p = [s for s in path.split("/") if s]
-
-    if m == "POST"   and p == ["api", "events", "create"]:                    return CreateEvent, {}
-    if m == "GET"    and p == ["api", "events", "live"]:                      return GetLiveEvents, {}
-    if m == "GET"    and p == ["api", "events", "nearby"]:                    return GetNearbyEvents, {}
-    if m == "GET"    and p == ["api", "events", "mine"]:                      return GetMyEvents, {}
-    if m == "GET"    and len(p) == 3 and p[:2] == ["api", "events"]:         return GetEvent, {"id": p[2]}
-    if m == "DELETE" and len(p) == 3 and p[:2] == ["api", "events"]:         return DeleteEvent, {"id": p[2]}
-    if m == "POST"   and p == ["api", "tickets", "book"]:                     return BookTicket, {}
-    if m == "POST"   and len(p) == 4 and p[1] == "tickets" and p[3] == "pay": return PayTicket, {"id": p[2]}
-
-    return None, {}
-
-
-# ── Lambda Entry Point ────────────────────────────────────────────────────────
+import utilities.cognito_auth as auth
 
 def lambda_handler(event, context):
-    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
-    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
-
-    http_method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
-
-    if http_method == "OPTIONS":
-        return util.ok({}, 200)
-
-    # ── Timeout guard ────────────────────────────────────────────────────────
-    if context.get_remaining_time_in_millis() < 1500:
-        util.log("warning", trace_id, "Lambda near timeout — returning 503",
-                 functionName=context.function_name)
-        return util.err("Request timed out. Please try again.", 503)
-
-    query_params = event.get("queryStringParameters") or {}
-    path_params  = event.get("pathParameters") or {}
-    body = util.parse_body(event)
-
-    handler, resolved_params = _resolve(http_method, path)
-    merged_params = {**path_params, **resolved_params}
-
-    if handler is None:
-        return util.err(f"Route not found: {http_method} {path}", 404)
-
-    # ── Centralized JWT Authentication ────────────────────────────────────────
-    # No public routes in events.py yet
-    sub = util.get_jwt_sub(event)
-    if not sub:
-        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
-        return util.err("Not authenticated.", 401)
-    event["auth_sub"] = sub
-
     try:
-        return handler(event, merged_params, query_params, body)
-    except Exception as exc:
-        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
-                 functionName=context.function_name)
-        return util.err("An internal error occurred.", 500)
+        # A. Parse Request Body
+        body_str = event.get('body')
+        if body_str:
+            try:
+                body = json.loads(body_str)
+            except json.JSONDecodeError:
+                return auth.build_response(400, {"error": "Malformed JSON in request body"})
+        else:
+            body = event.get('body') if isinstance(event.get('body'), dict) else {}
+            if not body:
+                body = event
+
+        action_item = body.get('actionItem')
+        if not action_item:
+            return auth.build_response(400, {"error": "Missing 'actionItem' in payload"})
+
+        # B. Verify Authorization
+        UNPROTECTED_ACTIONS = set()
+        
+        decoded_token = {}
+        if action_item not in UNPROTECTED_ACTIONS:
+            headers = event.get('headers', {})
+            auth_header = headers.get('Authorization') or headers.get('authorization')
+            if not auth_header:
+                return auth.build_response(401, {"error": "Missing Authorization header"})
+
+            token = auth_header.replace('Bearer ', '').replace('bearer ', '')
+            try:
+                decoded_token = auth.verify_token(token)
+                event["auth_sub"] = decoded_token.get("sub")
+            except Exception as auth_error:
+                print(f"Token verification failed: {str(auth_error)}")
+                return auth.build_response(401, {"error": "Unauthorized: Invalid or expired token"})
+
+        # C. Route to the requested function
+        selected_action = ACTION_HANDLERS.get(action_item)
+        if not selected_action:
+            return auth.build_response(400, {"error": f"Invalid actionItem: {action_item}"})
+
+        # Separate payload from actionItem
+        payload = {k: v for k, v in body.items() if k != 'actionItem'}
+
+        # Backward compatibility for existing handlers that expect path_params/query_params
+        path_params = payload
+        query_params = payload
+
+        # D. Execute the function
+        result = selected_action(event, path_params, query_params, payload)
+
+        if "statusCode" in result and "body" in result:
+            return result
+        return auth.build_response(200, result)
+
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return auth.build_response(500, {"error": "Internal Server Error"})

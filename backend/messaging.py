@@ -19,7 +19,7 @@ import utilities.util as util
 
 # ── Placeholder handlers ──────────────────────────────────────────────────────
 
-def StartConversation(event, path_params, query_params, body):
+def start_conversation(event, path_params, query_params, body):
     # TODO: Validate auth, find/create conversation record in DynamoDB
     target_user_id = body.get("targetUserId") or body.get("userId")
     conversation = {
@@ -33,12 +33,12 @@ def StartConversation(event, path_params, query_params, body):
     return util.ok({"success": True, "conversation": conversation})
 
 
-def ListConversations(event, path_params, query_params, body):
+def list_conversations(event, path_params, query_params, body):
     # TODO: query_items for all conversations where user is a participant
     return util.ok({"success": True, "conversations": []})
 
 
-def GetConversation(event, path_params, query_params, body):
+def get_conversation(event, path_params, query_params, body):
     # TODO: get_item conversation + query messages by conversationId
     return util.ok({
         "success": True,
@@ -47,7 +47,7 @@ def GetConversation(event, path_params, query_params, body):
     })
 
 
-def SendMessage(event, path_params, query_params, body):
+def send_message(event, path_params, query_params, body):
     # TODO: Validate auth + conversation membership, put_item message record
     message = {
         "id": util.new_id(10),
@@ -59,7 +59,7 @@ def SendMessage(event, path_params, query_params, body):
     return util.ok({"success": True, "message": message})
 
 
-def GetGroupMessages(event, path_params, query_params, body):
+def get_group_messages(event, path_params, query_params, body):
     # TODO: query_items messages for a group conversation
     return util.ok({
         "success": True,
@@ -68,7 +68,7 @@ def GetGroupMessages(event, path_params, query_params, body):
     })
 
 
-def CreateGroup(event, path_params, query_params, body):
+def create_group(event, path_params, query_params, body):
     conversation = {
         "id": util.new_id(8),
         "type": "group",
@@ -81,72 +81,80 @@ def CreateGroup(event, path_params, query_params, body):
     return util.ok({"success": True, "conversation": conversation})
 
 
-def UpdateMessage(event, path_params, query_params, body):
+def update_message(event, path_params, query_params, body):
     return util.ok({"success": True, "id": path_params.get("id")})
 
 
 # ── Router ────────────────────────────────────────────────────────────────────
 
-def _resolve(method, path):
-    m = method.upper()
-    p = [s for s in path.split("/") if s]
+ACTION_HANDLERS = {
+    "START_CONVERSATION": start_conversation,
+    "LIST_CONVERSATIONS": list_conversations,
+    "GET_CONVERSATION": get_conversation,
+    "SEND_MESSAGE": send_message,
+    "GET_GROUP_MESSAGES": get_group_messages,
+    "CREATE_GROUP": create_group,
+    "UPDATE_MESSAGE": update_message,
+}
 
-    base = ["api", "messages"]
-
-    if m == "POST" and p == base + ["conversations", "start"]:                              return StartConversation, {}
-    if m == "GET"  and p == base + ["conversations"]:                                       return ListConversations, {}
-    if m == "GET"  and len(p) == 4 and p[:3] == base + ["conversations"]:                  return GetConversation, {"id": p[3]}
-    if m == "GET"  and len(p) == 5 and p[:3] == base + ["conversations"] and p[4] == "messages": return GetConversation, {"id": p[3]}
-    if m == "POST" and len(p) == 5 and p[:3] == base + ["conversations"] and p[4] == "messages": return SendMessage, {"id": p[3]}
-    if m == "POST" and len(p) == 5 and p[:3] == base + ["conversations"] and p[4] == "send": return SendMessage, {"id": p[3]}
-    if m == "POST" and len(p) == 5 and p[:3] == base + ["conversations"] and p[4] in ("read", "clear", "delete"): return UpdateMessage, {"id": p[3]}
-    if m == "POST" and p == base + ["groups", "create"]:                                    return CreateGroup, {}
-    if m == "GET"  and len(p) == 5 and p[:3] == base + ["groups"] and p[4] == "messages":  return GetGroupMessages, {"id": p[3]}
-    if m == "POST" and len(p) >= 4 and p[:3] == base + ["groups"]:                         return UpdateMessage, {"id": p[3]}
-    if m in ("POST", "DELETE") and len(p) >= 4 and p[:3] == base + ["messages"]:           return UpdateMessage, {"id": p[3]}
-    if m in ("POST", "DELETE") and len(p) >= 4 and p[:3] == base + ["group-messages"]:     return UpdateMessage, {"id": p[3]}
-
-    return None, {}
-
-
-# ── Lambda Entry Point ────────────────────────────────────────────────────────
+import utilities.cognito_auth as auth
+import json
 
 def lambda_handler(event, context):
-    # ── Trace ID: prefer Lambda's own request ID for CloudWatch correlation ──
-    trace_id = context.aws_request_id or event.get("requestContext", {}).get("requestId") or "unknown"
-
-    http_method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
-
-    if http_method == "OPTIONS":
-        return util.ok({}, 200)
-
-    # ── Timeout guard ────────────────────────────────────────────────────────
-    if context.get_remaining_time_in_millis() < 1500:
-        util.log("warning", trace_id, "Lambda near timeout — returning 503",
-                 functionName=context.function_name)
-        return util.err("Request timed out. Please try again.", 503)
-
-    query_params = event.get("queryStringParameters") or {}
-    path_params  = event.get("pathParameters") or {}
-    body = util.parse_body(event)
-
-    handler, resolved_params = _resolve(http_method, path)
-    merged_params = {**path_params, **resolved_params}
-
-    if handler is None:
-        return util.err(f"Route not found: {http_method} {path}", 404)
-
-    # ── Centralized JWT Authentication ────────────────────────────────────────
-    sub = util.get_jwt_sub(event)
-    if not sub:
-        util.log("warning", trace_id, "Unauthorized request blocked in lambda_handler", path=path)
-        return util.err("Not authenticated.", 401)
-    event["auth_sub"] = sub
-
     try:
-        return handler(event, merged_params, query_params, body)
-    except Exception as exc:
-        util.log("error", trace_id, f"Unhandled error in {handler.__name__}: {exc}",
-                 functionName=context.function_name)
-        return util.err("An internal error occurred.", 500)
+        # A. Parse Request Body
+        body_str = event.get('body')
+        if body_str:
+            try:
+                body = json.loads(body_str)
+            except json.JSONDecodeError:
+                return auth.build_response(400, {"error": "Malformed JSON in request body"})
+        else:
+            body = event.get('body') if isinstance(event.get('body'), dict) else {}
+            if not body:
+                body = event
+
+        action_item = body.get('actionItem')
+        if not action_item:
+            return auth.build_response(400, {"error": "Missing 'actionItem' in payload"})
+
+        # B. Verify Authorization
+        UNPROTECTED_ACTIONS = set()
+        
+        decoded_token = {}
+        if action_item not in UNPROTECTED_ACTIONS:
+            headers = event.get('headers', {})
+            auth_header = headers.get('Authorization') or headers.get('authorization')
+            if not auth_header:
+                return auth.build_response(401, {"error": "Missing Authorization header"})
+
+            token = auth_header.replace('Bearer ', '').replace('bearer ', '')
+            try:
+                decoded_token = auth.verify_token(token)
+                event["auth_sub"] = decoded_token.get("sub")
+            except Exception as auth_error:
+                print(f"Token verification failed: {str(auth_error)}")
+                return auth.build_response(401, {"error": "Unauthorized: Invalid or expired token"})
+
+        # C. Route to the requested function
+        selected_action = ACTION_HANDLERS.get(action_item)
+        if not selected_action:
+            return auth.build_response(400, {"error": f"Invalid actionItem: {action_item}"})
+
+        # Separate payload from actionItem
+        payload = {k: v for k, v in body.items() if k != 'actionItem'}
+
+        # Backward compatibility for existing handlers that expect path_params/query_params
+        path_params = payload
+        query_params = payload
+
+        # D. Execute the function
+        result = selected_action(event, path_params, query_params, payload)
+
+        if "statusCode" in result and "body" in result:
+            return result
+        return auth.build_response(200, result)
+
+    except Exception as e:
+        print(f"Internal Server Error: {str(e)}")
+        return auth.build_response(500, {"error": "Internal Server Error"})
