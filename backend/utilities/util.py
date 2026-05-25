@@ -81,8 +81,7 @@ def _cors_headers() -> dict:
     """Standard CORS + content-type headers for all API responses."""
     return {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": env("FRONTEND_URL", "https://happnix-dev-new.ronakgo1.workers.dev"),
-        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Origin": "*",
         # X-HappniX-PreAuth — carries pre-auth token during OTP/signup flow
         # Authorization    — carries Cognito JWT Bearer token for authenticated calls
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRFToken,X-HappniX-PreAuth",

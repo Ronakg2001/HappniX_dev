@@ -842,13 +842,8 @@ def lambda_handler(event, context):
                  error=str(exc), functionName=context.function_name)
         return util.err(f"Internal server error: {exc}", 500, trace_id)
 
-    # Inject CORS origin from request header
-    headers = event.get("headers") or {}
-    origin  = (headers.get("origin") or headers.get("Origin")
-               or util.env("FRONTEND_URL", "https://happnix-dev-new.ronakgo1.workers.dev"))
     response.setdefault("headers", {})
-    response["headers"]["Access-Control-Allow-Origin"]      = origin
-    response["headers"]["Access-Control-Allow-Credentials"] = "true"
+    response["headers"]["Access-Control-Allow-Origin"]      = "*"
     response["headers"].setdefault("X-Happnix-Trace-Id", trace_id)
 
     util.log("info", trace_id, "Request completed",

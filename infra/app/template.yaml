@@ -208,9 +208,7 @@ Resources:
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happnix-Trace-Id,X-HappniX-PreAuth'"
-        AllowOrigin:
-          Fn::Sub: "'${FrontendUrl}'"
-        AllowCredentials: true
+        AllowOrigin: "'*'"
       MethodSettings:
         - HttpMethod: "*"
           ResourcePath: "/*"
