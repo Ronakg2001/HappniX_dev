@@ -1,0 +1,27 @@
+import os
+enviroment_variable={
+  "AWS_ACCESS_KEY_ID": os.environ.get("AWS_ACCESS_KEY_ID"),
+  "AWS_SECRET_ACCESS_KEY": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+  "AWS_ROLE_ARN": os.environ.get("AWS_ROLE_ARN"),
+  "AWS_REGION": os.environ.get("AWS_REGION"),
+  "NETWORK_VPC_ID": os.environ.get("NETWORK_VPC_ID"),
+  "NETWORK_PRIVATE_SUBNET_A_ID": os.environ.get("NETWORK_PRIVATE_SUBNET_A_ID"),
+  "NETWORK_PRIVATE_SUBNET_B_ID": os.environ.get("NETWORK_PRIVATE_SUBNET_B_ID"),
+  "NETWORK_LAMBDA_SECURITY_GROUP_ID": os.environ.get("NETWORK_LAMBDA_SECURITY_GROUP_ID"),
+  "NETWORK_DATABASE_SECURITY_GROUP_ID": os.environ.get("NETWORK_DATABASE_SECURITY_GROUP_ID"),
+  "API_BASE_URL": os.environ.get("API_BASE_URL"),
+  "DATA_DB_HOST": os.environ.get("DATA_DB_HOST"),
+  "AUTH_DB_NAME": os.environ.get("AUTH_DB_NAME"),
+  "AUTH_DB_USER": os.environ.get("AUTH_DB_USER"),
+  "AUTH_DB_PASSWORD": os.environ.get("AUTH_DB_PASSWORD"),
+  "DATA_DB_PORT": os.environ.get("DATA_DB_PORT"),
+  "COGNITO_REGION": os.environ.get("COGNITO_REGION"),
+  "COGNITO_USER_POOL_CLIENT_ID": os.environ.get("COGNITO_USER_POOL_CLIENT_ID"),
+  "COGNITO_USER_POOL_ID": os.environ.get("COGNITO_USER_POOL_ID"),
+  "CLOUDFLARE_ACCOUNT_ID": os.environ.get("CLOUDFLARE_ACCOUNT_ID"),
+  "R2_ACCESS_KEY_ID": os.environ.get("R2_ACCESS_KEY_ID"),
+  "R2_SECRET_ACCESS_KEY": os.environ.get("R2_SECRET_ACCESS_KEY"),
+  "R2_ENDPOINT": os.environ.get("R2_ENDPOINT"),
+  "R2_USERMEDIA_BUCKET": os.environ.get("R2_USERMEDIA_BUCKET"),
+  "R2_STATIC_MEDIA_BUCKET": os.environ.get("R2_STATIC_MEDIA_BUCKET")
+}
