@@ -6,9 +6,9 @@ Use them to inspect backend config, test Cognito connectivity, and
 verify auth flow settings without touching the main signup flow.
 """
 
-from backend.utils.Response import success_response, error_response
-from backend.utils import utilities as util
-from backend.integration import cognito_auth as cognito
+from utils.Response import success_response, error_response
+from utils import utilities as util
+from integration import cognito_auth as cognito
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

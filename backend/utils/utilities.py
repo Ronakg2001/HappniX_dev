@@ -17,7 +17,7 @@ from email.utils import parseaddr
 
 # ── Environment ───────────────────────────────────────────────────────────────
 
-from backend.utils import dependencies
+from utils import dependencies
 
 def env(key: str, default: str = "") -> str:
     """Safe os.environ.get with a fallback to dependencies.enviroment_variable."""

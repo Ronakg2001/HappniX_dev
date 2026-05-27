@@ -65,39 +65,11 @@
     return base ? `${base}${cleanPath}` : cleanPath;
   }
 
-  // ── Silent token refresh ─────────────────────────────────────────────────────
   async function handleTokenRefresh() {
-    const refreshToken = getRefreshToken();
-    const sessionId    = getSessionId();
-
-    // No credentials at all — never logged in, don't redirect
-    if (!refreshToken || !sessionId) return false;
-
-    try {
-      const res = await fetch(apiUrl("/api/auth"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ actionItem: "RefreshToken", refreshToken, sessionId })
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok && data.accessToken) {
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
-        return true;
-      }
-
-      // Only force logout on explicit session-expired 401 from the refresh endpoint
-      if (res.status === 401) {
-        clearAllTokens();
-        window.location.href = "/signup_signin.html";
-        return false;
-      }
-    } catch (e) {
-      // Network error — don't redirect, just fail silently
-      console.error("[HappniXAuth] Silent refresh failed (network error)", e);
-    }
-
+    // Backend authorization is removed. We don't refresh tokens via the API.
+    // If a request fails with 401, we just log out.
+    clearAllTokens();
+    window.location.href = "/signup_signin.html";
     return false;
   }
 
@@ -211,12 +183,8 @@
 
   // ── Logout ────────────────────────────────────────────────────────────────────
   async function logout() {
-    const sessionId = getSessionId();
-    try {
-      await postJson("/api/auth", { actionItem: "Logout", sessionId: sessionId || undefined });
-    } catch (_) {
-      // Redirect anyway so the user is not trapped in the signed-in UI
-    }
+    // Clear all local tokens and redirect to signin.
+    // We do not hit the backend for logout.
     clearAllTokens();
     window.location.replace("/signup_signin.html");
   }

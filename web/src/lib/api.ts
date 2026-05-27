@@ -18,9 +18,10 @@ apiClient.interceptors.request.use((config) => {
       config.headers["X-HappniX-PreAuth"] = preAuthToken;
     }
     
-    // Inject bearer token (JWT flow)
+    // Inject bearer token (JWT flow), except for auth endpoints
     const accessToken = localStorage.getItem("happnix_access_token");
-    if (accessToken) {
+    const isAuthEndpoint = config.url?.includes("/api/auth");
+    if (accessToken && !isAuthEndpoint) {
       config.headers["Authorization"] = `Bearer ${accessToken}`;
     }
     
@@ -30,6 +31,11 @@ apiClient.interceptors.request.use((config) => {
       localStorage.removeItem("happnix_access_token");
       localStorage.removeItem("happnix_refresh_token");
       localStorage.removeItem("happnix_session_id");
+      
+      // If a logout call is made to the backend, prevent it from firing since backend auth is removed
+      if (isAuthEndpoint) {
+        return Promise.reject(new axios.Cancel("Logout handled locally."));
+      }
     }
   }
   return config;

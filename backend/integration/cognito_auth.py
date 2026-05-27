@@ -13,8 +13,8 @@ Available functions:
 
 import boto3
 
-from backend.utils import utilities as util
-from backend.utils import dependencies
+from utils import utilities as util
+from utils import dependencies
 
 
 # ── Cognito client (single shared instance) ────────────────────────────────────

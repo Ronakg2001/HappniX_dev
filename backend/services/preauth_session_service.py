@@ -2,8 +2,8 @@
 services/preauth_session_service.py — Service layer for managing preauth OTP sessions.
 """
 
-from backend.utils import sessions
-from backend.utils.Response import success_response
+from utils import sessions
+from utils.Response import success_response
 
 
 def get_or_create_session(token):

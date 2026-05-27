@@ -18,10 +18,10 @@ Session model:
     No JWT / Cognito access token is used during signup or login initiation.
 """
 
-from backend.utils.Response import success_response, error_response
-from backend.utils import utilities as util
-from backend.integration import cognito_auth as cognito
-from backend.services import preauth_session_service as preauth
+from utils.Response import success_response, error_response
+from utils import utilities as util
+from integration import cognito_auth as cognito
+from services import preauth_session_service as preauth
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION HANDLERS
