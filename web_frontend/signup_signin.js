@@ -138,12 +138,6 @@ const views = {
         headers["X-HappniX-PreAuth"] = preAuth;
       }
 
-      // Attach JWT Bearer token if we have one (post-login calls)
-      const jwt = getAccessToken();
-      if (jwt) {
-        headers["Authorization"] = `Bearer ${jwt}`;
-      }
-
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
         headers,

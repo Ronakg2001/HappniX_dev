@@ -183,9 +183,6 @@
     const preAuth = getPreAuthToken();
     if (preAuth) headers["X-HappniX-PreAuth"] = preAuth;
 
-    const jwt = getAccessToken();
-    if (jwt) headers["Authorization"] = `Bearer ${jwt}`;
-
     const response = await fetch(apiUrl("/api/auth"), {
       method: "POST",
       headers,

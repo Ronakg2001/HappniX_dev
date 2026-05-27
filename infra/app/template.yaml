@@ -292,7 +292,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: signup_signin.lambda_handler
+      Handler: handlers.signup_signin.lambda_handler
       Description: HappniX signup and signin Lambda function.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -344,7 +344,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: cognito_post_confirmation.lambda_handler
+      Handler: handlers.CognitoPostConfirmation.lambda_handler
       Description: Sync confirmed Cognito users into HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -358,7 +358,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: cognito_pre_token.lambda_handler
+      Handler: handlers.CognitoPreToken.lambda_handler
       Description: Inject userID and userType claims from HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -372,7 +372,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: auth_schema_init.lambda_handler
+      Handler: handlers.AuthSchemaInit.lambda_handler
       Description: Initialize HappniX auth schema in PostgreSQL during deploy.
       Timeout: 60
       Policies:
@@ -430,7 +430,7 @@ Resources:
     Condition: HasHomePageApi
     Properties:
       CodeUri: ../../backend/
-      Handler: home_page.lambda_handler
+      Handler: handlers.home_page.lambda_handler
       Description: Home page — feed, live events, profile, social graph, search, settings.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -622,7 +622,7 @@ Resources:
     Condition: HasEventsApi
     Properties:
       CodeUri: ../../backend/
-      Handler: events.lambda_handler
+      Handler: handlers.events.lambda_handler
       Description: Events CRUD — create, list, discover, delete.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -694,7 +694,7 @@ Resources:
     Condition: HasMessagingApi
     Properties:
       CodeUri: ../../backend/
-      Handler: messaging.lambda_handler
+      Handler: handlers.messaging.lambda_handler
       Description: Direct messaging — conversations, messages, attachments.
       Policies:
         - AWSLambdaBasicExecutionRole
