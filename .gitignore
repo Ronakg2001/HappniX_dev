@@ -1,5 +1,6 @@
+#APPS_secrets
 secrets_folder/
-
+#backend/utils/dependencies.py
 # wrangler files
 .wrangler
 .dev.vars*
