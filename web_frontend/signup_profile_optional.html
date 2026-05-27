@@ -1,11 +1,10 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Happnix | Profile Setup</title>
-  <link rel="stylesheet" href="{% static 'css/signup_flow.css' %}" />
+  <link rel="stylesheet" href="signup_flow.css" />
 </head>
 <body>
   <main class="card">
@@ -13,8 +12,8 @@
     <p class="sub">Profile picture and bio are optional. You can skip now.</p>
 
     <form id="profileForm" novalidate>
-      <label for="profilePictureUrl">Profile Picture URL</label>
-      <input id="profilePictureUrl" type="url" placeholder="https://example.com/my-photo.jpg" />
+      <label for="profilePicture">Profile Picture</label>
+      <input id="profilePicture" type="file" accept="image/*" />
 
       <label for="bio">Bio</label>
       <textarea id="bio" rows="4" placeholder="Write something about yourself"></textarea>
@@ -27,10 +26,8 @@
     </form>
   </main>
 
-  
-  
-  <script id="signup-profile-optional-boot-config" type="application/json">{"csrfToken":"{{ csrf_token|escapejs }}"}</script>
+  <script id="signup-profile-optional-boot-config" type="application/json">{}</script>
   <script src="runtime-config.js"></script>
-  <script src="{% static 'js/signup_profile_optional.js' %}"></script>
+  <script src="signup_profile_optional.js"></script>
 </body>
 </html>

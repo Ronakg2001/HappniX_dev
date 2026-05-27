@@ -38,17 +38,42 @@ const profileForm = document.getElementById("profileForm");
     }
 
     async function callAuthAction(actionItem, data = {}) {
+      const headers = {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      };
+
+      // Attach pre-auth token if we have one (OTP/signup flow)
+      const preAuth = localStorage.getItem("happnix_preauth_token");
+      if (preAuth) {
+        headers["X-HappniX-PreAuth"] = preAuth;
+      }
+
+      // Attach JWT Bearer token if we have one (post-login calls)
+      const jwt = localStorage.getItem("happnix_access_token");
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({ actionItem, ...data })
       });
 
-      const body = await response.json().catch(() => ({}));
+      let body = {};
+      try {
+        body = await response.json();
+      } catch (_error) {
+        body = {};
+      }
+
+      // Save any pre-auth token returned in the response body
+      if (body.preAuthToken) {
+        localStorage.setItem("happnix_preauth_token", body.preAuthToken);
+      }
+
       if (!response.ok) {
         throw new Error(body.message || "Request failed.");
       }
@@ -78,15 +103,30 @@ const profileForm = document.getElementById("profileForm");
 
     profileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      await submitProfile(
-        {
-          skip: false,
-          profilePictureUrl: document.getElementById("profilePictureUrl").value.trim(),
-          bio: document.getElementById("bio").value.trim()
-        },
-        "Saving...",
-        saveBtn
-      );
+      
+      const fileInput = document.getElementById("profilePicture");
+      const bioInput = document.getElementById("bio").value.trim();
+      let profilePictureUrl = "";
+      
+      if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          profilePictureUrl = e.target.result;
+          await submitProfile(
+            { skip: false, profilePictureUrl, bio: bioInput },
+            "Saving...",
+            saveBtn
+          );
+        };
+        reader.readAsDataURL(file);
+      } else {
+        await submitProfile(
+          { skip: false, profilePictureUrl: "", bio: bioInput },
+          "Saving...",
+          saveBtn
+        );
+      }
     });
 
     skipBtn.addEventListener("click", async () => {
@@ -120,3 +160,4 @@ const profileForm = document.getElementById("profileForm");
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", openHashTarget);
     })();
+

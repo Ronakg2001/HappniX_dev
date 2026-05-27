@@ -29,7 +29,7 @@ if (!fs.existsSync(configDir)) {
 
 // Generate the backend config file
 // AWS explicit override
-const baseUrl = process.env.AWS_API_URL || 'https://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev';
+const baseUrl = process.env.AWS_API_URL || 'https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev';
 
 // Determine WebSocket URL
 // If an explicit AWS_WS_URL is provided, use it. Otherwise, fallback to deriving from baseUrl for local dev.

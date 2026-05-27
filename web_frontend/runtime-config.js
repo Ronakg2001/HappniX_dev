@@ -1,8 +1,8 @@
 window.HAPPNIX_RUNTIME_CONFIG = {
-  apiBaseUrl: "https://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev",
+  apiBaseUrl: "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev",
   cognitoRegion: "ap-south-1",
-  cognitoUserPoolId: "ap-south-1_9PbN3qrkN",
-  cognitoUserPoolClientId: "68uu3j15hdf4dpqr6d91s7iu3e",
+  cognitoUserPoolId: "ap-south-1_QSro12anU",
+  cognitoUserPoolClientId: "4rbpkmg4inqn8evi1fu7gu95kt",
   getApiBaseUrl() {
     return String(this.apiBaseUrl || "").replace(/\/$/, "");
   },

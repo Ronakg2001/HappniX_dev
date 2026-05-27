@@ -585,24 +585,10 @@ async function deleteTicket(ticketId) {
     applyLocalDelete();
     return;
   }
-
   try {
-    await fetch(`/api/tickets/${numericTicketId}/delete`, {
-      method: "DELETE",
-      headers: { "X-CSRFToken": getCsrfToken() },
-      credentials: "same-origin",
-    }).then(async (response) => {
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Request failed.");
-      return data;
-    });
+    await postJson(`/api/tickets/${numericTicketId}/delete`, {});
     applyLocalDelete();
   } catch (error) {
-    const message = String(error?.message || "");
-    if (message.toLowerCase().includes("ticket not found")) {
-      applyLocalDelete();
-      return;
-    }
     setLocationStatus(error.message || "Failed to delete ticket.", true);
   }
 }
@@ -846,8 +832,65 @@ function getCsrfToken() {
   return "";
 }
 
-async function getJson(url) {
-  const response = await fetch(url, { credentials: "same-origin" });
+function _apiUrl(path) {
+  const cfg = window.HAPPNIX_RUNTIME_CONFIG || {};
+  if (typeof cfg.buildApiUrl === 'function') return cfg.buildApiUrl(path);
+  const base = String(cfg.apiBaseUrl || '').replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return base ? `${base}${cleanPath}` : cleanPath;
+}
+
+async function _handleTokenRefresh() {
+  const refreshToken = localStorage.getItem("happnix_refresh_token");
+  const sessionId = localStorage.getItem("happnix_session_id");
+
+  // No credentials at all — user was never logged in, don't redirect
+  if (!refreshToken || !sessionId) return false;
+
+  try {
+    const res = await fetch(_apiUrl("/api/auth"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ actionItem: "RefreshToken", refreshToken, sessionId })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.accessToken) {
+      localStorage.setItem("happnix_access_token", data.accessToken);
+      return true;
+    }
+    // Only force logout on explicit session-expired 401 from the refresh endpoint
+    if (res.status === 401) {
+      localStorage.removeItem("happnix_access_token");
+      localStorage.removeItem("happnix_refresh_token");
+      localStorage.removeItem("happnix_session_id");
+      window.location.href = "/signup_signin.html";
+      return false;
+    }
+  } catch (e) {
+    // Network error — don't redirect, just fail silently and let the caller handle it
+    console.error("Silent refresh failed (network error)", e);
+  }
+
+  return false;
+}
+
+async function getJson(url, isRetry = false) {
+  const resolved = _apiUrl(url);
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(resolved, {
+    headers,
+    credentials: "include"
+  });
+
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return getJson(url, true);
+  }
+
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -855,16 +898,71 @@ async function getJson(url) {
   return data;
 }
 
-async function postJson(url, payload) {
-  const response = await fetch(url, {
+async function postFormData(url, formData, isRetry = false) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(_apiUrl(url), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    headers,
+    credentials: "include",
+    body: formData,
+  });
+
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return postFormData(url, formData, true);
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed.");
+  }
+  return data;
+}
+
+async function deleteJson(url, body = null, isRetry = false) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(_apiUrl(url), {
+    method: "DELETE",
+    headers,
+    credentials: "include",
+    body: body ? JSON.stringify(body) : null,
+  });
+
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return deleteJson(url, body, true);
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed.");
+  }
+  return data;
+}
+
+async function postJson(url, payload, isRetry = false) {
+  const token = localStorage.getItem("happnix_access_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(_apiUrl(url), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
+
+  if (response.status === 401 && !isRetry) {
+    const refreshed = await _handleTokenRefresh();
+    if (refreshed) return postJson(url, payload, true);
+  }
+
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || "Request failed.");
@@ -942,19 +1040,22 @@ async function saveProfileEditor() {
   state.profileEditor.saving = true;
   renderProfileEditorState();
   try {
-    const formData = new FormData();
-    formData.append("bio", state.profileEditor.bio || "");
-    formData.append(
-      "profilePictureUrl",
-      state.profileEditor.avatarUrl &&
-        !isPlaceholderAvatar(state.profileEditor.avatarUrl)
-        ? state.profileEditor.avatarUrl
-        : "",
-    );
+    const payload = {
+      bio: state.profileEditor.bio || "",
+      profilePictureUrl: state.profileEditor.avatarUrl && !isPlaceholderAvatar(state.profileEditor.avatarUrl) ? state.profileEditor.avatarUrl : ""
+    };
+    
     if (state.profileEditor.avatarFile) {
-      formData.append("profilePictureFile", state.profileEditor.avatarFile);
+      const base64Str = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(state.profileEditor.avatarFile);
+      });
+      payload.profilePictureUrl = base64Str;
     }
-    const data = await postFormData("/api/profile/update", formData);
+    
+    const data = await postJson("/api/profile/update", payload);
     state.currentUser.avatar =
       data?.profile?.profile_picture_url ||
       state.profileEditor.avatarUrl ||
@@ -1051,12 +1152,9 @@ function renderCurrentUserProfile() {
 }
 
 async function postFormData(url, formData) {
-  const response = await fetch(url, {
+  const response = await fetch(_apiUrl(url), {
     method: "POST",
-    headers: {
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    credentials: "include",
     body: formData,
   });
   const data = await response.json().catch(() => ({}));
@@ -1067,13 +1165,10 @@ async function postFormData(url, formData) {
 }
 
 async function deleteJson(url, body = null) {
-  const response = await fetch(url, {
+  const response = await fetch(_apiUrl(url), {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRFToken": getCsrfToken(),
-    },
-    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: body ? JSON.stringify(body) : null,
   });
   const data = await response.json().catch(() => ({}));
@@ -3775,8 +3870,23 @@ function goToHomeTabAndRefresh() {
   window.location.href = "/home/?tab=home";
 }
 
-function handleLogout() {
-  window.location.replace("/logout/");
+async function handleLogout() {
+  const sessionId = localStorage.getItem("happnix_session_id");
+  try {
+    await postJson("/api/auth", {
+      actionItem: "Logout",
+      sessionId: sessionId || undefined
+    });
+  } catch (_error) {
+    // Redirect anyway so the user is not trapped in the signed-in UI.
+  }
+  // Clear all auth tokens so the auto-login guard doesn't bounce them back in
+  localStorage.removeItem("happnix_access_token");
+  localStorage.removeItem("happnix_refresh_token");
+  localStorage.removeItem("happnix_session_id");
+  localStorage.removeItem("happnix_preauth_token");
+  localStorage.removeItem("happnix_active_tab");
+  window.location.replace("/signup_signin.html");
 }
 
 function getInitialTabFromUrl() {
@@ -6671,6 +6781,38 @@ function switchMyEventsTab(tabId) {
 // --- Interaction Logic ---
 
 function bindHomePageActions() {
+  const deleteBtn = document.getElementById("settings-delete-account-btn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      const confirmed = window.confirm("CAUTION: Are you sure you want to permanently delete your account? This action cannot be undone.");
+      if (!confirmed) return;
+      
+      const originalText = deleteBtn.textContent;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting...";
+      
+      try {
+        if (typeof deleteJson === 'function') {
+           await deleteJson("/api/profile/delete");
+        } else {
+           const res = await fetch("/api/profile/delete", { method: "DELETE" });
+           if (!res.ok) throw new Error("Failed to delete account");
+        }
+        
+        alert("Account deleted successfully.");
+        if (typeof handleLogout === "function") {
+          handleLogout();
+        } else {
+          window.location.replace("/signup_signin.html");
+        }
+      } catch (err) {
+        alert("Error deleting account: " + err.message);
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = originalText;
+      }
+    });
+  }
+
   document.addEventListener("click", (event) => {
     const actionEl = event.target.closest("[data-action]");
     if (!actionEl) return;
@@ -7046,7 +7188,14 @@ function switchTab(tabId) {
   document
     .querySelectorAll(".view-section")
     .forEach((el) => el.classList.remove("active"));
-  document.getElementById(`view-${tabId}`).classList.add("active");
+  const viewEl = document.getElementById(`view-${tabId}`);
+  if (viewEl) {
+    viewEl.classList.add("active");
+  } else {
+    // Fallback: show home if the target view element doesn't exist
+    const homeEl = document.getElementById("view-home");
+    if (homeEl) homeEl.classList.add("active");
+  }
 
   // Hide Mobile Header on Search/Add
   const header = document.getElementById("main-header");
@@ -8581,3 +8730,5 @@ if (!window.__finalGroupTicketBindingsBound) {
   );
   window.setTimeout(() => loadTickets(), 150);
 }
+
+

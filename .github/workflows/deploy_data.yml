@@ -54,3 +54,5 @@ jobs:
           ParameterKey=AuthDbName,ParameterValue='${{ vars.AUTH_DB_NAME }}'
           ParameterKey=AuthDbUser,ParameterValue='${{ vars.AUTH_DB_USER }}'
           ParameterKey=AuthDbPassword,ParameterValue='${{ secrets.AUTH_DB_PASSWORD }}'
+          ParameterKey=EnableSessionsTable,ParameterValue=true
+          ParameterKey=EnableOtpTable,ParameterValue=true

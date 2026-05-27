@@ -2,5 +2,5 @@
 // Do not edit it manually.
 export const BACKEND_IP = '192.168.29.135';
 export const BACKEND_PORT = '8000';
-export const API_BASE_URL = 'https://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev';
-export const WS_BASE_URL = 'wss://5imeml8ibf.execute-api.ap-south-1.amazonaws.com/dev';
+export const API_BASE_URL = 'https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev';
+export const WS_BASE_URL = 'wss://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev';

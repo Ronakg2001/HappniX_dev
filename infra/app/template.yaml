@@ -16,7 +16,7 @@ Parameters:
 
   FrontendUrl:
     Type: String
-    Default: "https://happnix-dev.ronakgo1.workers.dev"
+    Default: "https://happnix-dev-new.ronakgo1.workers.dev"
     Description: Frontend origin for CORS (cannot be '*' if using cookies).
 
   # ─── Network refs ───────────────────────────────────────────────────
@@ -64,79 +64,63 @@ Parameters:
     Type: String
     Default: ""
 
-  # ─── DynamoDB table names (from data stack) ────────────────────────
+  # ─── DynamoDB table names (from data stack) ────────────────────
   UsersTableName:
     Type: String
     Default: ""
     Description: DynamoDB users table name. Empty = feature disabled.
+  SessionsTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB sessions table name.
+  OtpTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB OTP table name.
+
+  NotificationsTableName:
+    Type: String
+    Default: ""
+    Description: DynamoDB notifications table name.
 
   # ─── Feature toggles (add Lambdas when ready) ─────────────────────
   EnableEventsApi:
     Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-    Description: Enable Events Lambda. Set true when events_api.py is ready.
-  EnableTicketsApi:
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable Events Lambda.
+  EnableHomePageApi:
     Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableProfilesApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable Home Page Lambda (feed, profile, social graph, settings).
   EnableMessagingApi:
     Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableGroupChatApi:
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable Messaging Lambda (DMs, group chat).
+  EnableProfileApi:
     Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableGuestsApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableNotificationsApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
-  EnableMediaApi:
-    Type: String
-    Default: "false"
-    AllowedValues: [ "true", "false" ]
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable Profile Lambda.
 
 Conditions:
   HasEventsApi:
     Fn::Equals:
       - Ref: EnableEventsApi
       - "true"
-  HasTicketsApi:
+  HasHomePageApi:
     Fn::Equals:
-      - Ref: EnableTicketsApi
-      - "true"
-  HasProfilesApi:
-    Fn::Equals:
-      - Ref: EnableProfilesApi
+      - Ref: EnableHomePageApi
       - "true"
   HasMessagingApi:
     Fn::Equals:
       - Ref: EnableMessagingApi
       - "true"
-  HasGroupChatApi:
+  HasProfileApi:
     Fn::Equals:
-      - Ref: EnableGroupChatApi
-      - "true"
-  HasGuestsApi:
-    Fn::Equals:
-      - Ref: EnableGuestsApi
-      - "true"
-  HasNotificationsApi:
-    Fn::Equals:
-      - Ref: EnableNotificationsApi
-      - "true"
-  HasMediaApi:
-    Fn::Equals:
-      - Ref: EnableMediaApi
+      - Ref: EnableProfileApi
       - "true"
   HasUsersTable:
     Fn::Not:
@@ -177,13 +161,30 @@ Globals:
         R2_ENDPOINT:
           Ref: R2Endpoint
         USERS_TABLE_NAME:
-          Ref: UsersTableName
+          Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
+        SESSIONS_TABLE_NAME:
+          Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
+        OTP_TABLE_NAME:
+          Fn::Sub: HappniX-otp-v2-${EnvironmentName}
+
+        NOTIFICATIONS_TABLE_NAME:
+          Ref: NotificationsTableName
+
+        # ── Feature table names (used by HomePageApi, EventsApi etc.) ───────
+        SOCIAL_TABLE_NAME:
+          Fn::Sub: HappniX-social-${EnvironmentName}
+        EVENTS_TABLE_NAME:
+          Fn::Sub: HappniX-events-${EnvironmentName}
+        SETTINGS_TABLE_NAME:
+          Fn::Sub: HappniX-settings-${EnvironmentName}
+
         COGNITO_USER_POOL_ID:
-          # Moved here from SignupSignin
           Ref: HappnixUserPool
         COGNITO_USER_POOL_CLIENT_ID:
-          # Moved here from SignupSignin
           Ref: HappnixUserPoolClient
+        # JWT sessions table — stores one refresh token per user-device (30-day TTL)
+        JWT_SESSIONS_TABLE_NAME:
+          Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
     VpcConfig:
       SecurityGroupIds:
         - Ref: LambdaSecurityGroupId
@@ -192,7 +193,6 @@ Globals:
         - Ref: PrivateSubnetBId
 
 Resources:
-
   # ══════════════════════════════════════════════════════════════════════
   # API Gateway — Free Tier: 1M REST API calls/month (12 months)
   # ══════════════════════════════════════════════════════════════════════
@@ -206,11 +206,8 @@ Resources:
       EndpointConfiguration: REGIONAL
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happn\
-          ix-Trace-Id'"
-        AllowOrigin:
-          Fn::Sub: "'${FrontendUrl}'"
-        AllowCredentials: true
+        AllowHeaders: "'Content-Type,Authorization,X-Requested-With,X-CSRFToken,X-Happnix-Trace-Id,X-HappniX-PreAuth'"
+        AllowOrigin: "'*'"
       MethodSettings:
         - HttpMethod: "*"
           ResourcePath: "/*"
@@ -248,6 +245,14 @@ Resources:
           AttributeDataType: String
           Required: false
           Mutable: true
+        - Name: dateOfBirth
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: userType
+          AttributeDataType: String
+          Required: false
+          Mutable: true
       LambdaConfig:
         PostConfirmation:
           Fn::GetAtt:
@@ -271,7 +276,8 @@ Resources:
       EnableTokenRevocation: true
       PreventUserExistenceErrors: ENABLED
       ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH # ← Email/Username + Password
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH # ← Server-side auth from Lambda (AdminInitiateAuth)
+        - ALLOW_USER_PASSWORD_AUTH # ← Email/Username + Password (client-side)
         - ALLOW_USER_SRP_AUTH # ← Secure Remote Password (client-side)
         - ALLOW_REFRESH_TOKEN_AUTH # ← Token refresh
         - ALLOW_CUSTOM_AUTH # ← Mobile + OTP (custom challenge)
@@ -286,7 +292,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: SignupSignin.lambda_handler
+      Handler: handlers.signup_signin.lambda_handler
       Description: HappniX signup and signin Lambda function.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -301,11 +307,23 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
-                Fn::If:
-                  - HasUsersTable
-                  - - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}"
-                    - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}/index/*"
-                  - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/dummy-table-not-used"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-userInfoTable-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-userInfoTable-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminGetUser
+                - cognito-idp:ListUsers
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GlobalSignOut # Logout action
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
       Events:
         AuthAction:
           Type: Api
@@ -314,12 +332,19 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/auth
             Method: POST
+        AuthActionLegacy:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /auth
+            Method: POST
 
   CognitoPostConfirmation:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: CognitoPostConfirmation.lambda_handler
+      Handler: handlers.CognitoPostConfirmation.lambda_handler
       Description: Sync confirmed Cognito users into HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -333,7 +358,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: CognitoPreToken.lambda_handler
+      Handler: handlers.CognitoPreToken.lambda_handler
       Description: Inject userID and userType claims from HappniX PostgreSQL.
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -347,7 +372,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: AuthSchemaInit.lambda_handler
+      Handler: handlers.AuthSchemaInit.lambda_handler
       Description: Initialize HappniX auth schema in PostgreSQL during deploy.
       Timeout: 60
       Policies:
@@ -399,16 +424,227 @@ Resources:
   # These are STUBS — update Handler/CodeUri when your code is ready.
   # ══════════════════════════════════════════════════════════════════════
 
+  # ── Home Page Lambda (replaces ProfilesApi) ───────────────────────────────
+  HomePageApi:
+    Type: AWS::Serverless::Function
+    Condition: HasHomePageApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: handlers.home_page.lambda_handler
+      Description: Home page — feed, live events, profile, social graph, search, settings.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+              Resource: "*"
+      Events:
+        HomeFeed:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/feed
+            Method: GET
+        HomeLive:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/live
+            Method: GET
+        HomeNearby:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/nearby
+            Method: GET
+        TicketsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets
+            Method: GET
+        BookTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/book
+            Method: POST
+        UpdateTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/{id}/{action}
+            Method: POST
+        DeleteTicketForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/tickets/{id}/delete
+            Method: DELETE
+        NotificationsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications
+            Method: GET
+        MarkNotificationsForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications
+            Method: POST
+        NotificationActivityForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/notifications/activity
+            Method: POST
+        GuestInvitesForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/guest-invites
+            Method: POST
+        UpdateGuestInviteForHome:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/guest-invites/{token}/{action}
+            Method: POST
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/me
+            Method: GET
+        UpdateProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/update
+            Method: POST
+        ProfilePrivacy:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/privacy
+            Method: POST
+        GetFollowing:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/following
+            Method: GET
+        GetFollowers:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/followers
+            Method: GET
+        FollowRequests:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/follow-requests
+            Method: GET
+        HandleFollowRequest:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/follow-requests
+            Method: POST
+        SearchUsers:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/search
+            Method: GET
+        FollowUser:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/follow
+            Method: POST
+        PublicProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/users/{id}/profile
+            Method: GET
+        GetPreferences:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/preferences
+            Method: GET
+        SavePreferences:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/preferences
+            Method: POST
+        GetPeople:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: GET
+        AddPerson:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: POST
+        RemovePerson:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/settings/people/{category}
+            Method: DELETE
+
   EventsApi:
     Type: AWS::Serverless::Function
     Condition: HasEventsApi
     Properties:
       CodeUri: ../../backend/
-      Handler: events_api.lambda_handler
+      Handler: handlers.events.lambda_handler
       Description: Events CRUD — create, list, discover, delete.
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+              Resource: "*"
       Events:
         CreateEvent:
           Type: Api
@@ -453,152 +689,34 @@ Resources:
             Path: /api/events/{id}
             Method: DELETE
 
-  TicketsApi:
-    Type: AWS::Serverless::Function
-    Condition: HasTicketsApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: tickets_api.lambda_handler
-      Description: Ticket booking, payment, cancellation, group management.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        ListTickets:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets
-            Method: GET
-        BookTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/book
-            Method: POST
-        PayTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/pay
-            Method: POST
-        CancelTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/cancel
-            Method: POST
-        ArchiveTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/archive
-            Method: POST
-        DeleteTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/delete
-            Method: DELETE
-        GroupTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/group
-            Method: POST
-        VerifyTicket:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/tickets/{id}/verify
-            Method: POST
-
-  ProfilesApi:
-    Type: AWS::Serverless::Function
-    Condition: HasProfilesApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: profiles_api.lambda_handler
-      Description: User profiles, follow system, search, settings.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        SearchUsers:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/search
-            Method: GET
-        FollowUser:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/follow
-            Method: POST
-        PublicProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/users/{id}/profile
-            Method: GET
-        MyProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/me
-            Method: GET
-        UpdateProfile:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/update
-            Method: POST
-        ProfilePrivacy:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/privacy
-            Method: POST
-        FollowRequests:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/follow-requests
-            Method: GET
-        FollowGraph:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/profile/{graph_type}
-            Method: GET
-
   MessagingApi:
     Type: AWS::Serverless::Function
     Condition: HasMessagingApi
     Properties:
       CodeUri: ../../backend/
-      Handler: messaging_api.lambda_handler
+      Handler: handlers.messaging.lambda_handler
       Description: Direct messaging — conversations, messages, attachments.
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+              Resource: "*"
       Events:
         ListConversations:
           Type: Api
@@ -621,6 +739,13 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/messages/conversations/{id}/messages
             Method: GET
+        SendConversationMessage:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/messages/conversations/{id}/messages
+            Method: POST
         MarkRead:
           Type: Api
           Properties:
@@ -656,179 +781,117 @@ Resources:
               Ref: HappnixDevApi
             Path: /api/messages/messages/{id}/unsend
             Method: POST
-
-  GroupChatApi:
-    Type: AWS::Serverless::Function
-    Condition: HasGroupChatApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: group_chat_api.lambda_handler
-      Description: Group conversations — CRUD, members, messages.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        CreateGroup:
+        CreateGroupConversation:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
             Path: /api/messages/groups/create
             Method: POST
-        GroupDetails:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}
-            Method: GET
-        GroupMessages:
+        GroupConversationMessages:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
             Path: /api/messages/groups/{id}/messages
             Method: GET
-        AddMembers:
+        UpdateGroupConversation:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/members
+            Path: /api/messages/groups/{id}/{action}
             Method: POST
-        LeaveGroup:
+        UpdateGroupMessage:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/leave
-            Method: POST
-        RenameGroup:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/messages/groups/{id}/rename
+            Path: /api/messages/group-messages/{id}/{action}
             Method: POST
 
-  GuestsApi:
+  ProfileApi:
     Type: AWS::Serverless::Function
-    Condition: HasGuestsApi
+    Condition: HasProfileApi
     Properties:
       CodeUri: ../../backend/
-      Handler: guests_api.lambda_handler
-      Description: Guest invite system — create, OTP, onboarding, payment.
+      Handler: profile.lambda_handler
+      Description: Deep profile operations — Aadhaar verification, settings, notifications.
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}/index/*"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:AdminDeleteUser # DeleteAccount action
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
       Events:
-        CreateInvite:
+        GetProfile:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/guest-invites
-            Method: POST
-        GuestSendOtp:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/send-mobile-otp
-            Method: POST
-        GuestVerifyOtp:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/verify-mobile-otp
-            Method: POST
-        GuestOnboarding:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/onboarding
-            Method: POST
-        GuestPay:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/pay
-            Method: POST
-        GuestCancel:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/guest-invites/{token}/cancel
-            Method: POST
-
-  NotificationsApi:
-    Type: AWS::Serverless::Function
-    Condition: HasNotificationsApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: notifications_api.lambda_handler
-      Description: Activity notifications — list, log, mark read.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        ListNotifications:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/notifications
+            Path: /api/profile/{id}
             Method: GET
-        LogActivity:
+        SendAadhaarOtp:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/notifications/activity
+            Path: /api/profile/verify/aadhaar/send
             Method: POST
-        MarkRead:
+        VerifyAadhaarOtp:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/notifications/read
+            Path: /api/profile/verify/aadhaar/verify
             Method: POST
-
-  MediaApi:
-    Type: AWS::Serverless::Function
-    Condition: HasMediaApi
-    Properties:
-      CodeUri: ../../backend/
-      Handler: media_api.lambda_handler
-      Description: Media upload — presigned URL generation for R2.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Events:
-        GetUploadUrl:
+        UploadProfilePicture:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/media/upload-url
+            Path: /api/profile/picture/upload
             Method: POST
-        DeleteMedia:
+        GetNotifications:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
-            Path: /api/media/delete
+            Path: /api/profile/notifications
+            Method: GET
+        MarkNotificationsRead:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/profile/notifications/read
             Method: POST
 
 Outputs:
   HappnixApiUrl:
     Description: Invoke URL for the HappniX API.
     Value:
-      Fn::Sub: "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${E\
+      Fn::Sub:
+        "https://${HappnixDevApi}.execute-api.${AWS::Region}.amazonaws.com/${E\
         nvironmentName}"
   HappnixCognitoRegion:
     Description: Cognito region.

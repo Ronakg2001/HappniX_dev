@@ -49,12 +49,12 @@ Parameters:
     Description: DynamoDB users table for username lookups (free tier).
   EnableSessionsTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB sessions table — replaces dev_store.py.
   EnableOtpTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB OTP table with 5-min TTL.
   EnableConnectionsTable:
@@ -69,9 +69,32 @@ Parameters:
     Description: DynamoDB presence table for online/offline.
   EnableNotificationsTable:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: DynamoDB notifications table.
+
+  # ─── Feature Table Toggles ─────────────────────────────────────────
+  EnableSocialTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Social graph (follows, follow-requests). Required by HomePageApi.
+  EnableEventsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Events table (live, upcoming, nearby). Required by HomePageApi.
+  EnableSettingsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: User preferences, blocked/muted lists. Required by HomePageApi.
+  EnableJwtSessionsTable:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: JWT refresh-token session store (one row per user-device, 30-day TTL).
+
 
 Conditions:
   HasRds:
@@ -102,6 +125,23 @@ Conditions:
     Fn::Equals:
       - Ref: EnableNotificationsTable
       - "true"
+  HasSocialTable:
+    Fn::Equals:
+      - Ref: EnableSocialTable
+      - "true"
+  HasEventsTable:
+    Fn::Equals:
+      - Ref: EnableEventsTable
+      - "true"
+  HasSettingsTable:
+    Fn::Equals:
+      - Ref: EnableSettingsTable
+      - "true"
+  HasJwtSessionsTable:
+    Fn::Equals:
+      - Ref: EnableJwtSessionsTable
+      - "true"
+
 
 Resources:
 
@@ -151,13 +191,13 @@ Resources:
   # PAY_PER_REQUEST = on-demand = auto-scales within free tier limits
   # ══════════════════════════════════════════════════════════════════════
 
-  # ─── Users Table (username lookups + uniqueness) ───────────────────
+  # ─── Users Table (User Profiles & Personal Details) ───────────────────
   HappnixUsersTable:
     Type: AWS::DynamoDB::Table
     Condition: HasUsersTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-users-${EnvironmentName}
+        Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: userID
@@ -167,17 +207,12 @@ Resources:
       KeySchema:
         - AttributeName: userID
           KeyType: HASH
-      GlobalSecondaryIndexes:
-        - IndexName: userName-index
-          KeySchema:
-            - AttributeName: userName
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
+        - AttributeName: userName
+          KeyType: RANGE
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-users-${EnvironmentName}
+            Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
 
   # ─── Sessions Table (replaces dev_store.py JSON file) ──────────────
   HappnixSessionsTable:
@@ -185,7 +220,7 @@ Resources:
     Condition: HasSessionsTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-sessions-${EnvironmentName}
+        Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: sessionToken
@@ -199,7 +234,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-sessions-${EnvironmentName}
+            Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
 
   # ─── OTP Table (5-minute TTL auto-cleanup) ─────────────────────────
   HappnixOtpTable:
@@ -207,7 +242,7 @@ Resources:
     Condition: HasOtpTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-otp-${EnvironmentName}
+        Fn::Sub: HappniX-otp-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: mobile
@@ -221,7 +256,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-otp-${EnvironmentName}
+            Fn::Sub: HappniX-otp-v2-${EnvironmentName}
 
   # ─── WebSocket Connections Registry ────────────────────────────────
   HappnixConnectionsTable:
@@ -229,7 +264,7 @@ Resources:
     Condition: HasConnectionsTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-connections-${EnvironmentName}
+        Fn::Sub: HappniX-connections-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: connectionId
@@ -249,7 +284,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-connections-${EnvironmentName}
+            Fn::Sub: HappniX-connections-v2-${EnvironmentName}
 
   # ─── Presence (online/offline with heartbeat TTL) ──────────────────
   HappnixPresenceTable:
@@ -298,6 +333,132 @@ Resources:
         - Key: Name
           Value:
             Fn::Sub: HappniX-notifications-${EnvironmentName}
+
+  # ─── Social Graph (follows, follow-requests) ───────────────────────
+  HappnixSocialTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasSocialTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-social-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: relationKey
+          AttributeType: S
+        - AttributeName: targetSub
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: relationKey
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: targetSub-index
+          KeySchema:
+            - AttributeName: targetSub
+              KeyType: HASH
+            - AttributeName: cognitoSub
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-social-${EnvironmentName}
+
+  # ─── Events (live, upcoming, geo) ──────────────────────────────────
+  HappnixEventsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasEventsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-events-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: statusStartAt
+          AttributeType: S
+        - AttributeName: geohash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: itemId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: status-startAt-index
+          KeySchema:
+            - AttributeName: statusStartAt
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: geohash-index
+          KeySchema:
+            - AttributeName: geohash
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-events-${EnvironmentName}
+
+  # ─── Settings (preferences, blocked, muted) ────────────────────────
+  HappnixSettingsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasSettingsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-settings-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: settingKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: settingKey
+          KeyType: RANGE
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-settings-${EnvironmentName}
+
+  # ─── JWT Sessions (refresh-token store, one row per user-device) ──────────
+  # PK: cognitoSub   SK: sessionId
+  # TTL: expiresAt   (30 days — mirrors Cognito refresh-token lifetime)
+  HappnixJwtSessionsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasJwtSessionsTable
+    Properties:
+      TableName:
+        Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cognitoSub
+          AttributeType: S
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cognitoSub
+          KeyType: HASH
+        - AttributeName: sessionId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Sub: HappniX-jwt-sessions-${EnvironmentName}
+
 
 # ══════════════════════════════════════════════════════════════════════
 # Outputs — conditional so they only appear when the resource exists
@@ -362,3 +523,23 @@ Outputs:
     Description: DynamoDB notifications table name.
     Value:
       Ref: HappnixNotificationsTable
+  SocialTableName:
+    Condition: HasSocialTable
+    Description: DynamoDB social graph table name.
+    Value:
+      Ref: HappnixSocialTable
+  EventsTableName:
+    Condition: HasEventsTable
+    Description: DynamoDB events table name.
+    Value:
+      Ref: HappnixEventsTable
+  SettingsTableName:
+    Condition: HasSettingsTable
+    Description: DynamoDB settings table name.
+    Value:
+      Ref: HappnixSettingsTable
+  JwtSessionsTableName:
+    Condition: HasJwtSessionsTable
+    Description: DynamoDB JWT sessions table name (refresh-token store).
+    Value:
+      Ref: HappnixJwtSessionsTable

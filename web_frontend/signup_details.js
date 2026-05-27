@@ -47,17 +47,42 @@ const form = document.getElementById("detailsForm");
     }
 
     async function callAuthAction(actionItem, data = {}) {
+      const headers = {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      };
+
+      // Attach pre-auth token if we have one (OTP/signup flow)
+      const preAuth = localStorage.getItem("happnix_preauth_token");
+      if (preAuth) {
+        headers["X-HappniX-PreAuth"] = preAuth;
+      }
+
+      // Attach JWT Bearer token if we have one (post-login calls)
+      const jwt = localStorage.getItem("happnix_access_token");
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({ actionItem, ...data })
       });
 
-      const body = await response.json().catch(() => ({}));
+      let body = {};
+      try {
+        body = await response.json();
+      } catch (_error) {
+        body = {};
+      }
+
+      // Save any pre-auth token returned in the response body
+      if (body.preAuthToken) {
+        localStorage.setItem("happnix_preauth_token", body.preAuthToken);
+      }
+
       if (!response.ok) {
         throw new Error(body.message || "Request failed.");
       }
@@ -65,6 +90,61 @@ const form = document.getElementById("detailsForm");
     }
 
     setDobMax();
+
+    const checkUsernameBtn = document.getElementById("checkUsernameBtn");
+    const usernameInput = document.getElementById("username");
+    const usernameStatus = document.getElementById("usernameStatus");
+
+    if (checkUsernameBtn) {
+      checkUsernameBtn.addEventListener("click", async () => {
+        const usernameVal = usernameInput.value.trim();
+        if (!usernameVal) {
+          usernameStatus.style.color = "var(--error-red, red)";
+          usernameStatus.textContent = "Please enter a username first.";
+          return;
+        }
+
+        const originalText = checkUsernameBtn.textContent;
+        checkUsernameBtn.disabled = true;
+        checkUsernameBtn.textContent = "...";
+        usernameStatus.textContent = "";
+
+        try {
+          const result = await callAuthAction("CheckUsername", { username: usernameVal });
+          if (result.available) {
+            usernameStatus.style.color = "var(--success-green, green)";
+            usernameStatus.textContent = "Username is available!";
+          } else {
+            usernameStatus.style.color = "var(--error-red, red)";
+            let msg = "Username is already taken.";
+            if (result.suggestions && result.suggestions.length > 0) {
+              msg += " Suggestions: " + result.suggestions.join(", ");
+            }
+            usernameStatus.textContent = msg;
+          }
+        } catch (err) {
+          usernameStatus.style.color = "var(--error-red, red)";
+          usernameStatus.textContent = err.message || "Failed to check username.";
+        } finally {
+          checkUsernameBtn.disabled = false;
+          checkUsernameBtn.textContent = originalText;
+        }
+      });
+    }
+
+    async function hydrateVerifiedMobile() {
+      const mobileInput = document.getElementById("mobile");
+      if (!mobileInput) return;
+      try {
+        const result = await callAuthAction("GetSignupSessionDetails");
+        mobileInput.value = result.formattedMobile || result.mobile || "";
+      } catch (err) {
+        error.textContent = err.message || "Verify mobile OTP again before continuing.";
+        submitBtn.disabled = true;
+      }
+    }
+
+    hydrateVerifiedMobile();
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -128,3 +208,4 @@ const form = document.getElementById("detailsForm");
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", openHashTarget);
     })();
+

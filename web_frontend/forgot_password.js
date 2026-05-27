@@ -14,7 +14,7 @@ const form = document.getElementById("forgotPasswordForm");
     const submitBtn = document.getElementById("submitBtn");
     const csrfTokenTemplate = bootConfig.csrfToken || "";
 
-    const AUTH_ENDPOINT = "/api/auth";
+    const AUTH_ENDPOINT = "/auth";
 
     function getCsrfToken() {
       if (csrfTokenTemplate && csrfTokenTemplate !== "NOTPROVIDED") {
@@ -38,12 +38,26 @@ const form = document.getElementById("forgotPasswordForm");
     }
 
     async function callAuthAction(actionItem, data = {}) {
+      const headers = {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      };
+
+      // Attach pre-auth token if we have one (OTP/signup flow)
+      const preAuth = localStorage.getItem("happnix_preauth_token");
+      if (preAuth) {
+        headers["X-HappniX-PreAuth"] = preAuth;
+      }
+
+      // Attach JWT Bearer token if we have one (post-login calls)
+      const jwt = localStorage.getItem("happnix_access_token");
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+
       const response = await fetch(buildApiUrl(AUTH_ENDPOINT), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCsrfToken()
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({ actionItem, ...data })
       });
@@ -53,6 +67,11 @@ const form = document.getElementById("forgotPasswordForm");
         body = await response.json();
       } catch (_error) {
         body = {};
+      }
+
+      // Save any pre-auth token returned in the response body
+      if (body.preAuthToken) {
+        localStorage.setItem("happnix_preauth_token", body.preAuthToken);
       }
 
       if (!response.ok) {
@@ -116,3 +135,4 @@ const form = document.getElementById("forgotPasswordForm");
       window.addEventListener("hashchange", openHashTarget);
       window.addEventListener("DOMContentLoaded", openHashTarget);
     })();
+

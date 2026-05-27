@@ -1,0 +1,84 @@
+Get all RDS user DAta
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevAllUsers' })
+}).then(res => res.json()).then(data => {
+  console.log("Here are all the users from RDS:");
+  console.table(data.users); // This will print them in a nice formatted table!
+});
+
+
+Wipe all the user in RDS and cognitive
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'WipeDevUsers' })
+}).then(res => res.json()).then(data => {
+  console.log("Wiped users from both RDS and Cognito!");
+});
+
+GET auth status 
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevAuthStatus' })
+}).then(res => res.json()).then(data => {
+  console.log("Auth status:", data);
+});
+
+
+GET current user profile
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetCurrentUser' })
+}).then(res => res.json()).then(data => {
+  console.log("Current user:", data);
+});
+
+GET current RDS user info
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetCurrentRDSUser' })
+}).then(res => res.json()).then(data => {
+  console.log("Current RDS user:", data);
+});
+
+GET cognito user pool ID
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevUserPoolID' })
+}).then(res => res.json()).then(data => {
+  console.log("Cognito user pool ID:", data);
+});
+
+GET RDS DB password 
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/auth'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevRDSDBPassword' })
+}).then(res => res.json()).then(data => {
+  console.log("RDS DB password:", data);
+});
+
+GET DynamoDB table names (needed for HomePage API)
+
+fetch(window.HAPPNIX_RUNTIME_CONFIG.buildApiUrl('/api/home'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ actionItem: 'GetDevTableNames' })
+}).then(r => r.json()).then(d => {
+  console.log("DynamoDB table names:", d);
+  window.HAPPNIX_RUNTIME_CONFIG.tables = d;
+});
+

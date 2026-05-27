@@ -64,6 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Wait just a split second for the flash to cover the screen, then redirect
     setTimeout(() => {
+      // If user is already logged in, skip the login page entirely
+      if (window.HappniXAuth && window.HappniXAuth.redirectIfLoggedIn()) return;
       window.location.href = "signup_signin.html";
     }, 200);
   }, 2800);
