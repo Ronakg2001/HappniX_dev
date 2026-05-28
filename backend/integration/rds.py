@@ -1,4 +1,5 @@
 import psycopg2
+import os
 from psycopg2.extras import RealDictCursor
 from utils import dependencies
 from utils import utilities as util
@@ -6,12 +7,15 @@ from utils import utilities as util
 def get_connection():
     """Establish a connection to the RDS PostgreSQL database."""
     try:
+        host = os.environ.get("AUTH_DB_HOST") or dependencies.enviroment_variable.get("DATA_DB_HOST", "")
+        port = os.environ.get("AUTH_DB_PORT") or dependencies.enviroment_variable.get("DATA_DB_PORT", "5432")
+        
         conn = psycopg2.connect(
-            host=dependencies.enviroment_variable.get("DATA_DB_HOST", ""),
+            host=host,
             dbname=dependencies.enviroment_variable.get("AUTH_DB_NAME", ""),
             user=dependencies.enviroment_variable.get("AUTH_DB_USER", ""),
             password=dependencies.enviroment_variable.get("AUTH_DB_PASSWORD", ""),
-            port=dependencies.enviroment_variable.get("DATA_DB_PORT", "5432"),
+            port=port,
             connect_timeout=5
         )
         return conn
