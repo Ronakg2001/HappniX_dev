@@ -139,6 +139,11 @@
     cursor: pointer;
   }
   body {
+    background: radial-gradient(circle at 50% 0%, #f7f9ff 0%, #edf0fa 75%) no-repeat fixed;
+    color: #09090b;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  :global(.dark) body, .dark body {
     background: radial-gradient(circle at 50% 0%, #1a1633 0%, #050508 75%) no-repeat fixed;
     color: white;
   }
@@ -306,4 +311,89 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── Light Mode Compatibility Layer ───────────────────────────── */
+html:not(.dark) .home-feed .text-white {
+  color: #09090b !important;
+}
+html:not(.dark) .home-feed .text-white\/95 {
+  color: rgba(9, 9, 11, 0.95) !important;
+}
+html:not(.dark) .home-feed .text-white\/90 {
+  color: rgba(9, 9, 11, 0.9) !important;
+}
+html:not(.dark) .home-feed .text-white\/85 {
+  color: rgba(9, 9, 11, 0.85) !important;
+}
+html:not(.dark) .home-feed .text-white\/80 {
+  color: rgba(9, 9, 11, 0.8) !important;
+}
+html:not(.dark) .home-feed .text-white\/75 {
+  color: rgba(9, 9, 11, 0.75) !important;
+}
+html:not(.dark) .home-feed .text-white\/70 {
+  color: rgba(9, 9, 11, 0.7) !important;
+}
+html:not(.dark) .home-feed .text-white\/60 {
+  color: rgba(9, 9, 11, 0.6) !important;
+}
+html:not(.dark) .home-feed .text-white\/55 {
+  color: rgba(9, 9, 11, 0.55) !important;
+}
+html:not(.dark) .home-feed .text-white\/50 {
+  color: rgba(9, 9, 11, 0.5) !important;
+}
+html:not(.dark) .home-feed .text-white\/45 {
+  color: rgba(9, 9, 11, 0.45) !important;
+}
+html:not(.dark) .home-feed .text-white\/40 {
+  color: rgba(9, 9, 11, 0.4) !important;
+}
+html:not(.dark) .home-feed .text-white\/30 {
+  color: rgba(9, 9, 11, 0.3) !important;
+}
+html:not(.dark) .home-feed .text-white\/25 {
+  color: rgba(9, 9, 11, 0.25) !important;
+}
+html:not(.dark) .home-feed .text-white\/20 {
+  color: rgba(9, 9, 11, 0.2) !important;
+}
+html:not(.dark) .home-feed .text-white\/10 {
+  color: rgba(9, 9, 11, 0.1) !important;
+}
+html:not(.dark) .home-feed .bg-white\/5 {
+  background-color: rgba(9, 9, 11, 0.05) !important;
+}
+html:not(.dark) .home-feed .bg-white\/10 {
+  background-color: rgba(9, 9, 11, 0.08) !important;
+}
+html:not(.dark) .home-feed .border-white\/5 {
+  border-color: rgba(9, 9, 11, 0.06) !important;
+}
+html:not(.dark) .home-feed .border-white\/10 {
+  border-color: rgba(9, 9, 11, 0.12) !important;
+}
+html:not(.dark) .home-feed .hover\:bg-white\/5:hover {
+  background-color: rgba(9, 9, 11, 0.05) !important;
+}
+html:not(.dark) .home-feed .hover\:bg-white\/10:hover {
+  background-color: rgba(9, 9, 11, 0.08) !important;
+}
+html:not(.dark) .home-feed .liquid-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(9, 9, 11, 0.05) 0%,
+    rgba(9, 9, 11, 0.02) 50%,
+    rgba(9, 9, 11, 0.04) 100%
+  ) !important;
+  border-color: rgba(9, 9, 11, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(9, 9, 11, 0.05) !important;
+}
+html:not(.dark) .home-feed .liquid-edge {
+  box-shadow: 0 0 0 1px rgba(9, 9, 11, 0.06), 0 20px 60px rgba(9, 9, 11, 0.05) !important;
+}
+html:not(.dark) .home-feed .glass-card {
+  background: rgba(9, 9, 11, 0.05) !important;
+  border-color: rgba(9, 9, 11, 0.08) !important;
 }

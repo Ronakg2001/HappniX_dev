@@ -63,17 +63,17 @@ export function SocialPostCard({ post }: SocialPostCardProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-sm border border-white/20 text-white shrink-0">
+          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-sm border border-border text-white shrink-0">
             {post.user.name[0]}
           </div>
           <div>
             <div className="flex items-center gap-1">
-              <h4 className="text-sm font-bold text-white leading-none">{post.user.name}</h4>
+              <h4 className="text-sm font-bold text-foreground leading-none">{post.user.name}</h4>
               {post.user.verified && (
                 <span className="h-4 w-4 bg-[var(--brand-1)] text-white text-[9px] font-black rounded-full flex items-center justify-center scale-90">✓</span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-white/40">
+            <div className="flex items-center gap-1.5 mt-1 text-xs text-foreground/45">
               <span>@{post.user.username}</span>
               <span>•</span>
               <span>{post.timestamp}</span>
@@ -85,7 +85,7 @@ export function SocialPostCard({ post }: SocialPostCardProps) {
       </div>
 
       {/* Body Content */}
-      <div className="text-sm sm:text-base text-white/90 leading-relaxed mb-3">
+      <div className="text-sm sm:text-base text-foreground/90 leading-relaxed mb-3">
         <p className="whitespace-pre-line">{post.content}</p>
         
         {/* Hashtags and Mentions */}
@@ -102,19 +102,19 @@ export function SocialPostCard({ post }: SocialPostCardProps) {
       {/* Tags (Music / Mood) */}
       <div className="flex flex-wrap gap-2 mb-4">
         {post.musicTag && (
-          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-white/70">
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-foreground/5 border border-border text-[11px] font-medium text-foreground/75">
             <Volume2 className="h-3.5 w-3.5 text-[var(--brand-1)]" />
             {post.musicTag}
           </span>
         )}
         {post.moodTag && (
-          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-white/70">
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-foreground/5 border border-border text-[11px] font-medium text-foreground/75">
             <Smile className="h-3.5 w-3.5 text-[var(--brand-4)]" />
             {post.moodTag}
           </span>
         )}
         {post.location && (
-          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--brand-1)]/10 border border-[var(--brand-1)]/20 text-[11px] font-semibold text-white/90 ml-auto">
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--brand-1)]/10 border border-[var(--brand-1)]/20 text-[11px] font-semibold text-foreground/90 ml-auto">
             <MapPin className="h-3.5 w-3.5 text-[var(--brand-1)]" />
             {post.location}
           </span>
@@ -123,7 +123,7 @@ export function SocialPostCard({ post }: SocialPostCardProps) {
 
       {/* Media Content */}
       {post.images && post.images.length > 0 && (
-        <div className="rounded-2xl overflow-hidden border border-white/10 mb-4 bg-black/45 relative aspect-[16/10] sm:aspect-[16/9]">
+        <div className="rounded-2xl overflow-hidden border border-border mb-4 bg-black/45 relative aspect-[16/10] sm:aspect-[16/9]">
           {/* Simulated Image */}
           <div className="absolute inset-0 bg-gradient-to-tr from-black/50 via-transparent to-black/20" />
           <div className="absolute inset-0 flex items-center justify-center bg-brand-gradient/20">
@@ -136,7 +136,7 @@ export function SocialPostCard({ post }: SocialPostCardProps) {
       )}
 
       {/* Footer Actions */}
-      <div className="flex items-center justify-between border-t border-white/5 pt-3 text-white/60">
+      <div className="flex items-center justify-between border-t border-border pt-3 text-foreground/60">
         <button 
           onClick={toggleLike}
           className={`flex items-center gap-1.5 text-xs sm:text-sm font-semibold hover:text-[var(--brand-1)] active:scale-90 transition-all ${liked ? 'text-[var(--brand-1)]' : ''}`}
@@ -197,7 +197,7 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
   return (
     <div className="liquid-glass liquid-edge rounded-lg overflow-hidden mb-4 hover:scale-[1.005] transition-all duration-300">
       {/* Banner / Hero Section */}
-      <div className="relative h-36 sm:h-36 bg-black/45 border-b border-white/5 flex flex-col justify-end p-4">
+      <div className="relative h-36 sm:h-36 bg-black/45 border-b border-border flex flex-col justify-end p-4">
         {/* Dynamic decorative backdrop */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-0" />
         <div className="absolute inset-0 bg-brand-gradient/10 z-0" />
@@ -235,7 +235,7 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
 
       {/* Details Section */}
       <div className="p-4 sm:p-5">
-        <div className="grid grid-cols-2 gap-3 mb-4 text-xs sm:text-sm text-white/75">
+        <div className="grid grid-cols-2 gap-3 mb-4 text-xs sm:text-sm text-foreground/75">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-[var(--brand-1)] shrink-0" />
             <span>{event.date}</span>
@@ -246,18 +246,18 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
           </div>
           <div className="flex items-center gap-2 col-span-2">
             <MapPin className="h-4 w-4 text-[var(--brand-3)] shrink-0" />
-            <span className="truncate">{event.venue} • <strong className="text-white/90">{event.distance}</strong></span>
+            <span className="truncate">{event.venue} • <strong className="text-foreground/90">{event.distance}</strong></span>
           </div>
         </div>
 
         {/* Real-time Indicators */}
-        <div className="flex items-center justify-between py-2.5 px-3 rounded-2xl bg-white/5 border border-white/5 mb-4 text-xs">
+        <div className="flex items-center justify-between py-2.5 px-3 rounded-2xl bg-foreground/5 border border-border mb-4 text-xs">
           <span className="text-red-400 font-bold flex items-center gap-1">
             <Ticket className="h-3.5 w-3.5" />
             {event.ticketsLeft} tickets left!
           </span>
           {event.friendsAttending && (
-            <span className="text-white/60 font-semibold">
+            <span className="text-foreground/60 font-semibold">
               ✨ {event.friendsAttending} friends attending
             </span>
           )}
@@ -276,8 +276,8 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
             onClick={() => setInterested(!interested)}
             className={`py-3 px-4 rounded-2xl border text-xs sm:text-sm font-semibold transition-all ${
               interested 
-                ? "bg-[var(--brand-3)]/10 border-[var(--brand-3)] text-white" 
-                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
+                ? "bg-[var(--brand-3)]/10 border-[var(--brand-3)] text-foreground" 
+                : "bg-foreground/5 border-border text-foreground/70 hover:bg-foreground/10"
             }`}
           >
             {interested ? "Interested ✓" : "Interested"}
@@ -285,8 +285,8 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
 
           <button 
             onClick={() => setSaved(!saved)}
-            className={`p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 active:scale-95 transition-all ${
-              saved ? "text-[var(--brand-1)]" : "text-white/60"
+            className={`p-3 rounded-2xl bg-foreground/5 border border-border hover:bg-foreground/10 active:scale-95 transition-all ${
+              saved ? "text-[var(--brand-1)]" : "text-foreground/60"
             }`}
           >
             <Bookmark className={`h-4 sm:h-5 w-4 sm:w-5 ${saved ? 'fill-[var(--brand-1)]' : ''}`} />
@@ -301,10 +301,19 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
 // --- SPONSORED / FEATURED EVENT CARD ---
 export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
   return (
-    <div className="relative rounded-lg overflow-hidden mb-6 border-2 border-[var(--brand-1)]/30 bg-black shadow-[0_0_30px_rgba(var(--glow-rgb),0.15)] hover:scale-[1.005] transition-all duration-300">
+    <div 
+      className="relative rounded-lg overflow-hidden bg-black shadow-[0_0_30px_rgba(212,175,55,0.15)] hover:scale-[1.005] transition-all duration-300"
+      style={{
+        backgroundImage: "linear-gradient(black, black), linear-gradient(to bottom right, var(--brand-4), #FCF6BA, #BF953F, var(--brand-4))",
+        backgroundClip: "content-box, border-box",
+        backgroundOrigin: "border-box",
+        borderWidth: "2px",
+        borderColor: "transparent"
+      }}
+    >
       {/* Promoter tag */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-1 px-3 py-1 rounded-full bg-[var(--brand-1)] text-white text-[10px] font-black uppercase tracking-wider shadow-glow">
-        <Sparkles className="h-3 w-3" />
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[var(--brand-4)] via-[#FCF6BA] to-[#BF953F] text-black text-[10px] font-black uppercase tracking-wider shadow-[0_0_15px_rgba(212,175,55,0.45)]">
+        {/* <Sparkles className="h-3 w-3 text-black" /> */}
         Promoted
       </div>
 
@@ -314,27 +323,27 @@ export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
           <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black via-black/40 to-transparent z-0" />
           <div className="absolute inset-0 bg-brand-gradient/20 z-0" />
           
-          <span className="relative z-10 px-2 py-0.5 rounded bg-[var(--brand-4)] text-black text-[9px] font-extrabold uppercase w-max mb-2">
+          <span className="relative z-10 px-2 py-0.5 rounded bg-gradient-to-r from-[var(--brand-4)] to-[#FFF5C3] text-black text-[9px] font-extrabold uppercase w-max mb-2">
             PREMIUM VENUE
           </span>
           <h3 className="relative z-10 text-base sm:text-lg font-black text-white leading-tight">{event.title}</h3>
         </div>
 
         {/* Details Column */}
-        <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between bg-white/5 backdrop-blur-md">
+        <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between bg-white/5 backdrop-blur-md text-white">
           <div>
             <div className="flex items-center gap-2 mb-3 text-xs text-white/50">
               <span>Host: <strong className="text-white/80">{event.organizer}</strong></span>
-              <span className="h-3.5 w-3.5 bg-[var(--brand-1)] text-white text-[8px] font-black rounded-full flex items-center justify-center">✓</span>
+              <span className="h-3.5 w-3.5 bg-gradient-to-r from-[#BF953F] to-[#AA771C] text-black text-[8px] font-black rounded-full flex items-center justify-center">✓</span>
             </div>
 
             <div className="space-y-2 text-xs sm:text-sm text-white/85 mb-4">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-[var(--brand-1)] shrink-0" />
+                <Calendar className="h-4 w-4 text-[#D4AF37] shrink-0" />
                 <span>{event.date} @ {event.time}</span>
               </div>
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-[var(--brand-3)] shrink-0" />
+                <MapPin className="h-4 w-4 text-[#D4AF37] shrink-0" />
                 <span className="truncate">{event.venue}</span>
               </div>
             </div>
@@ -343,7 +352,7 @@ export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
           <div className="flex items-center justify-between gap-4 mt-auto">
             <div>
               <p className="text-[10px] text-white/40 uppercase font-bold">Tickets starts at</p>
-              <p className="text-base font-black text-[var(--brand-1)]">{event.price}</p>
+              <p className="text-base font-black text-[#D4AF37]">{event.price}</p>
             </div>
             <button 
               onClick={onBookNow}
@@ -388,7 +397,7 @@ export function SuggestedProfilesCard() {
 
   return (
     <div className="liquid-glass liquid-edge rounded-lg p-4 sm:p-5 mb-4">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-white/55 mb-4 flex items-center gap-2">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-foreground/55 mb-4 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-[var(--brand-2)]" />
         Suggested People Nearby
       </h3>
@@ -400,16 +409,16 @@ export function SuggestedProfilesCard() {
           return (
             <div 
               key={profile.id} 
-              className="min-w-[150px] sm:min-w-[180px] rounded-2xl bg-white/5 border border-white/5 p-3 flex flex-col items-center text-center snap-start"
+              className="min-w-[150px] sm:min-w-[180px] rounded-2xl bg-foreground/5 border border-border p-3 flex flex-col items-center text-center snap-start"
             >
-              <div className="h-12 w-12 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-base border border-white/10 mb-2 text-white">
+              <div className="h-12 w-12 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-base border border-border mb-2 text-white">
                 {profile.name[0]}
               </div>
 
-              <h4 className="text-xs font-bold text-white line-clamp-1">{profile.name}</h4>
-              <p className="text-[10px] text-white/40 mb-2">@{profile.username}</p>
+              <h4 className="text-xs font-bold text-foreground line-clamp-1">{profile.name}</h4>
+              <p className="text-[10px] text-foreground/40 mb-2">@{profile.username}</p>
 
-              <p className="text-[9px] font-semibold text-white/60 mb-3 bg-white/5 px-2 py-0.5 rounded-full">
+              <p className="text-[9px] font-semibold text-foreground/60 mb-3 bg-foreground/5 px-2 py-0.5 rounded-full">
                 {profile.mutuals} mutual friends
               </p>
 
@@ -417,7 +426,7 @@ export function SuggestedProfilesCard() {
                 onClick={() => handleFollow(profile.id)}
                 className={`w-full py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
                   isFollowing
-                    ? "bg-white/10 text-white border border-white/10"
+                    ? "bg-foreground/10 text-foreground border border-border"
                     : "bg-brand-gradient text-white shadow-glow hover:scale-[1.02]"
                 }`}
               >
