@@ -55,46 +55,48 @@ export default function LocationBar({
   return (
     <>
       {/* Sticky Location Bar Pill */}
-      <div className="w-full flex justify-center py-2 px-4 sticky top-16 z-30 bg-background/80 backdrop-blur-sm border-b border-white/5">
-        <div className="flex items-center gap-3 px-4 py-2 rounded-full liquid-glass liquid-edge text-xs font-semibold max-w-md w-full justify-between shadow-card hover:scale-[1.01] transition-transform">
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 text-white/90"
-          >
-            <MapPin className="h-4 w-4 text-[var(--brand-1)] shrink-0" />
-            <span className="truncate">{currentLocation}</span>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-white/40">|</span>
-            <span className="text-white/60">Radius:</span>
-            <select
-              value={radius}
-              onChange={(e) => onRadiusChange(Number(e.target.value))}
-              className="bg-transparent text-[var(--brand-3)] font-bold focus:outline-none cursor-pointer"
+      {/* {!onlyModal && (
+        <div className="w-full flex justify-center py-2 px-4 sticky top-16 z-30 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="flex items-center gap-3 px-4 py-2 rounded-full liquid-glass liquid-edge text-xs font-semibold max-w-md w-full justify-between shadow-card hover:scale-[1.01] transition-transform">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 text-foreground/90"
             >
-              <option value={5} className="bg-[#12121a] text-white">5 km</option>
-              <option value={10} className="bg-[#12121a] text-white">10 km</option>
-              <option value={25} className="bg-[#12121a] text-white">25 km</option>
-              <option value={50} className="bg-[#12121a] text-white">50 km</option>
-            </select>
+              <MapPin className="h-4 w-4 text-[var(--brand-1)] shrink-0" />
+              <span className="truncate">{currentLocation}</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-foreground">
+              <span className="text-foreground/40">|</span>
+              <span className="text-foreground/60">Radius:</span>
+              <select
+                value={radius}
+                onChange={(e) => onRadiusChange(Number(e.target.value))}
+                className="bg-transparent text-[var(--brand-3)] font-bold focus:outline-none cursor-pointer"
+              >
+                <option value={5} className="bg-white dark:bg-[#12121a] text-black dark:text-white">5 km</option>
+                <option value={10} className="bg-white dark:bg-[#12121a] text-black dark:text-white">10 km</option>
+                <option value={25} className="bg-white dark:bg-[#12121a] text-black dark:text-white">25 km</option>
+                <option value={50} className="bg-white dark:bg-[#12121a] text-black dark:text-white">50 km</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+      )} */}
 
       {/* Location Picker Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-3xl liquid-glass liquid-edge border border-white/10 p-6 shadow-card max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md rounded-lg liquid-glass liquid-edge border border-border p-6 shadow-card max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <MapPin className="text-[var(--brand-1)] h-5 w-5" />
                 Select Location
               </h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                className="p-1 rounded-full hover:bg-foreground/10 text-foreground/60 hover:text-foreground transition-all"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -112,19 +114,19 @@ export default function LocationBar({
 
             {/* Search Input */}
             <div className="relative mb-6">
-              <Search className="absolute left-3 top-3.5 h-4 w-4 text-white/40" />
+              <Search className="absolute left-3 top-3.5 h-4 w-4 text-foreground/40" />
               <input
                 type="text"
                 placeholder="Search city or area..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-[var(--brand-2)] transition-colors placeholder-white/30"
+                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-foreground/5 border border-border text-sm text-foreground focus:outline-none focus:border-[var(--brand-2)] transition-colors placeholder-foreground/30"
               />
             </div>
 
             {/* Popular/Suggested Locations */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white/40 mb-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/40 mb-3">
                 Suggested Cities
               </h4>
               <div className="grid grid-cols-2 gap-2">
@@ -137,8 +139,8 @@ export default function LocationBar({
                     }}
                     className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all text-left flex items-center gap-2 ${
                       currentLocation === city
-                        ? "bg-[var(--brand-1)]/10 border-[var(--brand-1)] text-white"
-                        : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                        ? "bg-[var(--brand-1)]/10 border-[var(--brand-1)] text-foreground"
+                        : "bg-foreground/5 border-border text-foreground/70 hover:bg-foreground/10 hover:text-foreground"
                     }`}
                   >
                     <Compass className="h-4 w-4 text-[var(--brand-3)] shrink-0" />

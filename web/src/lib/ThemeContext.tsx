@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
 
-export type ThemeId = "neon-dusk" | "midnight" | "solar" | "emerald" | "crimson";
+export type ThemeId = "neon-dusk" | "midnight" | "solar" | "emerald" | "crimson" | "pearl-light";
 
 export interface Theme {
   id: ThemeId;
@@ -10,6 +10,7 @@ export interface Theme {
   vars: Record<string, string>;
   /** Visual swatch for the picker */
   swatch: string; // CSS gradient string
+  isLight?: boolean;
 }
 
 export const THEMES: Theme[] = [
@@ -93,6 +94,23 @@ export const THEMES: Theme[] = [
       "--aurora-4": "#FF6D00",
     },
   },
+  {
+    id: "pearl-light",
+    name: "Pearl Light",
+    isLight: true,
+    swatch: "linear-gradient(135deg, #FF4FD8, #72B7FF, #FFFFFF)",
+    vars: {
+      "--brand-1": "#FF4FD8",
+      "--brand-2": "#C96CFF",
+      "--brand-3": "#72B7FF",
+      "--brand-4": "#FFB347",
+      "--glow-rgb": "255, 79, 216",
+      "--aurora-1": "#FF4FD8",
+      "--aurora-2": "#72B7FF",
+      "--aurora-3": "#C96CFF",
+      "--aurora-4": "#FFB347",
+    },
+  },
 ];
 
 function applyTheme(theme: Theme) {
@@ -101,6 +119,11 @@ function applyTheme(theme: Theme) {
     root.style.setProperty(prop, val);
   }
   root.setAttribute("data-theme", theme.id);
+  if (theme.isLight) {
+    root.classList.remove("dark");
+  } else {
+    root.classList.add("dark");
+  }
 }
 
 interface ThemeContextValue {
