@@ -340,6 +340,35 @@ Resources:
             Path: /auth
             Method: POST
 
+  DevOnly:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../backend/
+      Handler: handlers.dev_only.lambda_handler
+      Description: HappniX dev-only utilities (wipe users, get auth config).
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:ListUsers
+                - cognito-idp:AdminDeleteUser
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
+      Events:
+        DevAction:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/dev_only
+            Method: POST
+
   CognitoPostConfirmation:
     Type: AWS::Serverless::Function
     Properties:
