@@ -142,9 +142,9 @@ Globals:
         ALLOW_FIXED_TEST_OTP:
           Ref: AllowFixedTestOtp
         ALLOW_MISSING_CLAIMS_FALLBACK: "false"
-        AUTH_DB_HOST:
+        DATA_DB_HOST:
           Ref: AuthDbHost
-        AUTH_DB_PORT:
+        DATA_DB_PORT:
           Ref: AuthDbPort
         AUTH_DB_NAME:
           Ref: AuthDbName
