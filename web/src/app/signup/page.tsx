@@ -165,7 +165,7 @@ const SignUpCard = () => {
         fullName: form.fullName.trim(),
         username: form.username.trim(),
         password: form.password,
-        sex: form.gender, // mapped mr./miss./other
+        gender: form.gender, // mapped mr./miss./other
         dateOfBirth: computedDob,
         email: form.email.trim(),
       });
