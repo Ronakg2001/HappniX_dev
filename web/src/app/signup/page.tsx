@@ -242,7 +242,7 @@ const SignUpCard = () => {
               <Select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
                 <option value="" className="bg-[#0a0a0a]">Select</option>
                 <option value="Male" className="bg-[#0a0a0a]">Male</option>
-                <option value="Female." className="bg-[#0a0a0a]">Female</option>
+                <option value="Female" className="bg-[#0a0a0a]">Female</option>
                 <option value="Other" className="bg-[#0a0a0a]">Other</option>
               </Select>
             </Field>

@@ -117,7 +117,7 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
                 {"Name": "custom:gender",         "Value": gender},
                 {"Name": "custom:region",         "Value": region},
                 {"Name": "custom:userId",         "Value": user_id},
-                {"Name": "email_verified",        "Value": "true"},
+                {"Name": "email_verified",        "Value": "true"},  # must be "true" or omitted — Cognito rejects "false" on admin_create_user
                 {"Name": "phone_number_verified", "Value": "true"},
             ],
             MessageAction="SUPPRESS",
@@ -139,7 +139,7 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
     except Exception as exc:
         util.log("error", "cognito_auth.create_user",
                  f"admin_create_user failed: {exc}", username=username)
-        return None
+        raise  # re-raise so the handler can catch the real error
 
 
 def authenticate_user(username, password):

@@ -307,23 +307,34 @@ def register_user_details(**kwargs):
     # Generate the UUIDv7 userID — entity=USER/GENERAL by default, embeds region & timestamp
     user_id = uuid_gen.generate_user_id(region_iso=region, user_type="GENERAL")
 
-    cognito_sub = cognito.create_user(
-        username=username,
-        email=email,
-        phone_e164=phone_e164,
-        full_name=full_name,
-        dob=dob,
-        gender=gender,
-        password=password,
-        region=region,
-        user_id=user_id,
-    )
+    try:
+        cognito_sub = cognito.create_user(
+            username=username,
+            email=email,
+            phone_e164=phone_e164,
+            full_name=full_name,
+            dob=dob,
+            gender=gender,
+            password=password,
+            region=region,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        exc_name = exc.__class__.__name__
+        util.log("error", "register_user_details",
+                 f"Cognito create_user raised {exc_name}: {exc}",
+                 username=username, user_id=user_id)
 
-    if not cognito_sub:
+        if exc_name == "UsernameExistsException":
+            return error_response("Username is already taken.", 409)
+        if exc_name == "InvalidPasswordException":
+            return error_response("Password does not meet Cognito requirements.", 400)
+        if exc_name == "InvalidParameterException":
+            return error_response(f"Invalid parameter: {exc}", 400)
+
+        # Catch-all — log full error and surface it so it is traceable
         return error_response(
-            "Could not create your account. "
-            "The username or email may already be in use.",
-            500
+            f"Could not create your account. Reason: {exc_name} — {exc}", 500
         )
 
     util.log("info", "register_user_details", "New user created",
