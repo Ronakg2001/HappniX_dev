@@ -57,7 +57,7 @@ def user_exists_by_phone(phone_e164):
         return False
 
 
-def create_user(username, email, phone_e164, full_name, dob, gender, password):
+def create_user(username, email, phone_e164, full_name, dob, gender, password, region):
     """
     Create a new Cognito user with a permanent password.
 
@@ -85,6 +85,7 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password):
                 {"Name": "name",                  "Value": full_name},
                 {"Name": "custom:dateOfBirth",    "Value": dob},
                 {"Name": "custom:gender",         "Value": gender},
+                {"Name": "custom:region",         "Value": region},
                 {"Name": "email_verified",        "Value": "true"},
                 {"Name": "phone_number_verified", "Value": "true"},
             ],

@@ -154,29 +154,14 @@ export default function MobileStep({ onOtpSent }: Props) {
             {/* Inline validation indicator */}
             {isDirty && (
               <span
-                className={`absolute right-3 top-1/2 -translate-y-1/2 text-[16px] transition-all duration-200 ${
-                  isValid ? "opacity-100" : "opacity-60"
-                }`}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 text-[16px] transition-all duration-200 ${isValid ? "opacity-100" : "opacity-60"
+                  }`}
               >
-                {isValid ? "✅" : "❌"}
+                {isValid ? <span>{"✓"}</span> : <span>{"✗"}</span>}
               </span>
             )}
           </div>
         </div>
-
-        {/* Pattern hint */}
-        {isDirty && !isValid && !error && (
-          <p className="text-[11px] text-white/35 mt-1">
-            Format: <span className="text-white/50 font-mono">{selected.mobile_number_pattern}</span>
-          </p>
-        )}
-
-        {/* Full number preview */}
-        {isDirty && isValid && (
-          <p className="text-[11px] text-[#72B7FF]/70 mt-1 font-mono">
-            {fullMobile}
-          </p>
-        )}
       </Field>
 
       <PrimaryBtn type="submit" loading={loading} disabled={!isValid}>

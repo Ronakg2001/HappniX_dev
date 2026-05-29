@@ -41,41 +41,47 @@ export default function SignInPage() {
           <span className="text-brand-gradient text-shadow-glow text-[28px] font-extrabold leading-none">Happnix</span>
         </a>
 
-        <div className="liquid-glass liquid-edge rounded-[28px] p-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 h-full w-[40%] bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -skew-x-12 pointer-events-none"
-            style={{ animation: "shimmer 5s ease-in-out infinite" }} />
-
-          <div className="mb-7">
-            <h1 className="text-[24px] font-extrabold text-white leading-tight">
-              {view === "mobile" && "Continue with mobile"}
-              {view === "otp" && "Verify your number"}
-              {view === "password" && "Sign in"}
-            </h1>
-            <p className="text-[14px] text-white/45 mt-1.5">
-              {view === "mobile" && "Enter your phone number to get an OTP."}
-              {view === "otp" && "Enter the 6-digit code we sent you."}
-              {view === "password" && "Enter your username/email and password."}
-            </p>
+        <div className="relative rounded-[28px]">
+          {/* Background Layer with Overflow Hidden for Shimmer */}
+          <div className="absolute inset-0 liquid-glass liquid-edge rounded-[28px] pointer-events-none z-0">
+            <div className="absolute top-0 left-0 h-full w-[40%] bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -skew-x-12"
+              style={{ animation: "shimmer 5s ease-in-out infinite" }} />
           </div>
 
-          {view === "mobile" && (
-            <MobileStep onOtpSent={(m) => { setMobile(m); setView("otp"); }} />
-          )}
-          {view === "otp" && (
-            <OtpStep mobile={mobile} onVerified={handleAuthResult} onBack={() => setView("mobile")} />
-          )}
-          {view === "password" && (
-            <PasswordStep onSuccess={handleAuthResult} onBack={() => setView("mobile")} />
-          )}
-
-          {view === "mobile" && (
-            <div className="mt-6 pt-5 border-t border-white/[0.06] text-center">
-              <button onClick={() => setView("password")}
-                className="text-[13px] text-white/45 hover:text-[#72B7FF] transition duration-200">
-                Sign in with Username / Email instead →
-              </button>
+          {/* Content Layer (allows dropdown overflow) */}
+          <div className="relative z-10 p-8">
+            <div className="mb-7">
+              <h1 className="text-[24px] font-extrabold text-white leading-tight">
+                {view === "mobile" && "Continue with mobile"}
+                {view === "otp" && "Verify your number"}
+                {view === "password" && "Sign in"}
+              </h1>
+              <p className="text-[14px] text-white/45 mt-1.5">
+                {view === "mobile" && "Enter your phone number to get an OTP."}
+                {view === "otp" && "Enter the 6-digit code we sent you."}
+                {view === "password" && "Enter your username/email and password."}
+              </p>
             </div>
-          )}
+
+            {view === "mobile" && (
+              <MobileStep onOtpSent={(m) => { setMobile(m); setView("otp"); }} />
+            )}
+            {view === "otp" && (
+              <OtpStep mobile={mobile} onVerified={handleAuthResult} onBack={() => setView("mobile")} />
+            )}
+            {view === "password" && (
+              <PasswordStep onSuccess={handleAuthResult} onBack={() => setView("mobile")} />
+            )}
+
+            {view === "mobile" && (
+              <div className="mt-6 pt-5 border-t border-white/[0.06] text-center">
+                <button onClick={() => setView("password")}
+                  className="text-[13px] text-white/45 hover:text-[#72B7FF] transition duration-200">
+                  Sign in with Username / Email instead →
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-[12px] text-white/25 mt-6">

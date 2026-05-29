@@ -21,6 +21,7 @@ Session model:
 from utils.Response import success_response, error_response
 from utils import utilities as util
 from utils import dependencies
+from utils import uuid_generator as uuid_gen
 from integration import cognito_auth as cognito
 from services import preauth_session_service as preauth
 
@@ -74,7 +75,7 @@ def send_mobile_otp(**kwargs):
     if not util.is_valid_mobile(mobile):
         return error_response("Please enter a valid mobile number with country code.")
 
-    otp = util.generate_otp()
+    otp = uuid_gen.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
     session["last_mobile"] = mobile
     session["region"] = region          # store for SMS gateway routing later
@@ -108,7 +109,7 @@ def resend_mobile_otp(**kwargs):
     if not util.is_valid_mobile(mobile):
         return error_response("Please enter a valid mobile number with country code.")
 
-    otp = util.generate_otp()
+    otp = uuid_gen.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
     preauth.save_session(token, session)
 
@@ -274,6 +275,11 @@ def register_user_details(**kwargs):
 
     # ── Create user in Cognito ─────────────────────────────────────────────────
     phone_e164 = util.format_phone_in(verified_mobile)
+    region = session.get("region", "IN")  # Default to 'IN' if missing
+
+    # Generate the UUIDv7 userID — entity=USER/GENERAL by default, embeds region & timestamp
+    user_id = uuid_gen.generate_user_id(region_iso=region, user_type="GENERAL")
+
     cognito_sub = cognito.create_user(
         username=username,
         email=email,
@@ -282,6 +288,7 @@ def register_user_details(**kwargs):
         dob=dob,
         gender=gender,
         password=password,
+        region=region,
     )
 
     if not cognito_sub:
@@ -292,7 +299,7 @@ def register_user_details(**kwargs):
         )
 
     util.log("info", "register_user_details", "New user created",
-        username=username, cognito_sub=cognito_sub)
+        username=username, user_id=user_id, cognito_sub=cognito_sub)
 
     # ── Cleanup preauth session — no longer needed ─────────────────────────────
     preauth.delete_session(token)
