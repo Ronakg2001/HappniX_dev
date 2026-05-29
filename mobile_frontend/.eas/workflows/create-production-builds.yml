@@ -7,8 +7,15 @@ on:
       - mobile_frontend/**
 
 jobs:
-  publish_update:
-    name: Publish Expo Go Preview Update
+  publish_android_update:
+    name: Publish Android Preview Update
     type: update
     params:
       branch: dev
+      platform: android
+  publish_ios_update:
+    name: Publish iOS Preview Update
+    type: update
+    params:
+      branch: dev
+      platform: ios
