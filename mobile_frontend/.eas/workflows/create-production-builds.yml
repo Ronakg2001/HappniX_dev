@@ -1,4 +1,4 @@
-name: Create Production Builds
+name: Publish Expo Go Preview Update
 
 on:
   push:
@@ -7,11 +7,8 @@ on:
       - mobile_frontend/**
 
 jobs:
-  build_android:
-    type: build
+  publish_update:
+    name: Publish Expo Go Preview Update
+    type: update
     params:
-      platform: android
-  build_ios:
-    type: build
-    params:
-      platform: ios
+      branch: dev
