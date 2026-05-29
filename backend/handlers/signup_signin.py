@@ -18,16 +18,40 @@ Session model:
     No JWT / Cognito access token is used during signup or login initiation.
 """
 
+import re
 from utils.Response import success_response, error_response
 from utils import utilities as util
 from utils import dependencies
 from utils import uuid_generator as uuid_gen
 from integration import cognito_auth as cognito
+from integration import rds
 from services import preauth_session_service as preauth
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION HANDLERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def check_username(**kwargs):
+    """
+    Checks if a username is available.
+    Does not require a preauth session.
+    """
+    username = str(kwargs.get("username", "")).strip()
+
+    if not username:
+        return success_response({"success": True, "available": False, "message": "Username is required."})
+
+    if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
+        return success_response({"success": True, "available": False, "message": "Invalid username format."})
+
+    from integration import rds
+    user_exists = rds.record_exists("userName", username)
+    
+    return success_response({
+        "success": True,
+        "available": not user_exists
+    })
+
 
 def get_country_codes(**kwargs):
     """
@@ -176,9 +200,10 @@ def verify_mobile_otp(**kwargs):
     # ── Clear used OTP ─────────────────────────────────────────────────────────
     session.get("otp_map", {}).pop(mobile, None)
 
-    # ── Check if user already exists in Cognito ────────────────────────────────
+    # ── Check if user already exists in RDS ────────────────────────────────
     phone_e164 = util.format_phone_in(mobile)
-    user_exists = cognito.user_exists_by_phone(phone_e164)
+    from integration import rds
+    user_exists = rds.record_exists("phoneNumber", phone_e164)
 
     if user_exists:
         # Existing user — clear session, tell frontend to proceed to login
@@ -250,13 +275,8 @@ def register_user_details(**kwargs):
     if not all([username, full_name, dob, gender, email, password]):
         return error_response("All fields are required.")
 
-    if len(username) < 3 or len(username) > 30:
-        return error_response("Username must be between 3 and 30 characters.")
-
-    if not username.replace("_", "").replace(".", "").isalnum():
-        return error_response(
-            "Username can only contain letters, numbers, underscores, and dots."
-        )
+    if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
+        return error_response("Invalid username format.")
 
     if len(full_name) < 3:
         return error_response("Please enter a valid full name.")
@@ -272,6 +292,13 @@ def register_user_details(**kwargs):
             "Password must include uppercase, lowercase, number, "
             "special character, and be at least 8 characters long."
         )
+
+    # ── Verify uniqueness in RDS before creating in Cognito ────────────────────
+    if rds.record_exists("userName", username):
+        return error_response("Username is already taken.")
+        
+    if rds.record_exists("emailAddress", email):
+        return error_response("Email address is already registered.")
 
     # ── Create user in Cognito ─────────────────────────────────────────────────
     phone_e164 = util.format_phone_in(verified_mobile)
@@ -364,6 +391,7 @@ def login_with_password(**kwargs):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ACTION_HANDLERS = {
+    "CheckUsername":        check_username,
     "GetCountryCodes":      get_country_codes,
     "SendMobileOtp":        send_mobile_otp,
     "ResendMobileOtp":      resend_mobile_otp,
@@ -413,7 +441,7 @@ def lambda_handler(event, context):
         if action_item == "SendMobileOtp":
             # Always create / retrieve a session — no prior token required
             token, session = preauth.get_or_create_session(incoming_token)
-        elif action_item in {"LoginWithPassword", "GetCountryCodes"}:
+        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername"}:
             # These actions do not use a preauth session
             pass
         else:

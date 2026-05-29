@@ -6,6 +6,7 @@ Import this module in handlers instead of calling boto3 directly.
 
 Available functions:
     user_exists_by_phone(phone_e164)         → bool
+    user_exists_by_username(username)        → bool
     create_user(username, email, ...)        → cognito_sub | None
     authenticate_user(username, password)    → dict | None
     describe_pool()                          → dict | None
@@ -54,6 +55,31 @@ def user_exists_by_phone(phone_e164):
     except Exception as exc:
         util.log("warning", "cognito_auth.user_exists_by_phone",
                  f"Cognito lookup failed: {exc}", phone=phone_e164)
+        return False
+
+
+def user_exists_by_username(username):
+    """
+    Check whether a Cognito user with the given username exists.
+
+    Args:
+        username: Cognito username.
+
+    Returns:
+        True if a matching user exists, False otherwise.
+    """
+    if not _client or not POOL_ID:
+        return False
+    try:
+        resp = _client.list_users(
+            UserPoolId=POOL_ID,
+            Filter=f'username = "{username}"',
+            Limit=1,
+        )
+        return len(resp.get("Users", [])) > 0
+    except Exception as exc:
+        util.log("warning", "cognito_auth.user_exists_by_username",
+                 f"Cognito lookup failed: {exc}", username=username)
         return False
 
 

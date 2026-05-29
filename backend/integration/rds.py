@@ -65,6 +65,35 @@ def get_all_users() -> dict:
         conn.close()
 
 
+def record_exists(column_name: str, value: str) -> bool:
+    """
+    Ultra-fast check to see if a record exists in the users table 
+    based on a specific column (e.g. "userName", "phoneNumber", "emailAddress").
+    """
+    conn = get_connection()
+    if not conn:
+        # If DB is down, return True to fail-safe and prevent duplicates/errors
+        return True
+    
+    # Whitelist allowed columns to prevent SQL injection
+    allowed_columns = {"userName", "phoneNumber", "emailAddress", "cognitoSub", "userID"}
+    if column_name not in allowed_columns:
+        util.log("error", "rds.record_exists", f"Invalid column name: {column_name}")
+        return True
+    
+    try:
+        with conn.cursor() as cur:
+            # We use f-string for the column name (safe because of the whitelist above), 
+            # and parameterized query %s for the value (safe from injection)
+            cur.execute(f'SELECT 1 FROM users WHERE "{column_name}" = %s LIMIT 1;', (value,))
+            return cur.fetchone() is not None
+    except Exception as exc:
+        util.log("error", "rds.record_exists", f"Failed to check {column_name}: {exc}")
+        return True # fail-safe
+    finally:
+        conn.close()
+
+
 def get_user_by_username(username: str) -> dict:
     """Retrieve a specific user by username."""
     conn = get_connection()

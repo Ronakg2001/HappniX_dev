@@ -95,16 +95,16 @@ const SignUpCard = () => {
       setUsernameStatus("");
       return;
     }
-    if (cleaned.length < 3) {
-      setUsernameStatus("Too short (min 3 chars)");
+    if (cleaned.length < 1) {
+      setUsernameStatus("Too short (min 1 chars)");
       return;
     }
     if (cleaned.length > 30) {
       setUsernameStatus("Too long (max 30 chars)");
       return;
     }
-    if (!cleaned.replace("_", "").replace(".", "").match(/^[a-zA-Z0-9]+$/)) {
-      setUsernameStatus("Contains invalid characters");
+    if (!/^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$/.test(cleaned)) {
+      setUsernameStatus("Invalid characters or format");
       return;
     }
 
@@ -121,7 +121,7 @@ const SignUpCard = () => {
       } catch (err) {
         setUsernameStatus((err as Error).message ?? "Taken or unavailable");
       }
-    }, 600);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [form.username]);
