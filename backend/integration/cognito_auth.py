@@ -83,25 +83,9 @@ def user_exists_by_username(username):
         return False
 
 
-def create_user(username, email, phone_e164, full_name, dob, gender, password, region, user_id):
+def create_user(username, email, phone_e164, password, user_id):
     """
     Create a new Cognito user with a permanent password.
-
-    Args:
-        username:   Cognito username (also the preferred_username attribute).
-        email:      User's email address.
-        phone_e164: Phone number in E.164 format, e.g. '+919876543210'.
-        full_name:  User's full display name.
-        dob:        Date of birth string in YYYY-MM-DD format.
-        gender:     Gender string (e.g. 'Male', 'Female', 'Other').
-        password:   Plain-text password — Cognito hashes it internally.
-        region:     ISO 3166-1 alpha-2 region code (e.g. 'IN', 'US').
-        user_id:    UUIDv7 string generated before this call — stored as
-                    custom:userId so the Post Confirmation trigger can read it
-                    and insert the matching RDS row with the same PK.
-
-    Returns:
-        cognito_sub (str) on success, None on failure.
     """
     if not _client or not POOL_ID:
         return None
@@ -112,12 +96,8 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
             UserAttributes=[
                 {"Name": "email",                 "Value": email},
                 {"Name": "phone_number",          "Value": phone_e164},
-                {"Name": "name",                  "Value": full_name},
-                {"Name": "custom:dateOfBirth",    "Value": dob},
-                {"Name": "custom:gender",         "Value": gender},
-                {"Name": "custom:region",         "Value": region},
                 {"Name": "custom:userId",         "Value": user_id},
-                {"Name": "email_verified",        "Value": "true"},  # must be "true" or omitted — Cognito rejects "false" on admin_create_user
+                {"Name": "email_verified",        "Value": "true"},  # must be "true" — Cognito rejects "false" on admin_create_user
                 {"Name": "phone_number_verified", "Value": "true"},
             ],
             MessageAction="SUPPRESS",
@@ -140,6 +120,19 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
         util.log("error", "cognito_auth.create_user",
                  f"admin_create_user failed: {exc}", username=username)
         raise  # re-raise so the handler can catch the real error
+
+
+def delete_user(username):
+    """
+    Deletes a Cognito user by username.
+    Used for rollback when RDS insert fails after a successful Cognito creation.
+
+    Args:
+        username: Cognito username to delete.
+    """
+    if not _client or not POOL_ID:
+        return
+    _client.admin_delete_user(UserPoolId=POOL_ID, Username=username)
 
 
 def authenticate_user(username, password):

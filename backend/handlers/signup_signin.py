@@ -59,21 +59,6 @@ def get_country_codes(**kwargs):
     Used to populate the country-code dropdown on the /signin page.
 
     No preauth session required — this is publicly accessible static data.
-
-    Frontend sends:  { "actionItem": "GetCountryCodes" }
-    Backend returns:
-        {
-            "success": true,
-            "countries": {
-                "India": {
-                    "region_code": "IN",
-                    "dial_code": "+91",
-                    "mobile_number_pattern": "^[6-9]\\d{9}$",
-                    "region_flag": "\ud83c\udde8�\uddf3"
-                },
-                ... (4 more)
-            }
-        }
     """
     return success_response({
         "success": True,
@@ -86,10 +71,6 @@ def send_mobile_otp(**kwargs):
     Step 1 of the auth flow.
     Generates an OTP for the given mobile number and stores it in a new
     (or existing) preauth session.
-
-    Frontend sends:  { "actionItem": "SendMobileOtp", "mobile": "9876543210" }
-    Backend returns: { "success": true, "message": "...", "preAuthToken": "..." }
-    In dev/qa with TEST_OTP_MODE=true also returns: { "debugOtp": "123456" }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
     region = str(kwargs.get("region", "IN")).strip().upper()
@@ -122,9 +103,6 @@ def resend_mobile_otp(**kwargs):
     """
     Resends OTP to the same mobile number.
     Requires a valid preauth token (set by SendMobileOtp).
-
-    Frontend sends:  { "actionItem": "ResendMobileOtp", "mobile": "9876543210" }
-    Backend returns: { "success": true, "message": "...", "preAuthToken": "..." }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
     token = kwargs.get("_preauth_token")
@@ -155,15 +133,6 @@ def verify_mobile_otp(**kwargs):
     Step 2 of the auth flow.
     Validates the OTP. On success, checks Cognito to determine whether the
     mobile number belongs to an existing user or a new one.
-
-    Frontend sends:  { "actionItem": "VerifyMobileOtp",
-                       "mobile": "9876543210", "otp": "123456" }
-    Backend returns (existing user):
-        { "success": true, "userStatus": "existing",
-          "message": "...", "preAuthToken": "..." }
-    Backend returns (new user):
-        { "success": true, "userStatus": "new",
-          "message": "...", "preAuthToken": "..." }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
     otp = str(kwargs.get("otp", "")).strip()
@@ -230,22 +199,6 @@ def register_user_details(**kwargs):
     """
     Step 3 of the signup flow (new users only).
     Registers the user in Cognito and saves their details.
-
-    Requires a valid preauth session with otp_verified=True.
-
-    Frontend sends:
-        {
-            "actionItem": "RegisterUserDetails",
-            "username":  "john_doe",
-            "fullName":  "John Doe",
-            "dateOfBirth": "2000-01-15",
-            "gender":    "Male",
-            "email":     "john@example.com",
-            "password":  "Secret@123"
-        }
-
-    Backend returns:
-        { "success": true, "message": "Account created. Please sign in." }
     """
     token = kwargs.get("_preauth_token")
     session = kwargs.get("_preauth_session", {})
@@ -314,11 +267,7 @@ def register_user_details(**kwargs):
             username=username,
             email=email,
             phone_e164=phone_e164,
-            full_name=full_name,
-            dob=dob,
-            gender=gender,
             password=password,
-            region=region,
             user_id=user_id,
         )
     except Exception as exc:
@@ -339,8 +288,39 @@ def register_user_details(**kwargs):
             f"Could not create your account. Reason: {exc_name} — {exc}", 500
         )
 
-    util.log("info", "register_user_details", "New user created",
+    util.log("info", "register_user_details", "Cognito user created",
         username=username, user_id=user_id, cognito_sub=cognito_sub)
+
+    # ── Insert user directly into RDS ──────────────────────────────────────────
+    rds_result = rds.insert_user(
+        user_id=user_id,
+        cognito_sub=cognito_sub,
+        username=username,
+        email=email,
+        phone_number=phone_e164,
+        full_name=full_name,
+        dob=dob,
+        gender=gender,
+        region=region,
+        email_verified=True,
+    )
+
+    if not rds_result.get("success"):
+        # RDS failed — roll back by deleting the Cognito user to keep stores in sync
+        util.log("error", "register_user_details",
+                 f"RDS insert failed after Cognito success — rolling back Cognito user. Error: {rds_result.get('error')}",
+                 username=username, user_id=user_id)
+        try:
+            cognito.delete_user(username)
+        except Exception as del_exc:
+            util.log("error", "register_user_details",
+                     f"Cognito rollback also failed: {del_exc}", username=username)
+        return error_response(
+            "Account creation failed at database step. Please try again.", 500
+        )
+
+    util.log("info", "register_user_details", "User inserted into RDS successfully",
+        username=username, user_id=user_id)
 
     # ── Cleanup preauth session — no longer needed ─────────────────────────────
     preauth.delete_session(token)
@@ -356,9 +336,6 @@ def login_with_password(**kwargs):
     """
     Authenticates a user via Cognito using their username/email/phone and password.
     Returns the real JWT access token. Does not require a preauth session.
-
-    Frontend sends:
-        { "actionItem": "LoginWithPassword", "identifier": "...", "password": "..." }
     """
     identifier = str(kwargs.get("identifier", "")).strip()
     password = str(kwargs.get("password", "")).strip()

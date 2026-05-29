@@ -254,10 +254,6 @@ Resources:
           Required: false
           Mutable: true
       LambdaConfig:
-        PostConfirmation:
-          Fn::GetAtt:
-            - CognitoPostConfirmation
-            - Arn
         PreTokenGenerationConfig:
           LambdaArn:
             Fn::GetAtt:
@@ -369,20 +365,6 @@ Resources:
             Path: /api/dev_only
             Method: POST
 
-  CognitoPostConfirmation:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ../../backend/
-      Handler: handlers.CognitoPostConfirmation.lambda_handler
-      Description: Sync confirmed Cognito users into HappniX PostgreSQL.
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - AWSLambdaVPCAccessExecutionRole
-      Environment:
-        Variables:
-          COGNITO_USER_POOL_ID: ""
-          COGNITO_USER_POOL_CLIENT_ID: ""
-
   CognitoPreToken:
     Type: AWS::Serverless::Function
     Properties:
@@ -409,20 +391,6 @@ Resources:
         - AWSLambdaVPCAccessExecutionRole
 
   # ── Cognito Invoke Permissions ─────────────────────────────────────
-  CognitoPostConfirmationInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName:
-        Ref: CognitoPostConfirmation
-      Principal: cognito-idp.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
-      SourceArn:
-        Fn::GetAtt:
-          - HappnixUserPool
-          - Arn
-
   CognitoPreTokenInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -445,7 +413,7 @@ Resources:
         Fn::GetAtt:
           - AuthSchemaInit
           - Arn
-      SchemaVersion: "2026-04-29-clean-arch-v1"
+      SchemaVersion: "2026-05-29-add-sex-enum"
 
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.
