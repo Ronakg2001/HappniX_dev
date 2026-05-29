@@ -27,3 +27,52 @@ enviroment_variable = {
     "TEST_OTP_MODE": "true",
     "APP_ENVIRONMENT": "dev",
 }
+
+# ── Region / Country-Code Mapping ─────────────────────────────────────────────
+# Used by the GetCountryCodes action to send country metadata to the frontend.
+# Frontend uses this to render a flag + dial-code dropdown and validate phone
+# numbers client-side via `mobile_number_pattern` (a regex without anchors
+# assumed to be applied with ^ and $).
+#
+# Structure per entry:
+#   country_name → {
+#       "region_code":           ISO 3166-1 alpha-2 code,
+#       "dial_code":             E.164 dial prefix (e.g. "+91"),
+#       "mobile_number_pattern": regex for the local (without dial code) number,
+#       "region_flag":           unicode flag emoji,
+#   }
+#
+# India is listed first so the frontend can default to index 0.
+
+region_code_mapping = {
+    "India": {
+        "region_code": "IN",
+        "dial_code": "+91",
+        "mobile_number_pattern": "^[6-9]\\d{9}$",
+        "region_flag": "🇮🇳",
+    },
+    "United States": {
+        "region_code": "US",
+        "dial_code": "+1",
+        "mobile_number_pattern": "^[2-9]\\d{9}$",
+        "region_flag": "🇺🇸",
+    },
+    "United Kingdom": {
+        "region_code": "GB",
+        "dial_code": "+44",
+        "mobile_number_pattern": "^7\\d{9}$",
+        "region_flag": "🇬🇧",
+    },
+    "United Arab Emirates": {
+        "region_code": "AE",
+        "dial_code": "+971",
+        "mobile_number_pattern": "^5[0-9]\\d{7}$",
+        "region_flag": "🇦🇪",
+    },
+    "Australia": {
+        "region_code": "AU",
+        "dial_code": "+61",
+        "mobile_number_pattern": "^4\\d{8}$",
+        "region_flag": "🇦🇺",
+    },
+}

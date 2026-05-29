@@ -20,12 +20,41 @@ Session model:
 
 from utils.Response import success_response, error_response
 from utils import utilities as util
+from utils import dependencies
 from integration import cognito_auth as cognito
 from services import preauth_session_service as preauth
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION HANDLERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def get_country_codes(**kwargs):
+    """
+    Returns the region_code_mapping from dependencies.py to the frontend.
+    Used to populate the country-code dropdown on the /signin page.
+
+    No preauth session required — this is publicly accessible static data.
+
+    Frontend sends:  { "actionItem": "GetCountryCodes" }
+    Backend returns:
+        {
+            "success": true,
+            "countries": {
+                "India": {
+                    "region_code": "IN",
+                    "dial_code": "+91",
+                    "mobile_number_pattern": "^[6-9]\\d{9}$",
+                    "region_flag": "\ud83c\udde8�\uddf3"
+                },
+                ... (4 more)
+            }
+        }
+    """
+    return success_response({
+        "success": True,
+        "countries": dependencies.region_code_mapping,
+    })
+
 
 def send_mobile_otp(**kwargs):
     """
@@ -38,19 +67,21 @@ def send_mobile_otp(**kwargs):
     In dev/qa with TEST_OTP_MODE=true also returns: { "debugOtp": "123456" }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
+    region = str(kwargs.get("region", "IN")).strip().upper()
     token = kwargs.get("_preauth_token")
     session = kwargs.get("_preauth_session", {})
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
     otp = util.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
     session["last_mobile"] = mobile
+    session["region"] = region          # store for SMS gateway routing later
     preauth.save_session(token, session)
 
     # TODO: integrate SMS gateway here (e.g. Twilio, AWS SNS)
-    util.log("info", "send_mobile_otp", "OTP generated", mobile=mobile)
+    util.log("info", "send_mobile_otp", "OTP generated", mobile=mobile, region=region)
 
     body = {
         "success": True,
@@ -75,7 +106,7 @@ def resend_mobile_otp(**kwargs):
     session = kwargs.get("_preauth_session", {})
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
     otp = util.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
@@ -118,7 +149,7 @@ def verify_mobile_otp(**kwargs):
         return error_response("Mobile number and OTP are required.")
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
     # ── OTP verification ───────────────────────────────────────────────────────
     saved_otp = session.get("otp_map", {}).get(mobile)
@@ -325,6 +356,7 @@ def login_with_password(**kwargs):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ACTION_HANDLERS = {
+    "GetCountryCodes":      get_country_codes,
     "SendMobileOtp":        send_mobile_otp,
     "ResendMobileOtp":      resend_mobile_otp,
     "VerifyMobileOtp":      verify_mobile_otp,
@@ -373,8 +405,8 @@ def lambda_handler(event, context):
         if action_item == "SendMobileOtp":
             # Always create / retrieve a session — no prior token required
             token, session = preauth.get_or_create_session(incoming_token)
-        elif action_item == "LoginWithPassword":
-            # Login does not use preauth session at all
+        elif action_item in {"LoginWithPassword", "GetCountryCodes"}:
+            # These actions do not use a preauth session
             pass
         else:
             # All other actions need an existing valid session
