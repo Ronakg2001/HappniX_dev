@@ -168,7 +168,6 @@ const SignUpCard = () => {
         sex: form.gender, // mapped mr./miss./other
         dateOfBirth: computedDob,
         email: form.email.trim(),
-        govId: "",
       });
       setSuccess((result.message ?? "Registration successful!") as string);
       setTimeout(() => {
@@ -242,9 +241,9 @@ const SignUpCard = () => {
             <Field label="Gender">
               <Select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
                 <option value="" className="bg-[#0a0a0a]">Select</option>
-                <option value="mr." className="bg-[#0a0a0a]">Male</option>
-                <option value="miss." className="bg-[#0a0a0a]">Female</option>
-                <option value="other" className="bg-[#0a0a0a]">Other</option>
+                <option value="Male" className="bg-[#0a0a0a]">Male</option>
+                <option value="Female." className="bg-[#0a0a0a]">Female</option>
+                <option value="Other" className="bg-[#0a0a0a]">Other</option>
               </Select>
             </Field>
           </div>

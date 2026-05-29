@@ -20,6 +20,10 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userStatus') THEN
         CREATE TYPE "userStatus" AS ENUM ('Active', 'Deactivated', 'Deleted');
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sex_enum') THEN
+        CREATE TYPE sex_enum AS ENUM ('Male', 'Female', 'Other');
+    END IF;
 END $$;
 
 
@@ -37,7 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
     "status" "userStatus" NOT NULL DEFAULT 'Active',
     "region" VARCHAR(5),
     "dateOfBirth" DATE NOT NULL,
-    "gender" VARCHAR(20),
+    "gender" sex_enum,
     "bio" TEXT,
     "profilePictureUrl" VARCHAR(500),
     "privacyMode" VARCHAR(10) NOT NULL DEFAULT 'public',
