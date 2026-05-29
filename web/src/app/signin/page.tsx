@@ -15,7 +15,7 @@ export default function SignInPage() {
   const [region, setRegion] = useState("IN");
   const [dialCode, setDialCode] = useState("+91");
 
-  function handleAuthResult(result: Record<string, unknown>, mobile: string, region: string, dialCode: string) {
+  function handleAuthResult(result: Record<string, unknown>, mobile: string = "", region: string = "", dialCode: string = "") {
     const { success, message, userStatus } = result;
     if (!success) {
       alert(message);
