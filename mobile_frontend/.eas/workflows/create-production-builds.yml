@@ -1,0 +1,17 @@
+name: Create Production Builds
+
+on:
+  push:
+    branches: ['dev']
+    paths:
+      - mobile_frontend/**
+
+jobs:
+  build_android:
+    type: build
+    params:
+      platform: android
+  build_ios:
+    type: build
+    params:
+      platform: ios
