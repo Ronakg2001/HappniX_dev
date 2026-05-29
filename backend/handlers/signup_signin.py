@@ -271,8 +271,10 @@ def register_user_details(**kwargs):
     gender = str(kwargs.get("gender", "")).strip()
     email = str(kwargs.get("email", "")).strip().lower()
     password = str(kwargs.get("password", "")).strip()
+    mobile = str(kwargs.get("mobile", "")).strip()
+    region = str(kwargs.get("region", "")).strip().upper()
 
-    if not all([username, full_name, dob, gender, email, password]):
+    if not all([username, full_name, dob, gender, email, password, mobile, region]):
         return error_response("All fields are required.")
 
     if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
@@ -301,8 +303,8 @@ def register_user_details(**kwargs):
         return error_response("Email address is already registered.")
 
     # ── Create user in Cognito ─────────────────────────────────────────────────
-    phone_e164 = util.format_phone_in(verified_mobile)
-    region = session.get("region", "IN")  # Default to 'IN' if missing
+    phone_e164 = util.format_phone_in(mobile)
+    region = region if region else session.get("region", "IN") or "IN"
 
     # Generate the UUIDv7 userID — entity=USER/GENERAL by default, embeds region & timestamp
     user_id = uuid_gen.generate_user_id(region_iso=region, user_type="GENERAL")

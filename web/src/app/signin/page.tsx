@@ -12,8 +12,10 @@ export default function SignInPage() {
   const router = useRouter();
   const [view, setView] = useState<View>("mobile");
   const [mobile, setMobile] = useState("");
+  const [region, setRegion] = useState("IN");
+  const [dialCode, setDialCode] = useState("+91");
 
-  function handleAuthResult(result: Record<string, unknown>) {
+  function handleAuthResult(result: Record<string, unknown>, mobile: string, region: string, dialCode: string) {
     const { success, message, userStatus } = result;
     if (!success) {
       alert(message);
@@ -21,6 +23,10 @@ export default function SignInPage() {
     }
 
     if (userStatus === 'new') {
+      // Persist mobile & region so the signup page can display them read-only
+      sessionStorage.setItem('signup_mobile', mobile);
+      sessionStorage.setItem('signup_region', region);
+      sessionStorage.setItem('signup_dialCode', dialCode);
       router.push('/signup');
     } else {
       router.push('/home');
@@ -64,10 +70,10 @@ export default function SignInPage() {
             </div>
 
             {view === "mobile" && (
-              <MobileStep onOtpSent={(m) => { setMobile(m); setView("otp"); }} />
+              <MobileStep onOtpSent={(m, r, d) => { setMobile(m); setRegion(r); setDialCode(d); setView("otp"); }} />
             )}
             {view === "otp" && (
-              <OtpStep mobile={mobile} onVerified={handleAuthResult} onBack={() => setView("mobile")} />
+              <OtpStep mobile={mobile} region={region} dialCode={dialCode} onVerified={handleAuthResult} onBack={() => setView("mobile")} />
             )}
             {view === "password" && (
               <PasswordStep onSuccess={handleAuthResult} onBack={() => setView("mobile")} />

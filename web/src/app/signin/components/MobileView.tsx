@@ -45,8 +45,8 @@ function validateNumber(localNumber: string, pattern: string): boolean {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface Props {
-  /** Called with the full E.164 number once OTP is sent (e.g. "+919876543210"). */
-  onOtpSent: (mobile: string) => void;
+  /** Called with the full E.164 number + region info once OTP is sent. */
+  onOtpSent: (mobile: string, region: string, dialCode: string) => void;
 }
 
 export default function MobileStep({ onOtpSent }: Props) {
@@ -106,7 +106,7 @@ export default function MobileStep({ onOtpSent }: Props) {
         mobile: fullMobile,   // full E.164: e.g. "+919876543210"
         region: selected.region_code,
       });
-      onOtpSent(fullMobile);
+      onOtpSent(fullMobile, selected.region_code, selected.dial_code);
     } catch (err) {
       setError((err as Error).message);
     } finally {
