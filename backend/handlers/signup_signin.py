@@ -289,6 +289,7 @@ def register_user_details(**kwargs):
         gender=gender,
         password=password,
         region=region,
+        user_id=user_id,
     )
 
     if not cognito_sub:

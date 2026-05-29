@@ -73,8 +73,10 @@ def get_user_by_username(username: str) -> dict:
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Note: adjust the column name if username is stored as something else (e.g. user_name or cognito_username)
-            cur.execute("SELECT * FROM users WHERE username = %s LIMIT 1;", (username,))
+            cur.execute(
+                'SELECT * FROM users WHERE "userName" = %s LIMIT 1;',
+                (username,)
+            )
             row = cur.fetchone()
             if row:
                 data = {k: str(v) if v is not None else None for k, v in row.items()}
@@ -86,3 +88,87 @@ def get_user_by_username(username: str) -> dict:
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()
+
+
+def insert_user(
+    user_id:      str,
+    cognito_sub:  str,
+    username:     str,
+    email:        str,
+    phone_number: str,
+    full_name:    str,
+    dob:          str,
+    gender:       str,
+    region:       str,
+    email_verified: bool = True,
+) -> dict:
+    """
+    Insert a new user row into the `users` table.
+
+    Called by the Cognito Post Confirmation Lambda after a user successfully
+    confirms their account. All required columns must be provided; optional
+    profile columns (bio, profilePictureUrl, etc.) default to NULL.
+
+    Args:
+        user_id:        UUIDv7 string — primary key, generated during signup.
+        cognito_sub:    Cognito sub UUID — unique identity bridge.
+        username:       Chosen username.
+        email:          Email address.
+        phone_number:   E.164 phone number (e.g. '+919876543210').
+        full_name:      Full display name (stored as userName).
+        dob:            Date of birth string in YYYY-MM-DD format.
+        gender:         Gender string (e.g. 'Male', 'Female', 'Other').
+        region:         ISO 3166-1 alpha-2 region code (e.g. 'IN').
+        email_verified: Whether the email is verified. Defaults to True.
+
+    Returns:
+        dict: {"success": True} on success, {"success": False, "error": ...} on failure.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    sql = """
+        INSERT INTO users (
+            "userID",
+            "cognitoSub",
+            "userName",
+            "fullName",
+            "emailAddress",
+            "phoneNumber",
+            "dateOfBirth",
+            "gender",
+            "region",
+            "emailVerified",
+            "status"
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active'
+        )
+        ON CONFLICT ("userID") DO NOTHING;
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (
+                user_id,
+                cognito_sub,
+                username,
+                full_name,
+                email,
+                phone_number,
+                dob,
+                gender,
+                region,
+                email_verified,
+            ))
+            conn.commit()
+        util.log("info", "rds.insert_user", "User inserted into RDS",
+                 user_id=user_id, cognito_sub=cognito_sub)
+        return {"success": True}
+    except Exception as exc:
+        conn.rollback()
+        util.log("error", "rds.insert_user", f"Failed to insert user: {exc}",
+                 user_id=user_id)
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+

@@ -3,17 +3,22 @@ BEGIN;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_type_enum') THEN
-        CREATE TYPE user_type_enum AS ENUM ('Authority', 'Admin', 'Business', 'General');
+        CREATE TYPE user_type_enum AS ENUM ('Authority', 'Admin', 'Business', 'General', 'Temporary');
     ELSE
         -- Add 'Authority' to existing enum if not present (safe for re-runs)
         IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'Authority'
                        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_type_enum')) THEN
             ALTER TYPE user_type_enum ADD VALUE 'Authority' BEFORE 'Admin';
         END IF;
+        -- Add 'Temporary' to existing enum if not present
+        IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'Temporary'
+                       AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_type_enum')) THEN
+            ALTER TYPE user_type_enum ADD VALUE 'Temporary' AFTER 'General';
+        END IF;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userStatus') THEN
-        CREATE TYPE "userStatus" AS ENUM ('Active', 'Deactivated', 'Deleted','Temporary');
+        CREATE TYPE "userStatus" AS ENUM ('Active', 'Deactivated', 'Deleted');
     END IF;
 END $$;
 
@@ -21,7 +26,8 @@ END $$;
 CREATE TABLE IF NOT EXISTS users (
     "userID" UUID PRIMARY KEY,
     "cognitoSub" UUID NOT NULL UNIQUE,
-    "userName" VARCHAR(150) NOT NULL,
+    "userName" VARCHAR(150) NOT NULL UNIQUE,
+    "fullName" VARCHAR(255) NOT NULL,
     "emailAddress" VARCHAR(255) NOT NULL,
     "userType" user_type_enum NOT NULL DEFAULT 'General',
     "phoneNumber" VARCHAR(20) NOT NULL UNIQUE,

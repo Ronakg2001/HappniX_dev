@@ -57,7 +57,7 @@ def user_exists_by_phone(phone_e164):
         return False
 
 
-def create_user(username, email, phone_e164, full_name, dob, gender, password, region):
+def create_user(username, email, phone_e164, full_name, dob, gender, password, region, user_id):
     """
     Create a new Cognito user with a permanent password.
 
@@ -69,6 +69,10 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
         dob:        Date of birth string in YYYY-MM-DD format.
         gender:     Gender string (e.g. 'Male', 'Female', 'Other').
         password:   Plain-text password — Cognito hashes it internally.
+        region:     ISO 3166-1 alpha-2 region code (e.g. 'IN', 'US').
+        user_id:    UUIDv7 string generated before this call — stored as
+                    custom:userId so the Post Confirmation trigger can read it
+                    and insert the matching RDS row with the same PK.
 
     Returns:
         cognito_sub (str) on success, None on failure.
@@ -86,6 +90,7 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password, r
                 {"Name": "custom:dateOfBirth",    "Value": dob},
                 {"Name": "custom:gender",         "Value": gender},
                 {"Name": "custom:region",         "Value": region},
+                {"Name": "custom:userId",         "Value": user_id},
                 {"Name": "email_verified",        "Value": "true"},
                 {"Name": "phone_number_verified", "Value": "true"},
             ],
