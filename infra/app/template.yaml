@@ -37,6 +37,7 @@ Parameters:
     Default: "5432"
   AuthDbName:
     Type: String
+    Default: "happnix_in_dev"
   AuthDbUser:
     Type: String
   AuthDbPassword:
@@ -384,7 +385,7 @@ Resources:
     Properties:
       CodeUri: ../../backend/
       Handler: handlers.AuthSchemaInit.lambda_handler
-      Description: Initialize HappniX auth schema in PostgreSQL during deploy.
+      Description: Initialize HappniX auth schema in PostgreSQL. Invoke manually or via CI/CD.
       Timeout: 60
       Policies:
         - AWSLambdaBasicExecutionRole
@@ -405,15 +406,11 @@ Resources:
           - HappnixUserPool
           - Arn
 
-  # ── Schema Initializer ─────────────────────────────────────────────
-  HappnixAuthSchemaInitializer:
-    Type: AWS::CloudFormation::CustomResource
-    Properties:
-      ServiceToken:
-        Fn::GetAtt:
-          - AuthSchemaInit
-          - Arn
-      SchemaVersion: "2026-05-29-add-sex-enum"
+  # NOTE: Schema is initialized manually via:
+  #   psql -h <RDS_HOST> -U <USER> -d <DB> -f backend/schemas/happnix_auth_schema.sql
+  # CloudFormation Custom Resource was removed — the AuthSchemaInit Lambda could not
+  # reach the CloudFormation ResponseURL (S3 pre-signed URL) from inside a private VPC
+  # without an S3 VPC endpoint. Run schema migrations manually or via a bastion host.
 
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.

@@ -31,7 +31,7 @@ Parameters:
     Default: ""
   AuthDbName:
     Type: String
-    Default: "happnixdb"
+    Default: "happnix_in_dev"
   AuthDbUser:
     Type: String
     Default: "happnixadmin"
@@ -163,7 +163,7 @@ Resources:
     Condition: HasRds
     Properties:
       DBInstanceIdentifier:
-        Fn::Sub: happnix-postgres-${EnvironmentName}
+        Fn::Sub: happnix-postgres-${EnvironmentName}-v2
       Engine: postgres
       EngineVersion: "16"
       DBInstanceClass: db.t4g.micro        # ← Free tier eligible (12 months)
