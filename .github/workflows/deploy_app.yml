@@ -71,3 +71,9 @@ jobs:
           ParameterKey=SessionsTableName,ParameterValue='HappniX-sessions-dev'
           ParameterKey=OtpTableName,ParameterValue='HappniX-otp-dev'
           ParameterKey=FrontendUrl,ParameterValue='https://happnix-dev-new.ronakgo1.workers.dev'
+
+      - name: Initialize Database Schema
+        run: |
+          echo "Invoking AuthSchemaInit to apply SQL schema to RDS..."
+          aws lambda invoke --function-name HappniX-dev-AuthSchemaInit response.json
+          cat response.json

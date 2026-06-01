@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
 import {
   X,
   ShieldCheck,
@@ -521,6 +523,16 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose, isPrivate, onPrivacyToggle, verified, onOpenVerification }: SettingsModalProps) {
+  const router = useRouter();
+  
+  const handleLogout = async () => {
+    try {
+      await apiClient.post("/api/home/logout", { actionItem: "Logout" });
+    } catch (err) {}
+    onClose();
+    router.push("/signin");
+  };
+
   const [activeTab, setActiveTab] = useState<SettingsTab>("privacy");
   const [blockedUsers] = useState(["shadow_x", "neon_ghost"]);
   const [restrictedUsers] = useState(["dj_phantom"]);
@@ -742,7 +754,10 @@ export function SettingsModal({ isOpen, onClose, isPrivate, onPrivacyToggle, ver
             <div className="space-y-3">
               <div className="p-3.5 rounded-lg bg-foreground/5 border border-border">
                 <p className="text-[10px] font-black uppercase tracking-wider text-foreground/40 mb-3">Account Actions</p>
-                <button className="w-full flex items-center gap-2.5 py-2.5 text-left text-xs font-semibold text-foreground/80 hover:text-foreground transition-all">
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 py-2.5 text-left text-xs font-semibold text-foreground/80 hover:text-foreground transition-all"
+                >
                   <LogOut className="h-4 w-4 text-[var(--brand-3)]" />
                   Sign Out
                 </button>

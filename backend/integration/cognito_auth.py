@@ -10,6 +10,7 @@ Available functions:
     create_user(username, email, ...)        → cognito_sub | None
     authenticate_user(username, password)    → dict | None
     describe_pool()                          → dict | None
+    global_sign_out(access_token)            → None
 """
 
 import boto3
@@ -133,6 +134,23 @@ def delete_user(username):
     if not _client or not POOL_ID:
         return
     _client.admin_delete_user(UserPoolId=POOL_ID, Username=username)
+
+
+def global_sign_out(access_token):
+    """
+    Signs out users from all devices.
+    Invalidates all access tokens and refresh tokens.
+
+    Args:
+        access_token: A valid active access token for the user.
+    """
+    if not _client:
+        return
+    try:
+        _client.global_sign_out(AccessToken=access_token)
+    except Exception as exc:
+        util.log("error", "cognito_auth.global_sign_out",
+                 f"global_sign_out failed: {exc}")
 
 
 def authenticate_user(username, password):

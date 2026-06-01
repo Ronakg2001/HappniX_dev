@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
 import {
   ArrowLeft,
   Lock,
@@ -170,6 +172,15 @@ function UserList({ users, label, actionLabel, actionColor }: {
 
 // ─── MAIN SETTINGS PAGE ────────────────────────────────────────
 export default function SettingsPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.post("/api/home/logout", { actionItem: "Logout" });
+    } catch (err) {}
+    router.push("/signin");
+  };
+
   // Privacy
   const [isPrivate, setIsPrivate] = useState(false);
 
@@ -449,7 +460,7 @@ export default function SettingsPage() {
             icon={<LogOut className="h-4 w-4" />}
             label="Sign Out"
             description="Log out of this device"
-            onClick={() => {}}
+            onClick={handleLogout}
             danger
           />
           <SettingRow

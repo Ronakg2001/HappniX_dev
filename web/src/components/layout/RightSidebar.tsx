@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Ticket, TrendingUp, Sparkles, UserPlus, UserCheck, QrCode } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Ticket, TrendingUp, Sparkles, UserPlus, UserCheck, QrCode, LogOut } from "lucide-react";
+import { apiClient } from "@/lib/api";
 
 interface RightSidebarProps {
   onBookNow: (title: string, price: string) => void;
@@ -10,6 +12,17 @@ interface RightSidebarProps {
 export default function RightSidebar({ onBookNow }: RightSidebarProps) {
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [showQR, setShowQR] = useState<string | null>(null);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      // The interceptor in api.ts will catch this, clear localStorage, and cancel the request
+      await apiClient.post("/api/home/logout", { actionItem: "Logout" });
+    } catch (err) {
+      // Axios cancel throws an error, which is expected
+    }
+    router.push("/signin");
+  };
 
   const upcomingTickets = [
     { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" }
@@ -137,6 +150,17 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
             );
           })}
         </div>
+      </div>
+
+      {/* Widget 4: Quick Actions */}
+      <div className="liquid-glass liquid-edge rounded-lg p-2 sm:p-3 mt-auto">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold text-red-400 hover:bg-red-400/10 transition-all"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </button>
       </div>
     </aside>
   );

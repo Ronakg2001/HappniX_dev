@@ -383,6 +383,7 @@ Resources:
   AuthSchemaInit:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub HappniX-${EnvironmentName}-AuthSchemaInit
       CodeUri: ../../backend/
       Handler: handlers.AuthSchemaInit.lambda_handler
       Description: Initialize HappniX auth schema in PostgreSQL. Invoke manually or via CI/CD.
@@ -446,6 +447,7 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GlobalSignOut # Logout action
               Resource: "*"
       Events:
         HomeFeed:
@@ -477,6 +479,13 @@ Resources:
           Properties:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/tickets/book
+            Method: POST
+        HomeLogout:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/logout
+            Method: POST
             Method: POST
         UpdateTicketForHome:
           Type: Api

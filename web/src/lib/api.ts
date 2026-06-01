@@ -33,7 +33,7 @@ apiClient.interceptors.request.use((config) => {
       localStorage.removeItem("happnix_session_id");
       
       // If a logout call is made to the backend, prevent it from firing since backend auth is removed
-      if (isAuthEndpoint) {
+      if (isAuthEndpoint || config.url?.includes("/api/home/logout")) {
         return Promise.reject(new axios.Cancel("Logout handled locally."));
       }
     }
