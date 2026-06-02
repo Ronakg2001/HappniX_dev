@@ -36,7 +36,7 @@ export default function RootLayout() {
         let isAuthenticated = false;
 
         try {
-          await api.get('/api/profile/me');
+          await api.get('/api/home/feed');
           isAuthenticated = true;
         } catch (e) {
           isAuthenticated = false;
