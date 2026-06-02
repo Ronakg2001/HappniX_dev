@@ -407,11 +407,15 @@ Resources:
           - HappnixUserPool
           - Arn
 
-  # NOTE: Schema is initialized manually via:
-  #   psql -h <RDS_HOST> -U <USER> -d <DB> -f backend/schemas/happnix_auth_schema.sql
-  # CloudFormation Custom Resource was removed — the AuthSchemaInit Lambda could not
-  # reach the CloudFormation ResponseURL (S3 pre-signed URL) from inside a private VPC
-  # without an S3 VPC endpoint. Run schema migrations manually or via a bastion host.
+  # CloudFormation Custom Resource to trigger schema initialization automatically.
+  # The Lambda uses an S3 VPC Gateway Endpoint to securely send the success
+  # signal back to the CloudFormation ResponseURL from inside the private VPC.
+  AuthSchemaInitTrigger:
+    Type: Custom::AuthSchemaInit
+    Properties:
+      ServiceToken: !GetAtt AuthSchemaInit.Arn
+      # Pass a random string/version to force it to run if needed
+      Version: "1"
 
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.
