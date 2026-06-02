@@ -416,7 +416,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AuthSchemaInit.Arn
       # Pass a random string/version to force it to run if needed
-      Version: "1"
+      Version: "2"
 
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.
