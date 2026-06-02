@@ -529,12 +529,7 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/guest-invites/{token}/{action}
             Method: POST
-        MyProfile:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/profile/me
-            Method: GET
+
         UpdateProfile:
           Type: Api
           Properties:
@@ -846,6 +841,12 @@ Resources:
                   - HappnixUserPool
                   - Arn
       Events:
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/me
+            Method: GET
         GetProfile:
           Type: Api
           Properties:

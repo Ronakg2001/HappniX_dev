@@ -5,8 +5,7 @@ This module owns the boto3 Cognito client and all direct Cognito API calls.
 Import this module in handlers instead of calling boto3 directly.
 
 Available functions:
-    user_exists_by_phone(phone_e164)         → bool
-    user_exists_by_username(username)        → bool
+    user_exists(attribute_name, value)       → bool
     create_user(username, email, ...)        → cognito_sub | None
     authenticate_user(username, password)    → dict | None
     describe_pool()                          → dict | None
@@ -34,12 +33,13 @@ except Exception:
 # COGNITO HELPERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def user_exists_by_phone(phone_e164):
+def user_exists(attribute_name: str, value: str) -> bool:
     """
-    Check whether a Cognito user with the given phone_number attribute exists.
+    Check whether a Cognito user with the given attribute exists.
 
     Args:
-        phone_e164: Phone number in E.164 format, e.g. '+919876543210'.
+        attribute_name: The attribute to filter by (e.g., 'phone_number', 'username', 'email').
+        value: The value of the attribute to search for.
 
     Returns:
         True if a matching user exists, False otherwise.
@@ -49,38 +49,13 @@ def user_exists_by_phone(phone_e164):
     try:
         resp = _client.list_users(
             UserPoolId=POOL_ID,
-            Filter=f'phone_number = "{phone_e164}"',
+            Filter=f'{attribute_name} = "{value}"',
             Limit=1,
         )
         return len(resp.get("Users", [])) > 0
     except Exception as exc:
-        util.log("warning", "cognito_auth.user_exists_by_phone",
-                 f"Cognito lookup failed: {exc}", phone=phone_e164)
-        return False
-
-
-def user_exists_by_username(username):
-    """
-    Check whether a Cognito user with the given username exists.
-
-    Args:
-        username: Cognito username.
-
-    Returns:
-        True if a matching user exists, False otherwise.
-    """
-    if not _client or not POOL_ID:
-        return False
-    try:
-        resp = _client.list_users(
-            UserPoolId=POOL_ID,
-            Filter=f'username = "{username}"',
-            Limit=1,
-        )
-        return len(resp.get("Users", [])) > 0
-    except Exception as exc:
-        util.log("warning", "cognito_auth.user_exists_by_username",
-                 f"Cognito lookup failed: {exc}", username=username)
+        util.log("warning", "cognito_auth.user_exists",
+                 f"Cognito lookup failed: {exc}", attribute_name=attribute_name, value=value)
         return False
 
 
@@ -206,3 +181,28 @@ def describe_pool():
         util.log("warning", "cognito_auth.describe_pool",
                  f"Pool unreachable: {exc}")
         return None
+
+
+def get_user(access_token):
+    """
+    Fetch user details from Cognito using an access token.
+    This effectively verifies that the token is valid, unexpired,
+    and that the user still exists and is not disabled in the user pool.
+
+    Args:
+        access_token: A valid active access token for the user.
+        
+    Returns:
+        dict: User details on success.
+        None: If the token is invalid, expired, or user is deleted/disabled.
+    """
+    if not _client:
+        return None
+    try:
+        resp = _client.get_user(AccessToken=access_token)
+        return resp
+    except Exception as exc:
+        util.log("error", "cognito_auth.get_user",
+                 f"get_user failed or token invalid: {exc}")
+        return None
+

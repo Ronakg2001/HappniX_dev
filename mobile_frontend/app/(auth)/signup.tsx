@@ -38,8 +38,8 @@ export default function SignupScreen() {
         Alert.alert('Verified', 'Mobile verified! Complete your sign-up.');
         router.replace('/(auth)/signup-details');
       } else {
-        Alert.alert('Welcome back!', data.message || 'Signed in successfully.');
-        router.replace('/(tabs)');
+        Alert.alert('Welcome back!', data.message || 'Mobile verified. Please sign in with your password.');
+        router.replace('/(auth)/login');
       }
     } catch (error: any) {
       Alert.alert('Verification Error', error.response?.data?.error || 'Invalid OTP');

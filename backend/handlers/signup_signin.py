@@ -169,10 +169,17 @@ def verify_mobile_otp(**kwargs):
     # ── Clear used OTP ─────────────────────────────────────────────────────────
     session.get("otp_map", {}).pop(mobile, None)
 
-    # ── Check if user already exists in RDS ────────────────────────────────
+    # ── Check if user already exists in Cognito and RDS ────────────────────────────────
     phone_e164 = util.format_phone_in(mobile)
     from integration import rds
-    user_exists = rds.record_exists("phoneNumber", phone_e164)
+    
+    # We check Cognito first as the primary identity store
+    cognito_exists = cognito.user_exists("phone_number", phone_e164)
+    
+    # We also check RDS, and require both to be true
+    rds_exists = rds.record_exists("phoneNumber", phone_e164)
+    
+    user_exists = cognito_exists and rds_exists
 
     if user_exists:
         # Existing user — clear session, tell frontend to proceed to login
