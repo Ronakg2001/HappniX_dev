@@ -51,7 +51,7 @@ def check_username(**kwargs):
     
     return success_response({
         "success": True,
-        "available": not user_exists
+        "available": user_exists
     })
 
 
