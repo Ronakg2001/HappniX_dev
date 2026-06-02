@@ -7,14 +7,14 @@ from utils import utilities as util
 def get_connection():
     """Establish a connection to the RDS PostgreSQL database."""
     try:
-        host = os.environ.get("AUTH_DB_HOST") or dependencies.enviroment_variable.get("DATA_DB_HOST", "")
-        port = os.environ.get("AUTH_DB_PORT") or dependencies.enviroment_variable.get("DATA_DB_PORT", "5432")
+        host = (os.environ.get("AUTH_DB_HOST") or dependencies.enviroment_variable.get("DATA_DB_HOST", "")).strip()
+        port = (os.environ.get("AUTH_DB_PORT") or dependencies.enviroment_variable.get("DATA_DB_PORT", "5432")).strip()
         
         conn = psycopg2.connect(
             host=host,
-            dbname=dependencies.enviroment_variable.get("AUTH_DB_NAME", ""),
-            user=dependencies.enviroment_variable.get("AUTH_DB_USER", ""),
-            password=dependencies.enviroment_variable.get("AUTH_DB_PASSWORD", ""),
+            dbname=(dependencies.enviroment_variable.get("AUTH_DB_NAME") or os.environ.get("AUTH_DB_NAME", "")).strip(),
+            user=(dependencies.enviroment_variable.get("AUTH_DB_USER") or os.environ.get("AUTH_DB_USER", "")).strip(),
+            password=(dependencies.enviroment_variable.get("AUTH_DB_PASSWORD") or os.environ.get("AUTH_DB_PASSWORD", "")).strip(),
             port=port,
             connect_timeout=5
         )

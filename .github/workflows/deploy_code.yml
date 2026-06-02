@@ -39,7 +39,7 @@ jobs:
 
       - name: Sync Lambda Code
         run: >
-          sam sync
+          echo "Y" | sam sync
           --stack-name "${STACK_NAME}"
           --template-file infra/app/template.yaml
           --code
