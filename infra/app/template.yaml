@@ -388,6 +388,7 @@ Resources:
       Handler: handlers.AuthSchemaInit.lambda_handler
       Description: Initialize HappniX auth schema in PostgreSQL. Invoke manually or via CI/CD.
       Timeout: 60
+      MemorySize: 256
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole

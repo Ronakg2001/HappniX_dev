@@ -6,7 +6,6 @@ on:
       - dev
     paths:
       - "infra/app/**"
-      - "backend/**"
       - ".github/workflows/deploy_app.yml"
   workflow_dispatch:
 
