@@ -183,6 +183,48 @@ def get_dev_rds_user(**kwargs):
     })
 
 
+def test_db_connection(**kwargs):
+    """Debug action to test RDS connection and return the exact error/host string."""
+    import os
+    import sys
+    from utils import dependencies
+    import psycopg2
+
+    raw_host_env = os.environ.get("AUTH_DB_HOST")
+    raw_host_dep = dependencies.enviroment_variable.get("DATA_DB_HOST")
+    
+    host = (raw_host_env or raw_host_dep or "").strip()
+    port = (os.environ.get("AUTH_DB_PORT") or dependencies.enviroment_variable.get("DATA_DB_PORT", "5432")).strip()
+    
+    debug_info = {
+        "raw_host_env": repr(raw_host_env),
+        "raw_host_dep": repr(raw_host_dep),
+        "final_host": repr(host),
+        "port": port,
+        "python_version": sys.version,
+    }
+
+    if not host:
+        return error_response(f"Host is empty! {debug_info}", 500)
+
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            dbname=(dependencies.enviroment_variable.get("AUTH_DB_NAME") or os.environ.get("AUTH_DB_NAME", "")).strip(),
+            user=(dependencies.enviroment_variable.get("AUTH_DB_USER") or os.environ.get("AUTH_DB_USER", "")).strip(),
+            password=(dependencies.enviroment_variable.get("AUTH_DB_PASSWORD") or os.environ.get("AUTH_DB_PASSWORD", "")).strip(),
+            port=port,
+            connect_timeout=5
+        )
+        conn.close()
+        return success_response({"success": True, "message": "Connection successful!", "debug": debug_info})
+    except Exception as exc:
+        debug_info["exception"] = str(exc)
+        debug_info["exception_type"] = exc.__class__.__name__
+        return error_response(f"Connection failed: {debug_info}", 500)
+
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -194,6 +236,7 @@ ACTION_HANDLERS = {
     "WipeDevRDSUsers":   wipe_dev_rds_users,
     "GetDevAllUsers":    get_dev_all_users,
     "GetDevRDSUser":     get_dev_rds_user,
+    "TestDBConnection":  test_db_connection,
 }
 
 
