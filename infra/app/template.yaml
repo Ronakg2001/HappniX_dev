@@ -408,16 +408,8 @@ Resources:
           - HappnixUserPool
           - Arn
 
-  # CloudFormation Custom Resource to trigger schema initialization automatically.
-  # The Lambda uses an S3 VPC Gateway Endpoint to securely send the success
-  # signal back to the CloudFormation ResponseURL from inside the private VPC.
-  AuthSchemaInitTrigger:
-    Type: Custom::AuthSchemaInit
-    Properties:
-      ServiceToken: !GetAtt AuthSchemaInit.Arn
-      # Pass a random string/version to force it to run if needed
-      Version: "2"
-
+  # The schema is applied automatically via the `aws lambda invoke` command 
+  # in the deploy_app.yml GitHub Actions pipeline, bypassing VPC S3 routing issues!
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.
   # Set EnableEventsApi=true (etc.) when you've written the handler.
