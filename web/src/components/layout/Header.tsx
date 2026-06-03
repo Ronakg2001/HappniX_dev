@@ -33,9 +33,9 @@ export default function Header({
               height={36}
               className="object-contain"
             />
-            <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
+            {/* <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
               Happnix
-            </span>
+            </span> */}
           </Link>
         </div>
 
