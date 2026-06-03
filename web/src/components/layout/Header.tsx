@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { 
   Bell, 
   MapPin, 
@@ -25,7 +26,14 @@ export default function Header({
         {/* LOGO */}
         <div className="flex items-center gap-3">
           <Link href="/home" className="flex items-center gap-2">
-            <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase">
+            <Image 
+              src="/Happnix.png" 
+              alt="Happnix Logo" 
+              width={36} 
+              height={36} 
+              className="object-contain"
+            />
+            <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
               Happnix
             </span>
           </Link>

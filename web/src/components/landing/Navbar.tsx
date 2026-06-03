@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -35,8 +36,17 @@ export default function Navbar() {
 
       <div className="mx-auto max-w-[1200px] px-6 py-4 flex items-center justify-between gap-6">
         {/* Logo */}
-        <a href="#" className="text-brand-gradient text-shadow-glow text-[26px] font-extrabold leading-none tracking-tight shrink-0">
-          Happnix
+        <a href="#" className="flex items-center gap-2 shrink-0 no-underline">
+          <Image 
+            src="/Happnix.png" 
+            alt="Happnix Logo" 
+            width={40} 
+            height={40} 
+            className="object-contain"
+          />
+          <span className="text-brand-gradient text-shadow-glow text-[26px] font-extrabold leading-none tracking-tight hidden sm:inline-block">
+            Happnix
+          </span>
         </a>
 
         {/* Desktop links */}
