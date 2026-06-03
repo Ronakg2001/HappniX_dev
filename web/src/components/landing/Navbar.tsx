@@ -25,8 +25,8 @@ export default function Navbar() {
     <nav
       ref={ref}
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled
-          ? "liquid-glass border-b border-white/[0.08]"
-          : "bg-transparent"
+        ? "liquid-glass border-b border-white/[0.08]"
+        : "bg-transparent"
         }`}
     >
       {/* Neon hairline on scroll */}
@@ -36,13 +36,14 @@ export default function Navbar() {
 
       <div className="mx-auto max-w-[1200px] px-6 py-4 flex items-center justify-between gap-6">
         {/* Logo */}
-        <Link href="/home" className="flex items-center gap-2 shrink-0 no-underline">
+        <Link href="/" className="flex items-center gap-2 shrink-0 no-underline">
           <Image
             src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
             alt="Happnix Logo"
-            width={36}
-            height={36}
-            className="object-contain"
+            width={400}
+            height={100}
+            className="w-[140px] h-auto object-contain"
+            priority
           />
         </Link>
 

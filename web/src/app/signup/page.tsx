@@ -9,6 +9,7 @@ import { Toast } from "@/components/ui/toast";
 import { PrimaryBtn } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { strongPassword } from "@/constants/regex";
+import Image from "next/image";
 
 function isStrongPassword(v: string) {
   return strongPassword.test(v);
@@ -36,7 +37,16 @@ const BrandSection = () => {
 
       <div className="relative z-10 flex flex-col justify-between h-full">
         <div>
-          <span className="text-brand-gradient text-shadow-glow text-[28px] font-extrabold leading-none">Happnix</span>
+          <a href="/signin">
+            <Image
+              src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
+              alt="Happnix Logo"
+              width={400}
+              height={100}
+              className="w-[140px] h-auto object-contain"
+              priority
+            />
+          </a>
         </div>
 
         <div className="max-w-[460px] my-auto">

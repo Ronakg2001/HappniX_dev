@@ -29,9 +29,10 @@ export default function Header({
             <Image
               src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
               alt="Happnix Logo"
-              width={36}
-              height={36}
-              className="object-contain"
+              width={400}
+              height={100}
+              className="w-[140px] h-auto object-contain"
+              priority
             />
             {/* <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
               Happnix

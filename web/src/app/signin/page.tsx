@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import AuroraBackground from "@/components/landing/AuroraBackground";
 import MobileStep from "./components/MobileView";
 import OtpStep from "./components/OTPView";
@@ -43,8 +44,15 @@ export default function SignInPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-[440px] mx-auto px-6 py-12">
-        <a href="/" className="block text-center mb-8">
-          <span className="text-brand-gradient text-shadow-glow text-[28px] font-extrabold leading-none">Happnix</span>
+        <a href="/signin" className="flex items-center justify-center mb-8">
+          <Image
+            src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
+            alt="Happnix Logo"
+            width={400}
+            height={100}
+            className="w-[140px] h-auto object-contain"
+            priority
+          />
         </a>
 
         <div className="relative rounded-[28px]">
