@@ -1,624 +1,223 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, ActivityIndicator, TouchableOpacity,
-  Alert, Image, ScrollView, Dimensions, TextInput, Modal, Switch
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BadgeCheck, Bell, Edit3, Lock, LogOut, ShieldCheck, X } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { BadgeCheck, Shield, X, Edit3, Lock, ChevronRight, Calendar, Camera } from 'lucide-react-native';
-import { profileApi, authApi, eventApi } from '../../services/api';
-import { eventToParams } from '../../utils/navigation';
-import * as ImagePicker from 'expo-image-picker';
-
-const { width } = Dimensions.get('window');
-const GRID_SIZE = (width - 48 - 8) / 3;
+import { Avatar, BrandHeader, EmptyState, EventArt, Glass, GradientButton, GhostButton, Screen } from '@/components/happnix/kit';
+import { colors, fonts } from '@/constants/brand';
+import { clearSession, eventApi, profileApi } from '@/services/api';
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Edit profile state
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editBio, setEditBio] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // Aadhaar verification state
-  const [aadhaarModalVisible, setAadhaarModalVisible] = useState(false);
-  const [aadhaarNumber, setAadhaarNumber] = useState('');
-  const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
-  const [aadhaarOtp, setAadhaarOtp] = useState('');
-  const [aadhaarLoading, setAadhaarLoading] = useState(false);
-
-  // Privacy State
+  const [editOpen, setEditOpen] = useState(false);
+  const [bio, setBio] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [pendingRequests, setPendingRequests] = useState(0);
-
-  // Connections State
-  const [connectionsModalVisible, setConnectionsModalVisible] = useState(false);
-  const [connectionType, setConnectionType] = useState<'fans' | 'following'>('fans');
-  const [connectionsList, setConnectionsList] = useState<any[]>([]);
-  const [connectionsLoading, setConnectionsLoading] = useState(false);
-
-  // User's own events
-  const [myEvents, setMyEvents] = useState<any[]>([]);
-
-  const openConnections = async (type: 'fans' | 'following') => {
-    setConnectionType(type);
-    setConnectionsModalVisible(true);
-    setConnectionsLoading(true);
-    try {
-      const res = type === 'fans' 
-        ? await profileApi.getFollowers()
-        : await profileApi.getFollowing();
-      setConnectionsList(res.data.users || []);
-    } catch (e) {
-      console.error('Failed to fetch connections:', e);
-      setConnectionsList([]);
-    } finally {
-      setConnectionsLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchProfile();
+    let alive = true;
+    async function load() {
+      try {
+        const [profileResult, eventsResult] = await Promise.allSettled([profileApi.me(), eventApi.mine()]);
+        if (!alive) return;
+        if (profileResult.status === 'fulfilled') {
+          const data = profileResult.value.data?.profile || profileResult.value.data || {};
+          setProfile(data);
+          setBio(data.bio || '');
+          setIsPrivate(Boolean(data.is_private || data.isPrivate));
+        }
+        if (eventsResult.status === 'fulfilled') {
+          setEvents(eventsResult.value.data?.events || []);
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const fetchProfile = async () => {
+  async function saveProfile() {
     try {
-      const response = await profileApi.me();
-      const data = response.data.profile || response.data;
-      setProfile(data);
-      setEditBio(data?.bio || '');
-      setIsPrivate(data?.is_private || false);
-      setPendingRequests(data?.pending_follow_requests_count || 0);
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-    } finally {
-      setLoading(false);
+      await profileApi.updateProfile({ bio });
+      setProfile((prev: any) => ({ ...prev, bio }));
+      setEditOpen(false);
+    } catch (error: any) {
+      Alert.alert('Could not update profile', error.message);
     }
-  };
+  }
 
-  // Fetch user's own events
-  const fetchMyEvents = async () => {
-    try {
-      const res = await eventApi.mine();
-      setMyEvents(res.data.events || []);
-    } catch (e) {
-      console.error('Failed to fetch my events:', e);
-    }
-  };
-
-  useEffect(() => {
-    fetchMyEvents();
-  }, [profile]);
-
-  const togglePrivacy = async (value: boolean) => {
+  async function togglePrivate(value: boolean) {
     setIsPrivate(value);
     try {
       await profileApi.setPrivacy(value);
-    } catch (e) {
-      console.error('Failed to update privacy:', e);
-      setIsPrivate(!value); // Revert on failure
+    } catch {
+      setIsPrivate(!value);
     }
-  };
+  }
 
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await authApi.logout();
-          } catch (e) {
-            console.error('Backend logout failed', e);
-          }
-          await SecureStore.deleteItemAsync('userToken');
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
-  };
-
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      await authApi.completeProfile({ bio: editBio });
-      setProfile((prev: any) => ({ ...prev, bio: editBio }));
-      setEditModalVisible(false);
-      Alert.alert('Updated', 'Profile updated successfully.');
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to update profile.');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  const handleSendAadhaarOtp = async () => {
-    if (aadhaarNumber.length !== 12) {
-      return Alert.alert('Error', 'Please enter a valid 12-digit Aadhaar number.');
-    }
-    setAadhaarLoading(true);
-    try {
-      const res = await profileApi.sendAadhaarOtp(aadhaarNumber);
-      setAadhaarOtpSent(true);
-      Alert.alert('OTP Sent', res.data.message || 'Check your Aadhaar-linked phone.');
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to send OTP.');
-    } finally {
-      setAadhaarLoading(false);
-    }
-  };
-
-  const handleVerifyAadhaar = async () => {
-    if (!aadhaarOtp) return Alert.alert('Error', 'Please enter the OTP.');
-    setAadhaarLoading(true);
-    try {
-      const res = await profileApi.verifyAadhaarOtp(aadhaarOtp);
-      Alert.alert('Verified!', res.data.message || 'Your Aadhaar has been verified.');
-      setAadhaarModalVisible(false);
-      setAadhaarOtpSent(false);
-      setAadhaarOtp('');
-      fetchProfile(); // Refresh profile to get updated verification status
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Verification failed.');
-    } finally {
-      setAadhaarLoading(false);
-    }
-  };
+  async function logout() {
+    await clearSession();
+    router.replace('/(auth)/login');
+  }
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#47e8ff" />
-      </View>
+      <Screen>
+        <View style={styles.center}><ActivityIndicator color={colors.blue} /></View>
+      </Screen>
     );
   }
 
-  const username = profile?.username || profile?.user?.username || 'User';
-  const fullName = profile?.full_name || username;
-  const bio = profile?.bio || '';
-  const isVerified = profile?.gov_id_verified ?? false;
-  const profilePicUrl = profile?.profile_picture_url || '';
-  const followersCount = profile?.followers_count ?? 0;
-  const followingCount = profile?.following_count ?? 0;
-  const vibesCount = myEvents.length;
+  const username = profile?.username || profile?.user?.username || 'happnix_user';
+  const name = profile?.full_name || profile?.fullName || username;
+  const verified = Boolean(profile?.gov_id_verified || profile?.verified);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['rgba(76, 29, 149, 0.8)', 'rgba(112, 26, 117, 0.8)', 'rgba(7, 11, 23, 0.8)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.banner}
+    <Screen>
+      <SafeAreaView style={{ flex: 1 }}>
+        <BrandHeader
+          title="Profile"
+          subtitle={`@${username}`}
+          right={
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
+              <Bell color={colors.text} size={19} />
+            </TouchableOpacity>
+          }
         />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Glass style={styles.profileCard}>
+            <View style={styles.banner} />
+            <View style={styles.profileBody}>
+              <View style={styles.avatarRow}>
+                <Avatar name={name} uri={profile?.profile_picture_url} size={88} />
+                <GhostButton label="Edit Profile" icon={<Edit3 color={colors.text} size={15} />} onPress={() => setEditOpen(true)} />
+              </View>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{name}</Text>
+                {verified ? <BadgeCheck color={colors.blue} size={21} /> : null}
+              </View>
+              <Text style={styles.handle}>@{username}</Text>
+              <Text style={styles.bio}>{profile?.bio || 'Add a bio to tell people what kind of nights you love.'}</Text>
 
-        <View style={styles.profileSection}>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatarContainer}>
-              {profilePicUrl ? (
-                <Image source={{ uri: profilePicUrl }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarText}>{username.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
+              <View style={styles.stats}>
+                <Stat label="Vibes" value={events.length} />
+                <Stat label="Fans" value={profile?.followers_count ?? 0} />
+                <Stat label="Following" value={profile?.following_count ?? 0} />
+              </View>
             </View>
-            <TouchableOpacity style={styles.editBtn} onPress={() => setEditModalVisible(true)}>
-              <Edit3 color="#f8f9ff" size={14} style={{ marginRight: 6 }} />
-              <Text style={styles.editBtnText}>Edit Profile</Text>
-            </TouchableOpacity>
-          </View>
+          </Glass>
 
-          <View style={styles.userInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.displayName}>{fullName || username}</Text>
-              {isVerified && (
-                <View style={styles.verifiedBadge}>
-                  <BadgeCheck color="#000" size={14} strokeWidth={3} />
-                </View>
-              )}
-            </View>
-            <Text style={styles.handle}>@{username}</Text>
-            {bio ? <Text style={styles.bio}>{bio}</Text> : null}
-          </View>
+          {!verified ? (
+            <Glass style={styles.verifyCard}>
+              <ShieldCheck color={colors.blue} size={24} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.verifyTitle}>Verify your identity</Text>
+                <Text style={styles.verifyBody}>Aadhaar verification unlocks hosting trust signals.</Text>
+              </View>
+              <GhostButton label="Verify" />
+            </Glass>
+          ) : null}
 
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNum}>{vibesCount}</Text>
-              <Text style={styles.statLabel}>VIBES</Text>
-            </View>
-            <TouchableOpacity 
-               style={[styles.statBox, styles.statBorder]} 
-               onPress={() => openConnections('fans')}
-               activeOpacity={0.7}
-            >
-              <Text style={styles.statNum}>{followersCount}</Text>
-              <Text style={styles.statLabel}>FANS</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-               style={styles.statBox}
-               onPress={() => openConnections('following')}
-               activeOpacity={0.7}
-            >
-              <Text style={styles.statNum}>{followingCount}</Text>
-              <Text style={styles.statLabel}>FOLLOWING</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Aadhaar Verification Section */}
-          {!isVerified && (
-            <TouchableOpacity
-              style={styles.verifySection}
-              onPress={() => setAadhaarModalVisible(true)}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['rgba(34, 211, 238, 0.1)', 'rgba(217, 70, 239, 0.1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.verifySectionInner}
-              >
-                <Shield color="#22d3ee" size={24} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.verifyTitle}>Get Verified</Text>
-                  <Text style={styles.verifyDesc}>Verify your Aadhaar to host events</Text>
-                </View>
-                <Text style={styles.verifyArrow}>→</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Account Settings */}
-          <View style={styles.settingsGroup}>
-            <Text style={styles.settingsHeader}>ACCOUNT SETTINGS</Text>
-            
+          <Glass style={styles.settingCard}>
             <View style={styles.settingRow}>
-              <View style={styles.settingIconWrap}>
-                 <Lock color="#f8f9ff" size={20} />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}><Lock color={colors.text} size={16} /> Private account</Text>
+                <Text style={styles.settingBody}>Only approved fans can view your profile activity.</Text>
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Private Account</Text>
-                <Text style={styles.settingDesc}>Only approved fans can view your content</Text>
-              </View>
-              <Switch
-                value={isPrivate}
-                onValueChange={togglePrivacy}
-                trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(217, 70, 239, 0.5)' }}
-                thumbColor={isPrivate ? '#d946ef' : '#94a3b8'}
-              />
+              <Switch value={isPrivate} onValueChange={togglePrivate} thumbColor={isPrivate ? colors.pink : '#d1d5db'} trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(255,79,216,0.42)' }} />
             </View>
+          </Glass>
 
-            {isPrivate && (
-              <TouchableOpacity style={styles.navRow} activeOpacity={0.7} onPress={() => router.push('/requests')}>
-                <Text style={styles.navTitle}>Follow Requests</Text>
-                <View style={styles.navRight}>
-                  {pendingRequests > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{pendingRequests}</Text>
-                    </View>
-                  )}
-                  <ChevronRight color="#64748b" size={20} />
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* MY EVENTS (Grid) #25 */}
-          {myEvents.length > 0 && (
-            <View style={styles.settingsGroup}>
-              <Text style={styles.settingsHeader}>MY EVENTS</Text>
-              <View style={styles.eventsGrid}>
-                {myEvents.map((event) => (
-                  <TouchableOpacity
-                    key={event.id}
-                    style={styles.gridItem}
-                    activeOpacity={0.8}
-                    onPress={() => router.push({ pathname: '/event-detail', params: eventToParams(event) })}
-                  >
-                    {event.imageUrl ? (
-                      <Image source={{ uri: event.imageUrl }} style={styles.gridImage} />
-                    ) : (
-                      <LinearGradient colors={['#7c3aed', '#c026d3']} style={styles.gridImage}>
-                        <Text style={styles.gridPlaceholder}>{(event.title || 'E').charAt(0)}</Text>
-                      </LinearGradient>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+          <Text style={styles.section}>Vibes</Text>
+          {events.length ? (
+            <View style={styles.grid}>
+              {events.slice(0, 9).map((event) => (
+                <TouchableOpacity key={event.id} style={styles.gridItem}>
+                  <EventArt uri={event.imageUrl} title={event.title || 'Event'} height={112} />
+                </TouchableOpacity>
+              ))}
             </View>
+          ) : (
+            <EmptyState title="No vibes yet" body="Hosted events and your Happnix moments will collect here." />
           )}
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.logout} onPress={logout}>
+            <LogOut color={colors.danger} size={17} />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      {/* Edit Profile Modal (#26: with avatar editing) */}
-      <Modal visible={editModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <X color="#94a3b8" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Avatar Picker */}
-            <TouchableOpacity
-              style={styles.avatarPickerWrap}
-              onPress={async () => {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                  allowsEditing: true,
-                  aspect: [1, 1],
-                  quality: 0.8,
-                });
-                if (!result.canceled && result.assets?.[0]?.uri) {
-                  try {
-                    await authApi.completeProfile({ profilePictureUrl: result.assets[0].uri });
-                    setProfile((prev: any) => ({ ...prev, profile_picture_url: result.assets[0].uri }));
-                    Alert.alert('Updated', 'Profile picture updated!');
-                  } catch (e) {
-                    Alert.alert('Error', 'Failed to update profile picture.');
-                  }
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.avatarPickerCircle}>
-                {profilePicUrl ? (
-                  <Image source={{ uri: profilePicUrl }} style={styles.avatarPickerImg} />
-                ) : (
-                  <Text style={styles.avatarText}>{username.charAt(0).toUpperCase()}</Text>
-                )}
-                <View style={styles.cameraBadge}>
-                  <Camera color="#fff" size={14} />
-                </View>
+        <Modal transparent visible={editOpen} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <Glass style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <TouchableOpacity onPress={() => setEditOpen(false)}><X color={colors.muted} size={22} /></TouchableOpacity>
               </View>
-              <Text style={styles.avatarPickerLabel}>Change Photo</Text>
-            </TouchableOpacity>
-
-            <View style={styles.modalField}>
-              <Text style={styles.modalLabel}>Bio</Text>
+              <Text style={styles.label}>Bio</Text>
               <TextInput
-                style={[styles.modalInput, styles.modalTextArea]}
-                value={editBio}
-                onChangeText={setEditBio}
-                multiline
+                value={bio}
+                onChangeText={setBio}
                 placeholder="Describe your vibe..."
-                placeholderTextColor="#64748b"
+                placeholderTextColor={colors.faint}
+                multiline
+                style={styles.input}
               />
-            </View>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={savingProfile} activeOpacity={0.8}>
-              <LinearGradient colors={['#7c3aed', '#d946ef']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.modalBtn}>
-                {savingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Save Changes</Text>}
-              </LinearGradient>
-            </TouchableOpacity>
+              <GradientButton label="Save Changes" onPress={saveProfile} />
+            </Glass>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </SafeAreaView>
+    </Screen>
+  );
+}
 
-      {/* Aadhaar Verification Modal */}
-      <Modal visible={aadhaarModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Aadhaar Verification</Text>
-              <TouchableOpacity onPress={() => { setAadhaarModalVisible(false); setAadhaarOtpSent(false); }}>
-                <X color="#94a3b8" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            {!aadhaarOtpSent ? (
-              <>
-                <View style={styles.modalField}>
-                  <Text style={styles.modalLabel}>12-Digit Aadhaar Number</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={aadhaarNumber}
-                    onChangeText={setAadhaarNumber}
-                    keyboardType="number-pad"
-                    maxLength={12}
-                    placeholder="Enter Aadhaar number"
-                    placeholderTextColor="#64748b"
-                  />
-                </View>
-                <TouchableOpacity onPress={handleSendAadhaarOtp} disabled={aadhaarLoading} activeOpacity={0.8}>
-                  <LinearGradient colors={['#22d3ee', '#0891b2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.modalBtn}>
-                    {aadhaarLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Send OTP</Text>}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.aadhaarSentText}>OTP sent to mobile linked with Aadhaar ending in {aadhaarNumber.slice(-4)}</Text>
-                <View style={styles.modalField}>
-                  <Text style={styles.modalLabel}>Enter OTP</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={aadhaarOtp}
-                    onChangeText={setAadhaarOtp}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    placeholder="6-digit OTP"
-                    placeholderTextColor="#64748b"
-                  />
-                </View>
-                <TouchableOpacity onPress={handleVerifyAadhaar} disabled={aadhaarLoading} activeOpacity={0.8}>
-                  <LinearGradient colors={['#4ade80', '#16a34a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.modalBtn}>
-                    {aadhaarLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalBtnText}>Verify</Text>}
-                  </LinearGradient>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Connections Modal */}
-      <Modal visible={connectionsModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: 24, height: '70%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{connectionType === 'fans' ? 'Fans' : 'Following'}</Text>
-              <TouchableOpacity onPress={() => setConnectionsModalVisible(false)}>
-                <X color="#94a3b8" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={{ gap: 16 }} showsVerticalScrollIndicator={false}>
-              {connectionsLoading ? (
-                <ActivityIndicator size="large" color="#47e8ff" style={{ marginTop: 40 }} />
-              ) : connectionsList.length === 0 ? (
-                <Text style={{ fontFamily: 'Sora_400Regular', color: '#94a3b8', textAlign: 'center', marginTop: 40 }}>
-                  {connectionType === 'fans' ? 'No fans yet' : 'Not following anyone yet'}
-                </Text>
-              ) : (
-                connectionsList.map((user: any) => (
-                  <View key={user.sql_user_id || user.username} style={styles.connectionCard}>
-                    {user.profile_picture_url ? (
-                      <Image source={{ uri: user.profile_picture_url }} style={styles.connectionAvatar} />
-                    ) : (
-                      <View style={[styles.connectionAvatar, { backgroundColor: '#7c3aed', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Text style={{ fontFamily: 'Syne_800ExtraBold', color: '#fff', fontSize: 16 }}>
-                          {(user.username || 'U').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.connectionUsername}>{user.username}</Text>
-                      <Text style={styles.connectionName}>{user.full_name || ''}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.connectionActionBtn}>
-                      <Text style={styles.connectionActionTxt}>{connectionType === 'fans' ? 'Remove' : 'Unfollow'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#070b17' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#070b17' },
-  container: { flexGrow: 1, backgroundColor: '#070b17', paddingBottom: 120 },
-
-  banner: { width: '100%', height: 160 },
-
-  profileSection: { paddingHorizontal: 24 },
-
-  avatarRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: -40, marginBottom: 16 },
-  avatarContainer: { width: 100, height: 100, borderRadius: 20, backgroundColor: '#000', padding: 4 },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 16, resizeMode: 'cover' },
-  avatarPlaceholder: { width: '100%', height: '100%', borderRadius: 16, backgroundColor: '#111730', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontFamily: 'Syne_800ExtraBold', fontSize: 40, color: '#f8f9ff' },
-
-  editBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  editBtnText: { fontFamily: 'Sora_700Bold', color: '#f8f9ff', fontSize: 13 },
-
-  userInfo: { marginBottom: 24 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  displayName: { fontFamily: 'Syne_800ExtraBold', fontSize: 24, color: '#f8f9ff' },
-  verifiedBadge: { backgroundColor: '#47e8ff', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
-  handle: { fontFamily: 'Sora_600SemiBold', fontSize: 15, color: '#94a3b8', marginTop: 4 },
-  bio: { fontFamily: 'Sora_400Regular', fontSize: 15, color: '#94a3b8', marginTop: 12, lineHeight: 22 },
-
-  statsRow: { flexDirection: 'row', paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', marginBottom: 24 },
-  statBox: { flex: 1, alignItems: 'flex-start' },
-  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', paddingHorizontal: 16 },
-  statNum: { fontFamily: 'Outfit_900Black', fontSize: 20, color: '#f8f9ff' },
-  statLabel: { fontFamily: 'Outfit_800ExtraBold', fontSize: 11, color: '#64748b', letterSpacing: 1, marginTop: 4 },
-
-  verifySection: { marginBottom: 16 },
-  verifySectionInner: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(34, 211, 238, 0.2)',
-  },
-  verifyTitle: { fontFamily: 'Sora_700Bold', color: '#f8f9ff', fontSize: 14 },
-  verifyDesc: { fontFamily: 'Sora_400Regular', color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  verifyArrow: { fontFamily: 'Outfit_900Black', color: '#22d3ee', fontSize: 20 },
-
-  settingsGroup: { marginBottom: 24 },
-  settingsHeader: { fontFamily: 'Outfit_800ExtraBold', color: '#64748b', fontSize: 11, letterSpacing: 1, marginBottom: 16 },
-  settingRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.3)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  settingIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  settingInfo: { flex: 1 },
-  settingTitle: { fontFamily: 'Sora_600SemiBold', color: '#f8f9ff', fontSize: 15 },
-  settingDesc: { fontFamily: 'Sora_400Regular', color: '#94a3b8', fontSize: 12, marginTop: 4 },
-  
-  navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.3)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginTop: 8 },
-  navTitle: { fontFamily: 'Sora_600SemiBold', color: '#f8f9ff', fontSize: 15 },
-  navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: { backgroundColor: '#ef4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
-  badgeText: { fontFamily: 'Outfit_800ExtraBold', color: '#fff', fontSize: 10 },
-
-  logoutBtn: { width: '100%', paddingVertical: 14, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center' },
-  logoutText: { fontFamily: 'Sora_700Bold', color: '#fca5a5', fontSize: 16 },
-
-  // Modal styles
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#0f172a',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontFamily: 'Syne_800ExtraBold', fontSize: 20, color: '#f8f9ff' },
-  modalField: { marginBottom: 16 },
-  modalLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 13, color: '#f8f9ff', marginBottom: 6 },
-  modalInput: {
-    borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 12,
-    padding: 14, fontSize: 15, backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    color: '#f8fafc', fontFamily: 'Sora_400Regular',
-  },
-  modalTextArea: { height: 100, textAlignVertical: 'top' },
-  modalBtn: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  modalBtnText: { fontFamily: 'Sora_700Bold', color: '#fff', fontSize: 16 },
-  aadhaarSentText: { fontFamily: 'Sora_400Regular', color: '#22d3ee', fontSize: 14, marginBottom: 16, lineHeight: 22 },
-
-  connectionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.4)', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  connectionAvatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12 },
-  connectionUsername: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#fff' },
-  connectionName: { fontFamily: 'Sora_400Regular', fontSize: 12, color: '#94a3b8' },
-  connectionActionBtn: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
-  connectionActionTxt: { fontFamily: 'Sora_600SemiBold', fontSize: 12, color: '#f8f9ff' },
-
-  myEventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.4)', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 8 },
-  myEventImage: { width: 50, height: 50, borderRadius: 12, marginRight: 12 },
-  myEventPrice: { fontFamily: 'Sora_700Bold', fontSize: 12, color: '#d946ef' },
-
-  // #25: Events Grid
-  eventsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  gridItem: { width: GRID_SIZE, height: GRID_SIZE, borderRadius: 8, overflow: 'hidden' },
-  gridImage: { width: '100%', height: '100%', resizeMode: 'cover', justifyContent: 'center', alignItems: 'center' },
-  gridPlaceholder: { fontFamily: 'Syne_800ExtraBold', fontSize: 24, color: 'rgba(255,255,255,0.3)' },
-
-  // #26: Avatar Picker
-  avatarPickerWrap: { alignItems: 'center', marginBottom: 20 },
-  avatarPickerCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#111730', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 8 },
-  avatarPickerImg: { width: 80, height: 80, borderRadius: 40 },
-  cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#7c3aed', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#0f172a' },
-  avatarPickerLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 12, color: '#47e8ff' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 16, paddingBottom: 120 },
+  iconBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  profileCard: { marginBottom: 16 },
+  banner: { height: 118, backgroundColor: 'rgba(255,79,216,0.22)' },
+  profileBody: { padding: 16, marginTop: -48 },
+  avatarRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  name: { fontFamily: fonts.black, color: colors.text, fontSize: 25 },
+  handle: { fontFamily: fonts.semibold, color: colors.faint, fontSize: 14, marginTop: 2 },
+  bio: { fontFamily: fonts.regular, color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: 20, marginTop: 12 },
+  stats: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row' },
+  stat: { flex: 1 },
+  statValue: { fontFamily: fonts.black, color: colors.text, fontSize: 21 },
+  statLabel: { fontFamily: fonts.black, color: colors.faint, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 },
+  verifyCard: { padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  verifyTitle: { fontFamily: fonts.black, color: colors.text, fontSize: 14 },
+  verifyBody: { fontFamily: fonts.regular, color: colors.muted, fontSize: 12, marginTop: 2 },
+  settingCard: { padding: 14, marginBottom: 18 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingText: { flex: 1 },
+  settingTitle: { fontFamily: fonts.black, color: colors.text, fontSize: 14 },
+  settingBody: { fontFamily: fonts.regular, color: colors.muted, fontSize: 12, marginTop: 4, lineHeight: 17 },
+  section: { fontFamily: fonts.black, color: colors.faint, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  gridItem: { width: '31.9%', borderRadius: 12, overflow: 'hidden' },
+  logout: { marginTop: 20, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 15 },
+  logoutText: { fontFamily: fonts.black, color: colors.danger, fontSize: 15 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.58)', padding: 16 },
+  modalCard: { padding: 16, gap: 13, marginBottom: 10 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { fontFamily: fonts.black, color: colors.text, fontSize: 20 },
+  label: { fontFamily: fonts.black, color: colors.faint, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
+  input: { minHeight: 110, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: 'rgba(255,255,255,0.07)', padding: 14, color: colors.text, fontFamily: fonts.regular, textAlignVertical: 'top' },
 });
