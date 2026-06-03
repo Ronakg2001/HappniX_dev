@@ -37,6 +37,7 @@ Parameters:
     Default: "5432"
   AuthDbName:
     Type: String
+    Default: "happnix_in_dev"
   AuthDbUser:
     Type: String
   AuthDbPassword:
@@ -132,7 +133,7 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 10
-    MemorySize: 128 # ← Free tier: 128MB is cheapest
+    MemorySize: 256 # ← Free tier: 256MB is safe for psycopg2 SSL networking
     Environment:
       Variables:
         APP_ENVIRONMENT:
@@ -254,10 +255,6 @@ Resources:
           Required: false
           Mutable: true
       LambdaConfig:
-        PostConfirmation:
-          Fn::GetAtt:
-            - CognitoPostConfirmation
-            - Arn
         PreTokenGenerationConfig:
           LambdaArn:
             Fn::GetAtt:
@@ -340,19 +337,34 @@ Resources:
             Path: /auth
             Method: POST
 
-  CognitoPostConfirmation:
+  DevOnly:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../../backend/
-      Handler: handlers.CognitoPostConfirmation.lambda_handler
-      Description: Sync confirmed Cognito users into HappniX PostgreSQL.
+      Handler: handlers.dev_only.lambda_handler
+      Description: HappniX dev-only utilities (wipe users, get auth config).
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
-      Environment:
-        Variables:
-          COGNITO_USER_POOL_ID: ""
-          COGNITO_USER_POOL_CLIENT_ID: ""
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:ListUsers
+                - cognito-idp:AdminDeleteUser
+              Resource:
+                Fn::GetAtt:
+                  - HappnixUserPool
+                  - Arn
+      Events:
+        DevAction:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HappnixDevApi
+            Path: /api/dev_only
+            Method: POST
 
   CognitoPreToken:
     Type: AWS::Serverless::Function
@@ -371,29 +383,17 @@ Resources:
   AuthSchemaInit:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub HappniX-${EnvironmentName}-AuthSchemaInit
       CodeUri: ../../backend/
       Handler: handlers.AuthSchemaInit.lambda_handler
-      Description: Initialize HappniX auth schema in PostgreSQL during deploy.
+      Description: Initialize HappniX auth schema in PostgreSQL. Invoke manually or via CI/CD.
       Timeout: 60
+      MemorySize: 256
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
 
   # ── Cognito Invoke Permissions ─────────────────────────────────────
-  CognitoPostConfirmationInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName:
-        Ref: CognitoPostConfirmation
-      Principal: cognito-idp.amazonaws.com
-      SourceAccount:
-        Ref: AWS::AccountId
-      SourceArn:
-        Fn::GetAtt:
-          - HappnixUserPool
-          - Arn
-
   CognitoPreTokenInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -408,16 +408,8 @@ Resources:
           - HappnixUserPool
           - Arn
 
-  # ── Schema Initializer ─────────────────────────────────────────────
-  HappnixAuthSchemaInitializer:
-    Type: AWS::CloudFormation::CustomResource
-    Properties:
-      ServiceToken:
-        Fn::GetAtt:
-          - AuthSchemaInit
-          - Arn
-      SchemaVersion: "2026-04-29-clean-arch-v1"
-
+  # The schema is applied automatically via the `aws lambda invoke` command 
+  # in the deploy_app.yml GitHub Actions pipeline, bypassing VPC S3 routing issues!
   # ══════════════════════════════════════════════════════════════════════
   # Feature Lambdas — each toggled independently.
   # Set EnableEventsApi=true (etc.) when you've written the handler.
@@ -452,6 +444,7 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+                - cognito-idp:GlobalSignOut # Logout action
               Resource: "*"
       Events:
         HomeFeed:
@@ -483,6 +476,13 @@ Resources:
           Properties:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/tickets/book
+            Method: POST
+        HomeLogout:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/home/logout
+            Method: POST
             Method: POST
         UpdateTicketForHome:
           Type: Api
@@ -526,12 +526,7 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/guest-invites/{token}/{action}
             Method: POST
-        MyProfile:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/profile/me
-            Method: GET
+
         UpdateProfile:
           Type: Api
           Properties:
@@ -843,6 +838,12 @@ Resources:
                   - HappnixUserPool
                   - Arn
       Events:
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/me
+            Method: GET
         GetProfile:
           Type: Api
           Properties:

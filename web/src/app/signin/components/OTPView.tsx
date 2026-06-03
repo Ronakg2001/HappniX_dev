@@ -7,7 +7,7 @@ import { Field } from "@/components/ui/field";
 import { GhostBtn, PrimaryBtn } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 
-export default function OtpStep({ mobile, onVerified, onBack }: { mobile: string; onVerified: (result: Record<string, unknown>) => void; onBack: () => void }) {
+export default function OtpStep({ mobile, region, dialCode, onVerified, onBack }: { mobile: string; region: string; dialCode: string; onVerified: (result: Record<string, unknown>, mobile: string, region: string, dialCode: string) => void; onBack: () => void }) {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -21,7 +21,7 @@ export default function OtpStep({ mobile, onVerified, onBack }: { mobile: string
     try {
       const result = await apiClient.post<any, any>("/api/auth", { actionItem: "VerifyMobileOtp", mobile, otp });
       setSuccess("Mobile verified!");
-      onVerified(result);
+      onVerified(result, mobile, region, dialCode);
     } catch (err) { setError((err as Error).message); }
     finally { setLoading(false); }
   }

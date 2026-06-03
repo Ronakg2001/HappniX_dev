@@ -18,39 +18,78 @@ Session model:
     No JWT / Cognito access token is used during signup or login initiation.
 """
 
+import re
 from utils.Response import success_response, error_response
 from utils import utilities as util
+from utils import dependencies
+from utils import uuid_generator as uuid_gen
 from integration import cognito_auth as cognito
+from integration import rds
 from services import preauth_session_service as preauth
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION HANDLERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+def check_username(**kwargs):
+    """
+    Checks if a username is available.
+    Does not require a preauth session.
+    """
+    username = str(kwargs.get("username", "")).strip()
+
+    if not username:
+        return success_response({"success": True, "available": False, "message": "Username is required."})
+
+    if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
+        return success_response({"success": True, "available": False, "message": "Invalid username format."})
+
+    cognito_exists = cognito.user_exists("username", username)
+    rds_exists = rds.record_exists("userName", username)
+    
+    user_exists = cognito_exists or rds_exists
+    
+    return success_response({
+        "success": True,
+        "available": not user_exists
+    })
+
+
+def get_country_codes(**kwargs):
+    """
+    Returns the region_code_mapping from dependencies.py to the frontend.
+    Used to populate the country-code dropdown on the /signin page.
+
+    No preauth session required — this is publicly accessible static data.
+    """
+    return success_response({
+        "success": True,
+        "countries": dependencies.region_code_mapping,
+    })
+
+
 def send_mobile_otp(**kwargs):
     """
     Step 1 of the auth flow.
     Generates an OTP for the given mobile number and stores it in a new
     (or existing) preauth session.
-
-    Frontend sends:  { "actionItem": "SendMobileOtp", "mobile": "9876543210" }
-    Backend returns: { "success": true, "message": "...", "preAuthToken": "..." }
-    In dev/qa with TEST_OTP_MODE=true also returns: { "debugOtp": "123456" }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
+    region = str(kwargs.get("region", "IN")).strip().upper()
     token = kwargs.get("_preauth_token")
     session = kwargs.get("_preauth_session", {})
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
-    otp = util.generate_otp()
+    otp = uuid_gen.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
     session["last_mobile"] = mobile
+    session["region"] = region          # store for SMS gateway routing later
     preauth.save_session(token, session)
 
     # TODO: integrate SMS gateway here (e.g. Twilio, AWS SNS)
-    util.log("info", "send_mobile_otp", "OTP generated", mobile=mobile)
+    util.log("info", "send_mobile_otp", "OTP generated", mobile=mobile, region=region)
 
     body = {
         "success": True,
@@ -66,18 +105,15 @@ def resend_mobile_otp(**kwargs):
     """
     Resends OTP to the same mobile number.
     Requires a valid preauth token (set by SendMobileOtp).
-
-    Frontend sends:  { "actionItem": "ResendMobileOtp", "mobile": "9876543210" }
-    Backend returns: { "success": true, "message": "...", "preAuthToken": "..." }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
     token = kwargs.get("_preauth_token")
     session = kwargs.get("_preauth_session", {})
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
-    otp = util.generate_otp()
+    otp = uuid_gen.generate_otp()
     session.setdefault("otp_map", {})[mobile] = otp
     preauth.save_session(token, session)
 
@@ -99,15 +135,6 @@ def verify_mobile_otp(**kwargs):
     Step 2 of the auth flow.
     Validates the OTP. On success, checks Cognito to determine whether the
     mobile number belongs to an existing user or a new one.
-
-    Frontend sends:  { "actionItem": "VerifyMobileOtp",
-                       "mobile": "9876543210", "otp": "123456" }
-    Backend returns (existing user):
-        { "success": true, "userStatus": "existing",
-          "message": "...", "preAuthToken": "..." }
-    Backend returns (new user):
-        { "success": true, "userStatus": "new",
-          "message": "...", "preAuthToken": "..." }
     """
     mobile = str(kwargs.get("mobile", "")).strip()
     otp = str(kwargs.get("otp", "")).strip()
@@ -118,7 +145,7 @@ def verify_mobile_otp(**kwargs):
         return error_response("Mobile number and OTP are required.")
 
     if not util.is_valid_mobile(mobile):
-        return error_response("Please enter a valid 10-digit mobile number.")
+        return error_response("Please enter a valid mobile number with country code.")
 
     # ── OTP verification ───────────────────────────────────────────────────────
     saved_otp = session.get("otp_map", {}).get(mobile)
@@ -144,9 +171,17 @@ def verify_mobile_otp(**kwargs):
     # ── Clear used OTP ─────────────────────────────────────────────────────────
     session.get("otp_map", {}).pop(mobile, None)
 
-    # ── Check if user already exists in Cognito ────────────────────────────────
+    # ── Check if user already exists in Cognito and RDS ────────────────────────────────
     phone_e164 = util.format_phone_in(mobile)
-    user_exists = cognito.user_exists_by_phone(phone_e164)
+    from integration import rds
+    
+    # We check Cognito first as the primary identity store
+    cognito_exists = cognito.user_exists("phone_number", phone_e164)
+    
+    # We also check RDS, and require both to be true
+    rds_exists = rds.record_exists("phoneNumber", phone_e164)
+    
+    user_exists = cognito_exists and rds_exists
 
     if user_exists:
         # Existing user — clear session, tell frontend to proceed to login
@@ -173,22 +208,6 @@ def register_user_details(**kwargs):
     """
     Step 3 of the signup flow (new users only).
     Registers the user in Cognito and saves their details.
-
-    Requires a valid preauth session with otp_verified=True.
-
-    Frontend sends:
-        {
-            "actionItem": "RegisterUserDetails",
-            "username":  "john_doe",
-            "fullName":  "John Doe",
-            "dateOfBirth": "2000-01-15",
-            "gender":    "Male",
-            "email":     "john@example.com",
-            "password":  "Secret@123"
-        }
-
-    Backend returns:
-        { "success": true, "message": "Account created. Please sign in." }
     """
     token = kwargs.get("_preauth_token")
     session = kwargs.get("_preauth_session", {})
@@ -214,17 +233,14 @@ def register_user_details(**kwargs):
     gender = str(kwargs.get("gender", "")).strip()
     email = str(kwargs.get("email", "")).strip().lower()
     password = str(kwargs.get("password", "")).strip()
+    mobile = str(kwargs.get("mobile", "")).strip()
+    region = str(kwargs.get("region", "")).strip().upper()
 
-    if not all([username, full_name, dob, gender, email, password]):
+    if not all([username, full_name, dob, gender, email, password, mobile, region]):
         return error_response("All fields are required.")
 
-    if len(username) < 3 or len(username) > 30:
-        return error_response("Username must be between 3 and 30 characters.")
-
-    if not username.replace("_", "").replace(".", "").isalnum():
-        return error_response(
-            "Username can only contain letters, numbers, underscores, and dots."
-        )
+    if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
+        return error_response("Invalid username format.")
 
     if len(full_name) < 3:
         return error_response("Please enter a valid full name.")
@@ -241,27 +257,79 @@ def register_user_details(**kwargs):
             "special character, and be at least 8 characters long."
         )
 
+    # ── Verify uniqueness in RDS before creating in Cognito ────────────────────
+    if rds.record_exists("userName", username):
+        return error_response("Username is already taken.")
+        
+    if rds.record_exists("emailAddress", email):
+        return error_response("Email address is already registered.")
+
     # ── Create user in Cognito ─────────────────────────────────────────────────
-    phone_e164 = util.format_phone_in(verified_mobile)
-    cognito_sub = cognito.create_user(
+    phone_e164 = util.format_phone_in(mobile)
+    region = region if region else session.get("region", "IN") or "IN"
+
+    # Generate the UUIDv7 userID — entity=USER/GENERAL by default, embeds region & timestamp
+    user_id = uuid_gen.generate_user_id(region_iso=region, user_type="GENERAL")
+
+    try:
+        cognito_sub = cognito.create_user(
+            username=username,
+            email=email,
+            phone_e164=phone_e164,
+            password=password,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        exc_name = exc.__class__.__name__
+        util.log("error", "register_user_details",
+                 f"Cognito create_user raised {exc_name}: {exc}",
+                 username=username, user_id=user_id)
+
+        if exc_name == "UsernameExistsException":
+            return error_response("Username is already taken.", 409)
+        if exc_name == "InvalidPasswordException":
+            return error_response("Password does not meet Cognito requirements.", 400)
+        if exc_name == "InvalidParameterException":
+            return error_response(f"Invalid parameter: {exc}", 400)
+
+        # Catch-all — log full error and surface it so it is traceable
+        return error_response(
+            f"Could not create your account. Reason: {exc_name} — {exc}", 500
+        )
+
+    util.log("info", "register_user_details", "Cognito user created",
+        username=username, user_id=user_id, cognito_sub=cognito_sub)
+
+    # ── Insert user directly into RDS ──────────────────────────────────────────
+    rds_result = rds.insert_user(
+        user_id=user_id,
+        cognito_sub=cognito_sub,
         username=username,
         email=email,
-        phone_e164=phone_e164,
+        phone_number=phone_e164,
         full_name=full_name,
         dob=dob,
         gender=gender,
-        password=password,
+        region=region,
+        email_verified=True,
     )
 
-    if not cognito_sub:
+    if not rds_result.get("success"):
+        # RDS failed — roll back by deleting the Cognito user to keep stores in sync
+        util.log("error", "register_user_details",
+                 f"RDS insert failed after Cognito success — rolling back Cognito user. Error: {rds_result.get('error')}",
+                 username=username, user_id=user_id)
+        try:
+            cognito.delete_user(username)
+        except Exception as del_exc:
+            util.log("error", "register_user_details",
+                     f"Cognito rollback also failed: {del_exc}", username=username)
         return error_response(
-            "Could not create your account. "
-            "The username or email may already be in use.",
-            500
+            "Account creation failed at database step. Please try again.", 500
         )
 
-    util.log("info", "register_user_details", "New user created",
-        username=username, cognito_sub=cognito_sub)
+    util.log("info", "register_user_details", "User inserted into RDS successfully",
+        username=username, user_id=user_id)
 
     # ── Cleanup preauth session — no longer needed ─────────────────────────────
     preauth.delete_session(token)
@@ -277,9 +345,6 @@ def login_with_password(**kwargs):
     """
     Authenticates a user via Cognito using their username/email/phone and password.
     Returns the real JWT access token. Does not require a preauth session.
-
-    Frontend sends:
-        { "actionItem": "LoginWithPassword", "identifier": "...", "password": "..." }
     """
     identifier = str(kwargs.get("identifier", "")).strip()
     password = str(kwargs.get("password", "")).strip()
@@ -325,6 +390,8 @@ def login_with_password(**kwargs):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ACTION_HANDLERS = {
+    "CheckUsername":        check_username,
+    "GetCountryCodes":      get_country_codes,
     "SendMobileOtp":        send_mobile_otp,
     "ResendMobileOtp":      resend_mobile_otp,
     "VerifyMobileOtp":      verify_mobile_otp,
@@ -373,8 +440,8 @@ def lambda_handler(event, context):
         if action_item == "SendMobileOtp":
             # Always create / retrieve a session — no prior token required
             token, session = preauth.get_or_create_session(incoming_token)
-        elif action_item == "LoginWithPassword":
-            # Login does not use preauth session at all
+        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername"}:
+            # These actions do not use a preauth session
             pass
         else:
             # All other actions need an existing valid session

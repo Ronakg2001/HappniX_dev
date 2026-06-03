@@ -1,0 +1,21 @@
+name: Publish Expo Go Preview Update
+
+on:
+  push:
+    branches: ['dev']
+    paths:
+      - mobile_frontend/**
+
+jobs:
+  publish_android_update:
+    name: Publish Android Preview Update
+    type: update
+    params:
+      branch: dev
+      platform: android
+  publish_ios_update:
+    name: Publish iOS Preview Update
+    type: update
+    params:
+      branch: dev
+      platform: ios

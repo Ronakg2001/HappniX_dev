@@ -8,9 +8,7 @@ Add new helpers here as additional handlers are built.
 import json
 import os
 import re
-import uuid
-import random
-import string
+import secrets
 from datetime import datetime, timezone
 from email.utils import parseaddr
 
@@ -83,8 +81,17 @@ def is_valid_email(email: str) -> bool:
 
 
 def is_valid_mobile(mobile: str) -> bool:
-    """Return True if mobile is exactly 10 digits (Indian format, no country code)."""
-    return str(mobile or "").strip().isdigit() and len(str(mobile).strip()) == 10
+    """
+    Return True if mobile is:
+      - Exactly 10 digits (legacy Indian format, no country code), OR
+      - E.164 format: starts with '+' followed by 7–15 digits
+        (e.g. "+919876543210", "+12025551234").
+    """
+    raw = str(mobile or "").strip()
+    if raw.startswith("+"):
+        digits_only = raw[1:]
+        return digits_only.isdigit() and 7 <= len(digits_only) <= 15
+    return raw.isdigit() and len(raw) == 10
 
 
 def is_strong_password(password: str) -> bool:
@@ -126,15 +133,7 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def new_user_id(length: int = 8) -> str:
-    """Return a random 8-char uppercase alphanumeric user ID (e.g. 'AB3X9KZ1')."""
-    alphabet = string.ascii_uppercase + string.digits
-    return "".join(random.choice(alphabet) for _ in range(length))
 
-
-def generate_otp(digits: int = 6) -> str:
-    """Return a zero-padded random numeric OTP string of `digits` length."""
-    return "".join(str(random.randint(0, 9)) for _ in range(digits))
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────

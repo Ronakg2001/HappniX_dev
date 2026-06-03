@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Ticket, TrendingUp, Sparkles, UserPlus, UserCheck, QrCode } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Ticket, TrendingUp, Sparkles, UserPlus, UserCheck, QrCode, LogOut } from "lucide-react";
+import { apiClient } from "@/lib/api";
 
 interface RightSidebarProps {
   onBookNow: (title: string, price: string) => void;
@@ -10,6 +12,17 @@ interface RightSidebarProps {
 export default function RightSidebar({ onBookNow }: RightSidebarProps) {
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [showQR, setShowQR] = useState<string | null>(null);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      // The interceptor in api.ts will catch this, clear localStorage, and cancel the request
+      await apiClient.post("/api/home/logout", { actionItem: "Logout" });
+    } catch (err) {
+      // Axios cancel throws an error, which is expected
+    }
+    router.push("/signin");
+  };
 
   const upcomingTickets = [
     { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" }
@@ -34,27 +47,27 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col gap-6 w-[340px] shrink-0 sticky top-20 overflow-y-auto pr-2 pb-6 scrollbar-thin">
+    <aside className="hidden xl:flex flex-col gap-6 w-[340px] shrink-0 sticky top-20 overflow-y-auto pr-2 pb-6 self-start scrollbar-thin">
       {/* Widget 1: Upcoming Tickets */}
       {upcomingTickets.length > 0 && (
         <div className="liquid-glass liquid-edge rounded-lg p-4 sm:p-5">
-          <h3 className="text-xs font-black uppercase tracking-wider text-white/50 mb-4 flex items-center gap-2">
+          <h3 className="text-xs font-black uppercase tracking-wider text-foreground/50 mb-4 flex items-center gap-2">
             <Ticket className="h-4 w-4 text-[var(--brand-1)]" />
             Upcoming Tickets
           </h3>
           {upcomingTickets.map((t) => (
-            <div key={t.id} className="relative rounded-md bg-white/10 border border-white/5 p-3 flex flex-col gap-2">
+            <div key={t.id} className="relative rounded-md bg-foreground/10 border border-border p-3 flex flex-col gap-2">
               <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="text-xs font-bold text-white leading-tight">{t.eventTitle}</h4>
-                  <p className="text-[10px] text-white/40 mt-1">{t.date} at {t.time}</p>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-foreground truncate leading-tight">{t.eventTitle}</h4>
+                  <p className="text-[10px] text-foreground/40 mt-1">{t.date} at {t.time}</p>
                   <span className="inline-block mt-2 px-2 py-0.5 rounded-md bg-[var(--brand-1)]/10 text-[var(--brand-1)] text-[9px] font-extrabold uppercase">
                     {t.seat}
                   </span>
                 </div>
                 <button 
                   onClick={() => setShowQR(showQR === t.id ? null : t.id)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 transition-all"
+                  className="p-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/80 transition-all shrink-0"
                   title="View Ticket QR"
                 >
                   <QrCode className="h-5 w-5 text-[var(--brand-3)]" />
@@ -63,7 +76,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
 
               {/* Simulated QR Code Area */}
               {showQR === t.id && (
-                <div className="flex flex-col items-center justify-center p-4 bg-white rounded-md animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center justify-center p-4 bg-white border border-border rounded-md mt-2 animate-in zoom-in-95 duration-200">
                   <div className="h-28 w-28 bg-black flex items-center justify-center font-bold text-xs text-white">
                     [ QR CODE ]
                   </div>
@@ -77,16 +90,16 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
 
       {/* Widget 2: Trending Events */}
       <div className="liquid-glass liquid-edge rounded-lg p-4 sm:p-5">
-        <h3 className="text-xs font-black uppercase tracking-wider text-white/50 mb-4 flex items-center gap-2">
+        <h3 className="text-xs font-black uppercase tracking-wider text-foreground/50 mb-4 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-[var(--brand-2)]" />
           Trending Events Nearby
         </h3>
         <div className="flex flex-col gap-3">
           {trendingEvents.map((e) => (
-            <div key={e.id} className="rounded-md bg-white/5 border border-white/5 p-3 flex items-center justify-between gap-2 hover:bg-white/10 transition-all">
+            <div key={e.id} className="rounded-md bg-foreground/5 border border-border p-3 flex items-center justify-between gap-2 hover:bg-foreground/10 transition-all">
               <div className="min-w-0">
-                <h4 className="text-xs font-bold text-white truncate leading-tight">{e.title}</h4>
-                <p className="text-[10px] text-white/40 mt-0.5 truncate">{e.location} • {e.distance}</p>
+                <h4 className="text-xs font-bold text-foreground truncate leading-tight">{e.title}</h4>
+                <p className="text-[10px] text-foreground/40 mt-0.5 truncate">{e.location} • {e.distance}</p>
                 <p className="text-xs font-extrabold text-[var(--brand-1)] mt-1.5">{e.price}</p>
               </div>
               <button 
@@ -102,7 +115,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
 
       {/* Widget 3: Suggested People */}
       <div className="liquid-glass liquid-edge rounded-lg p-4 sm:p-5">
-        <h3 className="text-xs font-black uppercase tracking-wider text-white/50 mb-4 flex items-center gap-2">
+        <h3 className="text-xs font-black uppercase tracking-wider text-foreground/50 mb-4 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--brand-4)]" />
           Suggested People
         </h3>
@@ -117,8 +130,8 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
                     {p.name[0]}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-white truncate">{p.name}</h4>
-                    <p className="text-[10px] text-white/40 truncate">@{p.username} • {p.mutuals} mutuals</p>
+                    <h4 className="text-xs font-bold text-foreground truncate">{p.name}</h4>
+                    <p className="text-[10px] text-foreground/40 truncate">@{p.username} • {p.mutuals} mutuals</p>
                   </div>
                 </div>
 
@@ -126,7 +139,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
                   onClick={() => handleFollow(p.id)}
                   className={`p-1.5 rounded-lg transition-all ${
                     isFollowing 
-                      ? "text-white/45 bg-white/5 border border-white/5" 
+                      ? "text-foreground/45 bg-foreground/5 border border-border" 
                       : "bg-[var(--brand-3)]/10 text-[var(--brand-3)] hover:bg-[var(--brand-3)]/20"
                   }`}
                   title={isFollowing ? "Unfollow" : "Follow"}
@@ -137,6 +150,17 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
             );
           })}
         </div>
+      </div>
+
+      {/* Widget 4: Quick Actions */}
+      <div className="liquid-glass liquid-edge rounded-lg p-2 sm:p-3 mt-auto">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold text-red-400 hover:bg-red-400/10 transition-all"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </button>
       </div>
     </aside>
   );

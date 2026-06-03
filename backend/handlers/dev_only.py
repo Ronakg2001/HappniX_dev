@@ -9,6 +9,7 @@ verify auth flow settings without touching the main signup flow.
 from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
+from integration import rds
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -109,6 +110,121 @@ def test_cognito_login(**kwargs):
         return error_response(f"Cognito error: {exc}", 500)
 
 
+def wipe_all_users(**kwargs):
+    """
+    Wipe all users from Cognito and RDS. DEV/QA only.
+    """
+    # 1. Wipe Cognito Users
+    cognito_deleted = 0
+    if cognito._client and cognito.POOL_ID:
+        try:
+            paginator = cognito._client.get_paginator('list_users')
+            for page in paginator.paginate(UserPoolId=cognito.POOL_ID):
+                for user in page.get('Users', []):
+                    cognito._client.admin_delete_user(
+                        UserPoolId=cognito.POOL_ID,
+                        Username=user['Username']
+                    )
+                    cognito_deleted += 1
+        except Exception as exc:
+            util.log("error", "dev_only.wipe_all_users", f"Cognito wipe failed: {exc}")
+            return error_response("Failed to wipe Cognito users. Check logs.", 500)
+    
+    # 2. Wipe RDS Users
+    rds_result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
+    if not rds_result.get("success"):
+        util.log("error", "dev_only.wipe_all_users", f"RDS wipe failed: {rds_result.get('error')}")
+        return error_response("Failed to wipe RDS users. Check logs.", 500)
+
+    return success_response({
+        "success": True,
+        "message": f"Successfully wiped {cognito_deleted} user(s) from Cognito and cleared RDS user tables."
+    })
+
+
+def wipe_dev_rds_users(**kwargs):
+    """Wipe only the RDS users (leaves Cognito intact)."""
+    rds_result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
+    if not rds_result.get("success"):
+        util.log("error", "dev_only.wipe_dev_rds_users", f"RDS wipe failed: {rds_result.get('error')}")
+        return error_response("Failed to wipe RDS users. Check logs.", 500)
+    
+    return success_response({
+        "success": True,
+        "message": "Successfully cleared RDS user tables."
+    })
+
+
+def get_dev_all_users(**kwargs):
+    """Retrieve all users from RDS."""
+    result = rds.get_all_users()
+    if not result.get("success"):
+        return error_response(f"Failed to fetch users: {result.get('error')}", 500)
+    
+    return success_response({
+        "success": True,
+        "users": result.get("data", [])
+    })
+
+
+def get_dev_rds_user(**kwargs):
+    """Retrieve a selective user from RDS by username."""
+    username = str(kwargs.get("username", "")).strip()
+    if not username:
+        return error_response("Username is required.", 400)
+    
+    result = rds.get_user_by_username(username)
+    if not result.get("success"):
+        return error_response(f"Failed to fetch user: {result.get('error')}", 404)
+    
+    return success_response({
+        "success": True,
+        "user": result.get("data")
+    })
+
+
+def test_db_connection(**kwargs):
+    """Debug action to test RDS connection and return the exact error/host string."""
+    import os
+    import sys
+    from utils import dependencies
+    import psycopg2
+
+    raw_host_env = os.environ.get("AUTH_DB_HOST")
+    raw_host_dep = dependencies.enviroment_variable.get("DATA_DB_HOST")
+    
+    host = (raw_host_env or raw_host_dep or "").strip()
+    port = (os.environ.get("AUTH_DB_PORT") or dependencies.enviroment_variable.get("DATA_DB_PORT", "5432")).strip()
+    
+    debug_info = {
+        "raw_host_env": repr(raw_host_env),
+        "raw_host_dep": repr(raw_host_dep),
+        "final_host": repr(host),
+        "port": port,
+        "python_version": sys.version,
+    }
+
+    if not host:
+        return error_response(f"Host is empty! {debug_info}", 500)
+
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            dbname=(dependencies.enviroment_variable.get("AUTH_DB_NAME") or os.environ.get("AUTH_DB_NAME", "")).strip(),
+            user=(dependencies.enviroment_variable.get("AUTH_DB_USER") or os.environ.get("AUTH_DB_USER", "")).strip(),
+            password=(dependencies.enviroment_variable.get("AUTH_DB_PASSWORD") or os.environ.get("AUTH_DB_PASSWORD", "")).strip(),
+            port=port,
+            connect_timeout=5
+        )
+        conn.close()
+        return success_response({"success": True, "message": "Connection successful!", "debug": debug_info})
+    except Exception as exc:
+        debug_info["exception"] = str(exc)
+        debug_info["exception_type"] = exc.__class__.__name__
+        return error_response(f"Connection failed: {debug_info}", 500)
+
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -116,6 +232,11 @@ def test_cognito_login(**kwargs):
 ACTION_HANDLERS = {
     "GetAuthConfig":     get_auth_config,
     "TestCognitoLogin":  test_cognito_login,
+    "WipeAllUsers":      wipe_all_users,
+    "WipeDevRDSUsers":   wipe_dev_rds_users,
+    "GetDevAllUsers":    get_dev_all_users,
+    "GetDevRDSUser":     get_dev_rds_user,
+    "TestDBConnection":  test_db_connection,
 }
 
 

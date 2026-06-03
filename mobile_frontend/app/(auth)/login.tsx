@@ -1,143 +1,205 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Dimensions, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { LinearGradient } from 'expo-linear-gradient';
-import { authApi } from '../../services/api';
-import { HX_LOGO } from '../../constants/images';
+import { Eye, EyeOff, LockKeyhole, Phone } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { authApi } from '@/services/api';
+import { colors, fonts, LOGO_URL } from '@/constants/brand';
+import { Glass, GradientButton, GhostButton, Screen } from '@/components/happnix/kit';
 
-const { width } = Dimensions.get('window');
+type Mode = 'mobile' | 'otp' | 'password';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [mode, setMode] = useState<Mode>('mobile');
+  const [mobile, setMobile] = useState('');
+  const [otp, setOtp] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!username || !password) {
-      return Alert.alert('Error', 'Please enter username/mobile and password');
+  const fullMobile = mobile.startsWith('+') ? mobile : `+91${mobile.replace(/\D/g, '')}`;
+
+  async function sendOtp() {
+    const local = mobile.replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(local) && !/^\+\d{10,15}$/.test(mobile)) {
+      Alert.alert('Check number', 'Enter a valid mobile number.');
+      return;
     }
-    
     setLoading(true);
     try {
-      const response = await authApi.loginWithPassword(username, password);
-      if (response.data.token) {
-         await SecureStore.setItemAsync('userToken', response.data.token);
-      }
-      router.replace('/(tabs)');
+      await authApi.sendMobileOtp(fullMobile, 'IN');
+      setMode('otp');
     } catch (error: any) {
-      console.error(error);
-      Alert.alert('Login Failed', error.response?.data?.error || error.response?.data?.message || 'Invalid credentials');
+      Alert.alert('Could not send OTP', error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  async function verifyOtp() {
+    if (!/^\d{6}$/.test(otp)) {
+      Alert.alert('Invalid OTP', 'Enter the 6-digit code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await authApi.verifyMobileOtp(fullMobile, otp);
+      if (result.data?.userStatus === 'new') {
+        router.replace({ pathname: '/(auth)/signup', params: { mobile: fullMobile, region: 'IN' } });
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      Alert.alert('Verification failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithPassword() {
+    if (!identifier || !password) {
+      Alert.alert('Missing details', 'Enter username/email and password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await authApi.loginWithPassword(identifier, password);
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Sign in failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.orb, styles.orbViolet]} />
-      <View style={[styles.orb, styles.orbFuchsia]} />
+    <Screen>
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
+            <Image source={{ uri: LOGO_URL }} style={styles.logo} resizeMode="contain" />
+            <Text style={styles.title}>
+              {mode === 'mobile' && 'Continue with mobile'}
+              {mode === 'otp' && 'Verify your number'}
+              {mode === 'password' && 'Sign in'}
+            </Text>
+            <Text style={styles.subtitle}>
+              Discover, host, book, and chat around Happnix experiences.
+            </Text>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, width: '100%' }}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          
-          <View style={styles.authShell}>
-            
-            {/* Brand Header */}
-            <LinearGradient
-              colors={['rgba(124, 58, 237, 0.35)', 'rgba(15, 23, 42, 0.32)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={styles.brandSection}
-            >
-              <Image source={HX_LOGO} style={styles.brandLogo} resizeMode="contain" />
-              <Text style={styles.brandTitle}>Feel Your Vibe</Text>
-              <Text style={styles.brandSub}>
-                Log in to manage your parties, invites, and group updates in one place. New here? Create an account in under a minute.
-              </Text>
-            </LinearGradient>
+            <Glass style={styles.card}>
+              {mode === 'mobile' ? (
+                <>
+                  <Field label="Mobile number">
+                    <TextInput
+                      value={mobile}
+                      onChangeText={setMobile}
+                      placeholder="9876543210"
+                      placeholderTextColor={colors.faint}
+                      keyboardType="phone-pad"
+                      style={styles.input}
+                    />
+                  </Field>
+                  <GradientButton label="Send OTP" icon={<Phone color="#fff" size={17} />} onPress={sendOtp} loading={loading} />
+                  <GhostButton label="Sign in with username or email" icon={<LockKeyhole color={colors.blue} size={16} />} onPress={() => setMode('password')} />
+                </>
+              ) : null}
 
-            {/* Forms Content */}
-            <View style={styles.formsSection}>
-              <Text style={styles.formTitle}>Sign-in with Username/Email</Text>
-              <Text style={styles.formDesc}>Enter your Username/Email and Password.</Text>
+              {mode === 'otp' ? (
+                <>
+                  <Text style={styles.helper}>OTP sent to {fullMobile}</Text>
+                  <Field label="OTP code">
+                    <TextInput
+                      value={otp}
+                      onChangeText={(value) => setOtp(value.replace(/\D/g, ''))}
+                      placeholder="000000"
+                      placeholderTextColor={colors.faint}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      style={[styles.input, styles.otpInput]}
+                    />
+                  </Field>
+                  <GradientButton label="Verify OTP" onPress={verifyOtp} loading={loading} />
+                  <View style={styles.row}>
+                    <GhostButton label="Resend" onPress={sendOtp} />
+                    <GhostButton label="Back" onPress={() => setMode('mobile')} />
+                  </View>
+                </>
+              ) : null}
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Username or Email</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter username or email"
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                  placeholderTextColor="#64748b"
-                />
-              </View>
+              {mode === 'password' ? (
+                <>
+                  <Field label="Username or email">
+                    <TextInput
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                      placeholder="aaravm"
+                      placeholderTextColor={colors.faint}
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+                  </Field>
+                  <Field label="Password">
+                    <View style={styles.passwordRow}>
+                      <TextInput
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder="Password"
+                        placeholderTextColor={colors.faint}
+                        secureTextEntry={!showPassword}
+                        style={[styles.input, { flex: 1, borderWidth: 0, backgroundColor: 'transparent' }]}
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword((value) => !value)} style={styles.eyeBtn}>
+                        {showPassword ? <EyeOff color={colors.muted} size={19} /> : <Eye color={colors.muted} size={19} />}
+                      </TouchableOpacity>
+                    </View>
+                  </Field>
+                  <GradientButton label="Sign in" onPress={loginWithPassword} loading={loading} />
+                  <GhostButton label="Use mobile OTP instead" onPress={() => setMode('mobile')} />
+                </>
+              ) : null}
+            </Glass>
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter password"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  placeholderTextColor="#64748b"
-                />
-              </View>
+            <Text style={styles.terms}>By continuing, you agree to Happnix Terms and Privacy Policy.</Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </Screen>
+  );
+}
 
-              <TouchableOpacity style={styles.inlineLinks} onPress={() => router.push('/(auth)/forgot-password')}>
-                <Text style={styles.formLink}>Forget Password</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={handleLogin} disabled={loading} activeOpacity={0.8} style={{ marginTop: 20 }}>
-                <LinearGradient colors={['#7c3aed', '#d946ef']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnPrimary}>
-                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign-in</Text>}
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <View style={styles.formLinks}>
-                <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-                  <Text style={styles.formLink}>New user? Sign-in with Mobile Number</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={{ gap: 7 }}>
+      <Text style={styles.label}>{label}</Text>
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  orb: { position: 'absolute', borderRadius: 999, opacity: 0.28 },
-  orbViolet: { width: 280, height: 280, top: -80, left: -80, backgroundColor: '#7c3aed' },
-  orbFuchsia: { width: 340, height: 340, right: -120, bottom: -120, backgroundColor: '#c026d3' },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  authShell: {
-    width: '100%',
-    maxWidth: 480,
-    backgroundColor: 'rgba(15, 23, 42, 0.78)',
-    borderRadius: 26,
+  wrap: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16 },
+  logo: { width: 146, height: 58, alignSelf: 'center', marginBottom: 8 },
+  title: { fontFamily: fonts.black, fontSize: 28, color: colors.text, textAlign: 'center' },
+  subtitle: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 8 },
+  card: { padding: 18, gap: 16 },
+  label: { fontFamily: fonts.black, fontSize: 11, color: colors.faint, textTransform: 'uppercase', letterSpacing: 1 },
+  input: {
+    minHeight: 52,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
+    borderColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 14,
+    color: colors.text,
+    fontFamily: fonts.semibold,
+    fontSize: 16,
   },
-  brandSection: { paddingVertical: 40, paddingHorizontal: 30, borderBottomWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)' },
-  brandLogo: { width: 140, height: 40, marginBottom: 16 },
-  brandTitle: { fontSize: 28, fontWeight: '800', color: '#f8fafc', lineHeight: 34, marginBottom: 12 },
-  brandSub: { fontSize: 15, color: '#cbd5e1', lineHeight: 24 },
-  formsSection: { paddingVertical: 34, paddingHorizontal: 30 },
-  formTitle: { fontSize: 24, fontWeight: '700', color: '#f8fafc', marginBottom: 8 },
-  formDesc: { fontSize: 15, color: '#94a3b8', marginBottom: 24 },
-  field: { marginBottom: 16 },
-  label: { display: 'flex', fontSize: 14, fontWeight: '600', color: '#f8fafc', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.16)', borderRadius: 12, padding: 14, fontSize: 15, backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#f8fafc' },
-  inlineLinks: { alignItems: 'flex-start', marginTop: 4 },
-  formLink: { color: '#e879f9', fontSize: 14, fontWeight: '600' },
-  btnPrimary: { padding: 14, borderRadius: 12, alignItems: 'center' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  formLinks: { marginTop: 24, alignItems: 'center' }
+  otpInput: { textAlign: 'center', fontFamily: fonts.black, fontSize: 22, letterSpacing: 4 },
+  helper: { fontFamily: fonts.semibold, color: colors.muted, fontSize: 13 },
+  row: { flexDirection: 'row', gap: 10 },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: 'rgba(255,255,255,0.07)' },
+  eyeBtn: { width: 48, height: 52, alignItems: 'center', justifyContent: 'center' },
+  terms: { fontFamily: fonts.regular, color: colors.faint, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

@@ -83,11 +83,24 @@ const SignUpCard = () => {
     dob: "",
     email: "",
   });
+  const [mobile, setMobile] = useState("");
+  const [region, setRegion] = useState("");
+  const [dialCode, setDialCode] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"checking" | "available" | string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // ── Load mobile & region from sessionStorage (set by signin flow) ─────────
+  useEffect(() => {
+    const m = sessionStorage.getItem('signup_mobile') ?? "";
+    const r = sessionStorage.getItem('signup_region') ?? "";
+    const d = sessionStorage.getItem('signup_dialCode') ?? "";
+    setMobile(m);
+    setRegion(r);
+    setDialCode(d);
+  }, []);
 
   useEffect(() => {
     const cleaned = form.username.trim();
@@ -95,16 +108,16 @@ const SignUpCard = () => {
       setUsernameStatus("");
       return;
     }
-    if (cleaned.length < 3) {
-      setUsernameStatus("Too short (min 3 chars)");
+    if (cleaned.length < 1) {
+      setUsernameStatus("Too short (min 1 chars)");
       return;
     }
     if (cleaned.length > 30) {
       setUsernameStatus("Too long (max 30 chars)");
       return;
     }
-    if (!cleaned.replace("_", "").replace(".", "").match(/^[a-zA-Z0-9]+$/)) {
-      setUsernameStatus("Contains invalid characters");
+    if (!/^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$/.test(cleaned)) {
+      setUsernameStatus("Invalid characters or format");
       return;
     }
 
@@ -121,7 +134,7 @@ const SignUpCard = () => {
       } catch (err) {
         setUsernameStatus((err as Error).message ?? "Taken or unavailable");
       }
-    }, 600);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [form.username]);
@@ -165,11 +178,16 @@ const SignUpCard = () => {
         fullName: form.fullName.trim(),
         username: form.username.trim(),
         password: form.password,
-        sex: form.gender, // mapped mr./miss./other
+        gender: form.gender,
         dateOfBirth: computedDob,
         email: form.email.trim(),
-        govId: "",
+        mobile: mobile,
+        region: region,
       });
+      // Clean up sessionStorage after successful signup
+      sessionStorage.removeItem('signup_mobile');
+      sessionStorage.removeItem('signup_region');
+      sessionStorage.removeItem('signup_dialCode');
       setSuccess((result.message ?? "Registration successful!") as string);
       setTimeout(() => {
         router.push("/home");
@@ -200,6 +218,28 @@ const SignUpCard = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {/* ── Read-only: mobile + region from signin flow ─────────────── */}
+          {mobile && (
+            <div className="flex gap-3">
+              <div className="flex-none">
+                <label className="block text-[11px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Region</label>
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/50 text-[14px] select-none cursor-not-allowed">
+                  <span className="text-[16px]">{dialCode}</span>
+                  <span className="text-white/30">·</span>
+                  <span>{region}</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <label className="block text-[11px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Mobile Number</label>
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/50 text-[14px] select-none cursor-not-allowed">
+                  <span>🔒</span>
+                  <span>{mobile}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Field label="Username">
             <div className="relative">
               <Input
@@ -242,9 +282,9 @@ const SignUpCard = () => {
             <Field label="Gender">
               <Select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
                 <option value="" className="bg-[#0a0a0a]">Select</option>
-                <option value="mr." className="bg-[#0a0a0a]">Male</option>
-                <option value="miss." className="bg-[#0a0a0a]">Female</option>
-                <option value="other" className="bg-[#0a0a0a]">Other</option>
+                <option value="Male" className="bg-[#0a0a0a]">Male</option>
+                <option value="Female" className="bg-[#0a0a0a]">Female</option>
+                <option value="Other" className="bg-[#0a0a0a]">Other</option>
               </Select>
             </Field>
           </div>

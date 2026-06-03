@@ -182,7 +182,7 @@ export default function NotificationsScreen() {
                     <Bell color="#9ca3af" size={32} />
                   </View>
                   <Text style={styles.emptyText}>No notifications yet</Text>
-                  <Text style={styles.emptyHint}>When people follow you or interact with your events, you'll see it here.</Text>
+                  <Text style={styles.emptyHint}>When people follow you or interact with your events, you will see it here.</Text>
                 </View>
               ) : null
             }

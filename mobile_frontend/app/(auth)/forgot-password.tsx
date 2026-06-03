@@ -47,7 +47,7 @@ export default function ForgotPasswordScreen() {
               <Image source={HX_LOGO} style={styles.brandLogo} resizeMode="contain" />
               <Text style={styles.brandTitle}>Reset Password</Text>
               <Text style={styles.brandSub}>
-                Enter your registered email and we'll send you reset instructions.
+                Enter your registered email and we will send you reset instructions.
               </Text>
             </LinearGradient>
 
@@ -59,7 +59,7 @@ export default function ForgotPasswordScreen() {
                   </View>
                   <Text style={styles.successTitle}>Check Your Inbox</Text>
                   <Text style={styles.successDesc}>
-                    If an account exists with {email}, we've sent password reset instructions.
+                    If an account exists with {email}, we have sent password reset instructions.
                   </Text>
                   <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
                     <ArrowLeft color="#e879f9" size={18} />

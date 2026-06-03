@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeContext";
-import ThemeChanger from "@/components/landing/ThemeChanger";
+import AppLayout from "@/components/layout/AppLayout";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -27,8 +27,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          {children}
-          {/* <ThemeChanger /> */}
+          <AppLayout>
+            {children}
+          </AppLayout>
         </ThemeProvider>
       </body>
     </html>

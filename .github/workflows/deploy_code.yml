@@ -1,0 +1,46 @@
+name: Deploy Code
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy_code.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-code:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+      STACK_NAME: happnix-app-dev
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Set up AWS SAM
+        uses: aws-actions/setup-sam@v2
+
+      - name: Sync Lambda Code
+        run: >
+          echo "Y" | sam sync
+          --stack-name "${STACK_NAME}"
+          --template-file infra/app/template.yaml
+          --code
+          --region "ap-south-1"

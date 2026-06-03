@@ -5,10 +5,11 @@ This module owns the boto3 Cognito client and all direct Cognito API calls.
 Import this module in handlers instead of calling boto3 directly.
 
 Available functions:
-    user_exists_by_phone(phone_e164)         → bool
+    user_exists(attribute_name, value)       → bool
     create_user(username, email, ...)        → cognito_sub | None
     authenticate_user(username, password)    → dict | None
     describe_pool()                          → dict | None
+    global_sign_out(access_token)            → None
 """
 
 import boto3
@@ -32,12 +33,13 @@ except Exception:
 # COGNITO HELPERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def user_exists_by_phone(phone_e164):
+def user_exists(attribute_name: str, value: str) -> bool:
     """
-    Check whether a Cognito user with the given phone_number attribute exists.
+    Check whether a Cognito user with the given attribute exists.
 
     Args:
-        phone_e164: Phone number in E.164 format, e.g. '+919876543210'.
+        attribute_name: The attribute to filter by (e.g., 'phone_number', 'username', 'email').
+        value: The value of the attribute to search for.
 
     Returns:
         True if a matching user exists, False otherwise.
@@ -47,31 +49,19 @@ def user_exists_by_phone(phone_e164):
     try:
         resp = _client.list_users(
             UserPoolId=POOL_ID,
-            Filter=f'phone_number = "{phone_e164}"',
+            Filter=f'{attribute_name} = "{value}"',
             Limit=1,
         )
         return len(resp.get("Users", [])) > 0
     except Exception as exc:
-        util.log("warning", "cognito_auth.user_exists_by_phone",
-                 f"Cognito lookup failed: {exc}", phone=phone_e164)
+        util.log("warning", "cognito_auth.user_exists",
+                 f"Cognito lookup failed: {exc}", attribute_name=attribute_name, value=value)
         return False
 
 
-def create_user(username, email, phone_e164, full_name, dob, gender, password):
+def create_user(username, email, phone_e164, password, user_id):
     """
     Create a new Cognito user with a permanent password.
-
-    Args:
-        username:   Cognito username (also the preferred_username attribute).
-        email:      User's email address.
-        phone_e164: Phone number in E.164 format, e.g. '+919876543210'.
-        full_name:  User's full display name.
-        dob:        Date of birth string in YYYY-MM-DD format.
-        gender:     Gender string (e.g. 'Male', 'Female', 'Other').
-        password:   Plain-text password — Cognito hashes it internally.
-
-    Returns:
-        cognito_sub (str) on success, None on failure.
     """
     if not _client or not POOL_ID:
         return None
@@ -82,10 +72,8 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password):
             UserAttributes=[
                 {"Name": "email",                 "Value": email},
                 {"Name": "phone_number",          "Value": phone_e164},
-                {"Name": "name",                  "Value": full_name},
-                {"Name": "custom:dateOfBirth",    "Value": dob},
-                {"Name": "custom:gender",         "Value": gender},
-                {"Name": "email_verified",        "Value": "true"},
+                {"Name": "custom:userId",         "Value": user_id},
+                {"Name": "email_verified",        "Value": "true"},  # must be "true" — Cognito rejects "false" on admin_create_user
                 {"Name": "phone_number_verified", "Value": "true"},
             ],
             MessageAction="SUPPRESS",
@@ -107,7 +95,37 @@ def create_user(username, email, phone_e164, full_name, dob, gender, password):
     except Exception as exc:
         util.log("error", "cognito_auth.create_user",
                  f"admin_create_user failed: {exc}", username=username)
-        return None
+        raise  # re-raise so the handler can catch the real error
+
+
+def delete_user(username):
+    """
+    Deletes a Cognito user by username.
+    Used for rollback when RDS insert fails after a successful Cognito creation.
+
+    Args:
+        username: Cognito username to delete.
+    """
+    if not _client or not POOL_ID:
+        return
+    _client.admin_delete_user(UserPoolId=POOL_ID, Username=username)
+
+
+def global_sign_out(access_token):
+    """
+    Signs out users from all devices.
+    Invalidates all access tokens and refresh tokens.
+
+    Args:
+        access_token: A valid active access token for the user.
+    """
+    if not _client:
+        return
+    try:
+        _client.global_sign_out(AccessToken=access_token)
+    except Exception as exc:
+        util.log("error", "cognito_auth.global_sign_out",
+                 f"global_sign_out failed: {exc}")
 
 
 def authenticate_user(username, password):
@@ -163,3 +181,28 @@ def describe_pool():
         util.log("warning", "cognito_auth.describe_pool",
                  f"Pool unreachable: {exc}")
         return None
+
+
+def get_user(access_token):
+    """
+    Fetch user details from Cognito using an access token.
+    This effectively verifies that the token is valid, unexpired,
+    and that the user still exists and is not disabled in the user pool.
+
+    Args:
+        access_token: A valid active access token for the user.
+        
+    Returns:
+        dict: User details on success.
+        None: If the token is invalid, expired, or user is deleted/disabled.
+    """
+    if not _client:
+        return None
+    try:
+        resp = _client.get_user(AccessToken=access_token)
+        return resp
+    except Exception as exc:
+        util.log("error", "cognito_auth.get_user",
+                 f"get_user failed or token invalid: {exc}")
+        return None
+
