@@ -143,7 +143,7 @@
     color: #09090b;
     transition: background 0.3s ease, color 0.3s ease;
   }
-  :global(.dark) body, .dark body {
+  .dark body {
     background: radial-gradient(circle at 50% 0%, #1a1633 0%, #050508 75%) no-repeat fixed;
     color: white;
   }

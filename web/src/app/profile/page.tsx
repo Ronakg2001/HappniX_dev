@@ -150,7 +150,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <main className="flex-1 min-w-0 flex flex-col gap-0 max-w-2xl mx-auto w-full">
+      <main className="flex-1 min-w-0 flex flex-col gap-0 mx-auto w-full">
 
         {/* ── Profile Header Card ────────────────────────── */}
         <div className="liquid-glass liquid-edge rounded-lg overflow-hidden mb-4">
@@ -325,3 +325,16 @@ export default function ProfilePage() {
     </>
   );
 }
+
+/* 
+Restricted Features Until Verified
+Unverified users are warned:
+* Cannot host parties
+* Cannot join parties
+
+### Verification Banners & Prompts
+The app repeatedly encourages verification through:
+* Red warning banners
+* “Verify Aadhaar” buttons
+* Security modals
+*/
