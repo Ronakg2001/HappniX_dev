@@ -133,7 +133,7 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 10
-    MemorySize: 128 # ← Free tier: 128MB is cheapest
+    MemorySize: 256 # ← Free tier: 256MB is safe for psycopg2 SSL networking
     Environment:
       Variables:
         APP_ENVIRONMENT:
