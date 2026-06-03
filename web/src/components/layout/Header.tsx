@@ -3,9 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { 
-  Bell, 
-  MapPin, 
+import {
+  Bell,
+  MapPin,
   ChevronDown
 } from "lucide-react";
 
@@ -26,11 +26,11 @@ export default function Header({
         {/* LOGO */}
         <div className="flex items-center gap-3">
           <Link href="/home" className="flex items-center gap-2">
-            <Image 
-              src="/Happnix.png" 
-              alt="Happnix Logo" 
-              width={36} 
-              height={36} 
+            <Image
+              src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
+              alt="Happnix Logo"
+              width={36}
+              height={36}
               className="object-contain"
             />
             <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
@@ -42,7 +42,7 @@ export default function Header({
         {/* ACTIONS */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Location Picker (Always Visible/Active) */}
-          <button 
+          <button
             onClick={onLocationClick}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass liquid-edge hover:scale-[1.03] active:scale-[0.98] transition-all text-xs font-semibold text-foreground/95"
           >
@@ -52,7 +52,7 @@ export default function Header({
           </button>
 
           {/* Notifications */}
-          <button 
+          <button
             onClick={onNotificationsClick}
             className="p-2 rounded-full liquid-glass hover:liquid-edge text-foreground/80 hover:text-foreground transition-all relative"
             aria-label="Notifications"
