@@ -386,17 +386,23 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
 
 // --- CREATE EVENT MODAL ---
 export function CreateEventModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { addCreatedEvent } = useLayout();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Party");
+  const [price, setPrice] = useState("");
   const [created, setCreated] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    addCreatedEvent(title, category, price);
     setCreated(true);
     setTimeout(() => {
       setCreated(false);
+      setTitle("");
+      setPrice("");
+      setCategory("Party");
       onClose();
     }, 2000);
   };
@@ -456,6 +462,8 @@ export function CreateEventModal({ isOpen, onClose }: { isOpen: boolean; onClose
                   <input
                     type="number"
                     placeholder="999"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
                     className="w-full px-4 py-3 rounded-2xl bg-foreground/5 border border-border text-sm text-foreground focus:outline-none focus:border-[var(--brand-1)] transition-all placeholder-foreground/30"
                   />
                 </div>

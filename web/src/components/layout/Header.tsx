@@ -6,7 +6,8 @@ import Image from "next/image";
 import {
   Bell,
   MapPin,
-  ChevronDown
+  ChevronDown,
+  MessageSquare
 } from "lucide-react";
 
 interface HeaderProps {
@@ -29,9 +30,9 @@ export default function Header({
             <Image
               src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
               alt="Happnix Logo"
-              width={400}
+              width={360}
               height={100}
-              className="w-[140px] h-auto object-contain"
+              className="w-[100px] h-auto object-contain"
               priority
             />
             {/* <span className="text-2xl font-black tracking-wider text-brand-gradient uppercase hidden sm:inline-block">
@@ -51,6 +52,17 @@ export default function Header({
             <span className="max-w-[80px] sm:max-w-none truncate">{currentLocation}</span>
             <ChevronDown className="h-3 w-3 text-foreground/40" />
           </button>
+
+          {/* Messages (Mobile/Desktop) */}
+          <Link
+            href="/messages"
+            className="p-2 rounded-full liquid-glass hover:liquid-edge text-foreground/80 hover:text-foreground transition-all md:hidden relative"
+            aria-label="Messages"
+          >
+            <MessageSquare className="h-4 sm:h-5 w-4 sm:w-5" />
+            {/* Unread dot indicator */}
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-[var(--brand-1)] ring-2 ring-background" />
+          </Link>
 
           {/* Notifications */}
           <button

@@ -5,6 +5,7 @@ import {
   MessageSquare, 
   User,
   Bell,
+  Ticket,
 } from "lucide-react";
 
 export interface NavItem {
@@ -29,12 +30,6 @@ export const NAV_ITEMS: NavItem[] = [
     section: "primary"
   },
   {
-    label: "My Events",
-    path: "/my-events",
-    icon: Calendar,
-    section: "primary"
-  },
-  {
     label: "Messages",
     path: "/messages",
     icon: MessageSquare,
@@ -42,10 +37,23 @@ export const NAV_ITEMS: NavItem[] = [
     section: "primary"
   },
   {
-    label: "Notifications",
-    path: "/notifications",
-    icon: Bell,
-    badgeKey: "notificationsCount",
+    label: "My Events",
+    path: "/my-events",
+    icon: Calendar,
+    section: "primary"
+  },
+  
+  // {
+  //   label: "Notifications",
+  //   path: "/notifications",
+  //   icon: Bell,
+  //   badgeKey: "notificationsCount",
+  //   section: "primary"
+  // },
+  {
+    label: "My Bookings",
+    path: "/my-bookings",
+    icon: Ticket,
     section: "primary"
   },
   {
