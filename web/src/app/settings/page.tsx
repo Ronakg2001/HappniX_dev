@@ -144,12 +144,12 @@ function RadioGroup({
   );
 }
 
-// ─── BLOCKED / RESTRICTED LIST ────────────────────────────────
-function UserList({ users, label, actionLabel, actionColor }: {
+function UserList({ users, label, actionLabel, actionColor, onAction }: {
   users: string[];
   label: string;
   actionLabel: string;
   actionColor: string;
+  onAction?: (username: string) => void;
 }) {
   if (users.length === 0) {
     return (
@@ -161,7 +161,7 @@ function UserList({ users, label, actionLabel, actionColor }: {
       {users.map((u) => (
         <div key={u} className="flex items-center justify-between py-1">
           <p className="text-sm text-foreground/70">@{u}</p>
-          <button className="text-xs font-bold" style={{ color: actionColor }}>
+          <button onClick={() => onAction && onAction(u)} className="text-xs font-bold hover:underline cursor-pointer" style={{ color: actionColor }}>
             {actionLabel}
           </button>
         </div>
@@ -186,8 +186,8 @@ export default function SettingsPage() {
 
   // Safety
   const [verified] = useState(false);
-  const [blockedUsers] = useState(["shadow_x", "neon_ghost"]);
-  const [restrictedUsers] = useState(["dj_phantom"]);
+  const [blockedUsers, setBlockedUsers] = useState(["shadow_x", "neon_ghost"]);
+  const [restrictedUsers, setRestrictedUsers] = useState(["dj_phantom"]);
 
   // Social
   const [tagPermission, setTagPermission] = useState("followers");
@@ -219,7 +219,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="flex-1 min-w-0 max-w-2xl mx-auto w-full">
+    <div className="flex-1 min-w-0 mx-auto w-full">
       {/* ── Page Header ────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-6">
         <Link
@@ -300,7 +300,16 @@ export default function SettingsPage() {
                 <p className="text-[11px] text-foreground/45">{blockedUsers.length} blocked</p>
               </div>
             </div>
-            <UserList users={blockedUsers} label="Blocked" actionLabel="Unblock" actionColor="#f87171" />
+            <UserList 
+              users={blockedUsers} 
+              label="Blocked" 
+              actionLabel="Unblock" 
+              actionColor="#f87171" 
+              onAction={(u) => {
+                setBlockedUsers(blockedUsers.filter(x => x !== u));
+                alert(`@${u} has been unblocked.`);
+              }}
+            />
           </div>
 
           {/* Restricted */}
@@ -314,7 +323,16 @@ export default function SettingsPage() {
                 <p className="text-[11px] text-foreground/45">{restrictedUsers.length} restricted</p>
               </div>
             </div>
-            <UserList users={restrictedUsers} label="Restricted" actionLabel="Remove" actionColor="var(--brand-4)" />
+            <UserList 
+              users={restrictedUsers} 
+              label="Restricted" 
+              actionLabel="Remove" 
+              actionColor="var(--brand-4)" 
+              onAction={(u) => {
+                setRestrictedUsers(restrictedUsers.filter(x => x !== u));
+                alert(`Restrictions removed for @${u}.`);
+              }}
+            />
           </div>
         </SectionCard>
 
@@ -439,13 +457,13 @@ export default function SettingsPage() {
             icon={<HelpCircle className="h-4 w-4" />}
             label="Help & Support"
             description="FAQs, contact us, and troubleshooting"
-            onClick={() => {}}
+            onClick={() => alert("Help Ticket Created! Support will contact you shortly.")}
           />
           <SettingRow
             icon={<FileText className="h-4 w-4" />}
             label="Privacy Policy"
             description="How we handle your data"
-            onClick={() => {}}
+            onClick={() => alert("HappniX Privacy Policy is versioned under standard PWA safety guidelines. (V1.0.0)")}
           />
           <SettingRow
             icon={<Smartphone className="h-4 w-4" />}
@@ -467,7 +485,13 @@ export default function SettingsPage() {
             icon={<Trash2 className="h-4 w-4" />}
             label="Delete Account"
             description="Permanently remove your account and all data"
-            onClick={() => {}}
+            onClick={() => {
+              if (confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
+                localStorage.clear();
+                alert("Account deleted successfully.");
+                router.push("/signup");
+              }
+            }}
             danger
           />
         </SectionCard>
@@ -479,3 +503,39 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+/* 
+
+# 5. Privacy System
+Advanced account privacy management.
+
+## Features
+Users can switch between:
+* Public account
+* Private account
+
+### Follow Request Approval
+For private accounts:
+* Users must request access
+* Requests can be approved/rejected
+
+---
+
+# 8. People Management System
+A built-in moderation/social management layer.
+## Includes
+### Search People
+
+Users can:
+* Search usernames
+* Search display names
+
+### Saved Profiles
+Bookmark or save accounts.
+
+### Blocked Accounts
+Users can:
+* Block unsafe people
+
+### Restricted Accounts
+Soft restrictions without full blocking. */

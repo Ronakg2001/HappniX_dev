@@ -4,6 +4,7 @@ import {
   Calendar, 
   MessageSquare, 
   User,
+  Bell,
 } from "lucide-react";
 
 export interface NavItem {
@@ -38,6 +39,13 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/messages",
     icon: MessageSquare,
     badgeKey: "messagesCount",
+    section: "primary"
+  },
+  {
+    label: "Notifications",
+    path: "/notifications",
+    icon: Bell,
+    badgeKey: "notificationsCount",
     section: "primary"
   },
   {

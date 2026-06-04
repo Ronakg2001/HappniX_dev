@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Header from "./Header";
 import LocationBar from "@/components/location/LocationBar";
@@ -12,11 +12,21 @@ import {
   CreateEventModal 
 } from "@/components/modals/HomeModals";
 
+interface TicketType {
+  id: string;
+  eventTitle: string;
+  date: string;
+  time: string;
+  seat: string;
+}
+
 interface LayoutContextType {
   openBooking: (title: string, price: string) => void;
   openCreateEvent: () => void;
   currentLocation: string;
   radius: number;
+  bookedTickets: TicketType[];
+  addTicket: (title: string, price: string) => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -37,6 +47,68 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [currentLocation, setCurrentLocation] = useState("Jaipur");
   const [radius, setRadius] = useState(10);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  // Tickets State
+  const [bookedTickets, setBookedTickets] = useState<TicketType[]>([]);
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedLoc = localStorage.getItem("happnix_location");
+      if (savedLoc) setCurrentLocation(savedLoc);
+
+      const savedRadius = localStorage.getItem("happnix_radius");
+      if (savedRadius) setRadius(Number(savedRadius));
+
+      const savedTickets = localStorage.getItem("happnix_booked_tickets");
+      if (savedTickets) {
+        const parsed = JSON.parse(savedTickets);
+        // If they only have the old 1-pass layout default, upgrade it to the multiple default list
+        if (parsed.length === 1 && parsed[0].id === "t1") {
+          const defaultTickets = [
+            { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" },
+            { id: "t2", eventTitle: "Rooftop Unplugged Gig", date: "May 30", time: "7:00 PM", seat: "General Entry" },
+            { id: "t3", eventTitle: "Forbidden Forest Warehouse Party", date: "Jun 06", time: "10:00 PM", seat: "VIP Access Pass" }
+          ];
+          setBookedTickets(defaultTickets);
+          localStorage.setItem("happnix_booked_tickets", JSON.stringify(defaultTickets));
+        } else {
+          setBookedTickets(parsed);
+        }
+      } else {
+        const defaultTickets = [
+          { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" },
+          { id: "t2", eventTitle: "Rooftop Unplugged Gig", date: "May 30", time: "7:00 PM", seat: "General Entry" },
+          { id: "t3", eventTitle: "Forbidden Forest Warehouse Party", date: "Jun 06", time: "10:00 PM", seat: "VIP Access Pass" }
+        ];
+        setBookedTickets(defaultTickets);
+        localStorage.setItem("happnix_booked_tickets", JSON.stringify(defaultTickets));
+      }
+    }
+  }, []);
+
+  const handleLocationChange = (loc: string) => {
+    setCurrentLocation(loc);
+    localStorage.setItem("happnix_location", loc);
+  };
+
+  const handleRadiusChange = (rad: number) => {
+    setRadius(rad);
+    localStorage.setItem("happnix_radius", String(rad));
+  };
+
+  const addTicket = (title: string, price: string) => {
+    const newTicket: TicketType = {
+      id: `t_${Date.now()}`,
+      eventTitle: title,
+      date: "Jun 06", // Simulated date
+      time: "9:00 PM",
+      seat: "General Entry"
+    };
+    const updated = [newTicket, ...bookedTickets];
+    setBookedTickets(updated);
+    localStorage.setItem("happnix_booked_tickets", JSON.stringify(updated));
+  };
 
   // Modal States
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -59,7 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <LayoutContext.Provider value={{ openBooking, openCreateEvent, currentLocation, radius }}>
+    <LayoutContext.Provider value={{ openBooking, openCreateEvent, currentLocation, radius, bookedTickets, addTicket }}>
       <div className="min-h-screen flex flex-col relative bg-background text-foreground home-feed">
         {/* Background gradients/glow effects */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -78,8 +150,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <LocationBar
           currentLocation={currentLocation}
           radius={radius}
-          onLocationChange={setCurrentLocation}
-          onRadiusChange={setRadius}
+          onLocationChange={handleLocationChange}
+          onRadiusChange={handleRadiusChange}
           isModalOpen={isLocationModalOpen}
           setIsModalOpen={setIsLocationModalOpen}
         />
