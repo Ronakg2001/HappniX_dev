@@ -1,3 +1,4 @@
+export const LOGO_URL = 'PLACEHOLDER_MOBILE_LOGO_URL';
 
 export const colors = {
   bg: '#050508',

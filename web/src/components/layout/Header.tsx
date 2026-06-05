@@ -27,7 +27,7 @@ export default function Header({
         <div className="flex items-center gap-3">
           <Link href="/home" className="flex items-center gap-2">
             <Image
-              src="/happnix.svg"
+              src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
               alt="Happnix Logo"
               width={400}
               height={100}

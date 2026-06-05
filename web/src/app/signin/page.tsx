@@ -46,7 +46,7 @@ export default function SignInPage() {
       <div className="relative z-10 w-full max-w-[440px] mx-auto px-6 py-12">
         <a href="/signin" className="flex items-center justify-center mb-8">
           <Image
-            src="/happnix.svg"
+            src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
             alt="Happnix Logo"
             width={400}
             height={100}
