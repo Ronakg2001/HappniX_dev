@@ -161,8 +161,8 @@ Globals:
           Ref: R2BucketName
         R2_ENDPOINT:
           Ref: R2Endpoint
-        USERS_TABLE_NAME:
-          Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
+        # USERS_TABLE_NAME:
+        #   Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
         SESSIONS_TABLE_NAME:
           Fn::Sub: HappniX-sessions-v2-${EnvironmentName}
         OTP_TABLE_NAME:

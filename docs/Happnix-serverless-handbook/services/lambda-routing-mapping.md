@@ -4,7 +4,7 @@ The serverless architecture routes API Gateway calls to designated AWS Lambda fu
 
 | API Route(s) | Lambda Function | Backend Handler Path |
 | --- | --- | --- |
-| **POST** `/api/auth/*`<br>**POST** `/api/signup/*` | **`SignupSignin`** | `backend/SignupSignin.lambda_handler` |
+| **POST** `/api/auth` | **`SignupSignin`** | `backend/handlers/signup_signin.lambda_handler` |
 | **GET, POST, DELETE** `/api/events/*`<br>**POST** `/api/tickets/*` | **`EventsApi`** | `backend/events.lambda_handler` |
 | **GET, POST, DELETE** `/api/home/*`<br>**GET, POST, DELETE** `/api/tickets/*`<br>**GET, POST** `/api/notifications/*`<br>**POST** `/api/guest-invites` | **`HomePageApi`** | `backend/home_page.lambda_handler` |
 | **GET, POST** `/api/messages/*` | **`MessagingApi`** | `backend/messaging.lambda_handler` |

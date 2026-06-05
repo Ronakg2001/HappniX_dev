@@ -39,7 +39,7 @@ const BrandSection = () => {
         <div>
           <a href="/signin">
             <Image
-              src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG"
+              src="/happnix.svg"
               alt="Happnix Logo"
               width={400}
               height={100}

@@ -4,18 +4,16 @@
 > **Note on Error Handling:** To prevent the app from crashing, the frontend should always check the `Status Code`. Any `4xx` or `5xx` code will return a standard error JSON `{"message": "Error description"}` which should be displayed to the user as a toast/alert, or used to redirect the user to a safe previous page.
 
 ## Authentication & Signup
-*(Note: These are handled by the `SignupSignin` Lambda).*
+*(Note: These are handled by the `SignupSignin` Lambda via a single `POST /api/auth` endpoint utilizing `actionItem` routing).*
 
-| API / Endpoint | Method | Request Header | Request Data | Status Code | Response Data |
+| API / Endpoint | Method | Request Header | Request Data (`actionItem`) | Status Code | Response Data |
 |---|---|---|---|---|---|
-| `/api/auth/mobile/send-otp` | POST | `Content-Type: application/json`* | `{ "mobile": "9876543210"* }` | **200** (OK)<br>**400** (Bad Req)<br>**500** (Error) | `{"message": "OTP sent successfully..."}`<br>`{"message": "Please enter a valid..."}`<br>`{"message": "Internal server error"}` |
-| `/api/auth/mobile/verify-otp` | POST | `Content-Type: application/json`* | `{ "mobile": "9876543210"*, "otp": "123456"* }` | **200** (OK)<br>**400** (Bad Req)<br>**500** (Error) | `{"message": "Mobile OTP verified.", "userStatus": "existing"}`<br>`{"message": "Invalid OTP."}`<br>`{"message": "Internal server error"}` |
-| `/api/auth/mobile/resend-otp` | POST | `Content-Type: application/json`* | `{ "mobile": "9876543210"* }` | **200** (OK)<br>**400** (Bad Req)<br>**500** (Error) | `{"message": "OTP resent to..."}`<br>`{"message": "Please enter a valid..."}`<br>`{"message": "Internal server error"}` |
-| `/api/auth/username/login` | POST | `Content-Type: application/json`* | `{ "identifier": "user"*, "password": "pw"* }` | **200** (OK)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Signed in successfully..."}`<br>`{"message": "Invalid username/email or password."}`<br>`{"message": "Internal server error"}` |
-| `/api/auth/username/check` | POST | `Content-Type: application/json`* | `{ "username": "ronak"* }` | **200** (OK)<br>**400** (Bad Req)<br>**500** (Error) | `{"available": true, "username": "ronak"}`<br>`{"available": false, "suggestions": ["ronak1", "ronak_2"]}` |
-| `/api/auth/password/forgot` | POST | `Content-Type: application/json`* | `{ "email": "user@example.com"* }` | **200** (OK)<br>**400** (Bad Req)<br>**500** (Error) | `{"message": "Verification email request accepted..."}`<br>`{"message": "Please enter a valid email."}`<br>`{"message": "Internal server error"}` |
-| `/api/signup/details` | POST | `Content-Type: application/json`* | `{ "fullName"*, "username"*, "password"*, "sex"*, "dateOfBirth"*, "email"*, "govId" }` | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Details saved..."}`<br>`{"message": "Username already exists."}`<br>`{"message": "Signup session expired."}`<br>`{"message": "Internal server error"}` |
-| `/api/signup/profile` | POST | `Content-Type: application/json`*<br>`Cookie: happnix_session`* | `{ "skip": false, "bio": "", "profilePictureUrl": "" }` | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Profile setup completed."}`<br>`{"message": "Profile setup session not found."}`<br>`{"message": "Please sign in first."}`<br>`{"message": "Internal server error"}` |
+| `/api/auth` | POST | `X-HappniX-PreAuth` | `SendMobileOtp`, `"mobile": "9876543210"*` | **200** (OK)<br>**400** (Bad Req) | `{"message": "OTP sent to..."}` |
+| `/api/auth` | POST | `X-HappniX-PreAuth`* | `VerifyMobileOtp`, `"mobile": "9876543210"*, "otp": "123456"*` | **200** (OK)<br>**400** (Bad Req) | `{"message": "Mobile verified.", "userStatus": "existing" / "new"}` |
+| `/api/auth` | POST | `X-HappniX-PreAuth`* | `ResendMobileOtp`, `"mobile": "9876543210"*` | **200** (OK)<br>**400** (Bad Req) | `{"message": "OTP resent to..."}` |
+| `/api/auth` | POST | None | `LoginWithPassword`, `"identifier": "user"*, "password": "pw"*` | **200** (OK)<br>**401** (Unauth) | `{"accessToken": "...", "idToken": "..."}` |
+| `/api/auth` | POST | None | `CheckUsername`, `"username": "ronak"*` | **200** (OK) | `{"available": true, "success": true}` |
+| `/api/auth` | POST | `X-HappniX-PreAuth`* | `RegisterUserDetails`, `"username"*, "fullName"*, "dateOfBirth"*, "email"*, "password"*, "mobile"*, "gender"*` | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**409** (Conflict) | `{"message": "Account created successfully..."}` |
 
 ## Events APIs
 *(Note: These are handled by the `EventsApi` Lambda).*

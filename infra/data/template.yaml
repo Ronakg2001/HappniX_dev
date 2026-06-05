@@ -192,27 +192,27 @@ Resources:
   # ══════════════════════════════════════════════════════════════════════
 
   # ─── Users Table (User Profiles & Personal Details) ───────────────────
-  HappnixUsersTable:
-    Type: AWS::DynamoDB::Table
-    Condition: HasUsersTable
-    Properties:
-      TableName:
-        Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: userID
-          AttributeType: S
-        - AttributeName: userName
-          AttributeType: S
-      KeySchema:
-        - AttributeName: userID
-          KeyType: HASH
-        - AttributeName: userName
-          KeyType: RANGE
-      Tags:
-        - Key: Name
-          Value:
-            Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
+  # HappnixUsersTable:
+  #   Type: AWS::DynamoDB::Table
+  #   Condition: HasUsersTable
+  #   Properties:
+  #     TableName:
+  #       Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
+  #     BillingMode: PAY_PER_REQUEST
+  #     AttributeDefinitions:
+  #       - AttributeName: userID
+  #         AttributeType: S
+  #       - AttributeName: userName
+  #         AttributeType: S
+  #     KeySchema:
+  #       - AttributeName: userID
+  #         KeyType: HASH
+  #       - AttributeName: userName
+  #         KeyType: RANGE
+  #     Tags:
+  #       - Key: Name
+  #         Value:
+  #           Fn::Sub: Happnix-userInfoTable-${EnvironmentName}
 
   # ─── Sessions Table (replaces dev_store.py JSON file) ──────────────
   HappnixSessionsTable:
@@ -486,18 +486,18 @@ Outputs:
       Ref: HappnixPostgresDatabase
 
   # DynamoDB
-  UsersTableName:
-    Condition: HasUsersTable
-    Description: DynamoDB users table name.
-    Value:
-      Ref: HappnixUsersTable
-  UsersTableArn:
-    Condition: HasUsersTable
-    Description: DynamoDB users table ARN.
-    Value:
-      Fn::GetAtt:
-        - HappnixUsersTable
-        - Arn
+  # UsersTableName:
+  #   Condition: HasUsersTable
+  #   Description: DynamoDB users table name.
+  #   Value:
+  #     Ref: HappnixUsersTable
+  # UsersTableArn:
+  #   Condition: HasUsersTable
+  #   Description: DynamoDB users table ARN.
+  #   Value:
+  #     Fn::GetAtt:
+  #       - HappnixUsersTable
+  #       - Arn
   SessionsTableName:
     Condition: HasSessionsTable
     Description: DynamoDB sessions table name.

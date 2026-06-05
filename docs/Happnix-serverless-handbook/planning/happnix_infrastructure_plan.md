@@ -176,7 +176,7 @@ GET    /api/profile/{graph_type}
 GET    /api/settings/preferences
 POST   /api/settings/preferences
 GET    /api/settings/people/{category}
-POST   /api/auth/username/check          ← NEW (Instagram-style)
+POST   /api/auth (actionItem: CheckUsername)   ← NEW (Instagram-style)
 
 # Notifications (3 routes)
 GET    /api/notifications
@@ -469,7 +469,7 @@ sequenceDiagram
     participant Lambda as SignupSignin Lambda
     participant DDB as DynamoDB happnix-users
 
-    Client->>APIGW: POST /api/auth/username/check { "username": "ronak_g" }
+    Client->>APIGW: POST /api/auth { "actionItem": "CheckUsername", "username": "ronak_g" }
     APIGW->>Lambda: Route to username_check handler
     Lambda->>Lambda: Normalize to lowercase and strip
     Lambda->>DDB: Query userName-index where userName = "ronak_g"
@@ -491,7 +491,7 @@ sequenceDiagram
 | Min/max length | 3–30 characters |
 | Allowed characters | `a-z`, `0-9`, `_`, `.` (no consecutive `.` or `_`) |
 | Reserved words | Block `admin`, `happnix`, `support`, etc. |
-| Real-time check | Frontend calls `/api/auth/username/check` on input debounce (300ms) |
+| Real-time check | Frontend calls `POST /api/auth` (actionItem `CheckUsername`) on input debounce (300ms) |
 | Signup enforcement | `register_user_details` must re-verify uniqueness before creating the user |
 
 #### Suggestion Algorithm

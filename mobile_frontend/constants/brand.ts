@@ -1,4 +1,3 @@
-export const LOGO_URL = 'https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix.PNG';
 
 export const colors = {
   bg: '#050508',

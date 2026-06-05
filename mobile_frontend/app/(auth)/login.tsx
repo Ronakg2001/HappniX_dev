@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { Eye, EyeOff, LockKeyhole, Phone } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '@/services/api';
-import { colors, fonts, LOGO_URL } from '@/constants/brand';
+import { colors, fonts } from '@/constants/brand';
+import HappnixLogo from '@/assets/images/Happnix_logo';
 import { Glass, GradientButton, GhostButton, Screen } from '@/components/happnix/kit';
 
 type Mode = 'mobile' | 'otp' | 'password';
@@ -78,7 +79,9 @@ export default function LoginScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
-            <Image source={{ uri: LOGO_URL }} style={styles.logo} resizeMode="contain" />
+            <View style={styles.logo}>
+              <HappnixLogo />
+            </View>
             <Text style={styles.title}>
               {mode === 'mobile' && 'Continue with mobile'}
               {mode === 'otp' && 'Verify your number'}

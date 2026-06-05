@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Header from "./Header";
 import LocationBar from "@/components/location/LocationBar";
@@ -45,6 +45,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Exclude landing page and authentication screens from the global app shell
   const isAppRoute = pathname !== "/" && pathname !== "/signin" && pathname !== "/signup";
+
+  // Auth guard: redirect unauthenticated users away from protected routes
+  useEffect(() => {
+    if (isAppRoute) {
+      const token = localStorage.getItem("happnix_access_token");
+      if (!token) {
+        router.replace("/signin");
+      }
+    }
+  }, [isAppRoute, router]);
 
   const openBooking = (title: string, price: string) => {
     setSelectedBooking({ title, price });
