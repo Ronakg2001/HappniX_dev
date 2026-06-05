@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import RightSidebar from "@/components/layout/RightSidebar";
 import { 
@@ -16,7 +17,8 @@ import {
 import { Compass, Sparkles, Flame, Users, Calendar, MessageCircle } from "lucide-react";
 
 export default function HomePage() {
-  const { openBooking } = useLayout();
+  const router = useRouter();
+  const { openBooking, currentLocation } = useLayout();
 
   // Active Feed Tab
   const [activeTab, setActiveTab] = useState("all");
@@ -118,7 +120,8 @@ export default function HomePage() {
     price: "₹1,999"
   };
 
-  const handleBookNow = (title: string, price: string) => {
+  const handleBookNow = (title: string, price: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     openBooking(title, price);
   };
 
@@ -127,7 +130,7 @@ export default function HomePage() {
       {/* Central Feed Content */}
       <main className="flex-1 min-w-0 max-w-2xl flex flex-col gap-6">
         {/* Feed Filter Segmented Control */}
-        {/* <div className="w-full flex items-center justify-between pb-1 border-b border-white/5 scroll-x">
+        <div className="w-full flex items-center justify-between pb-1 border-b border-white/5 scroll-x">
           <div className="flex gap-2 sm:gap-4 overflow-x-auto scrollbar-none">
             {["all", "posts", "events", "nearby"].map((tab) => (
               <button
@@ -146,37 +149,43 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-        </div> */}
+        </div>
 
         {/* Sponsored/Featured Event Card (Render always at the top of feed) */}
-        {activeTab !== "posts" && (
-          <SponsoredEventCard
-            event={mockSponsoredEvent}
-            onBookNow={() => handleBookNow(mockSponsoredEvent.title, mockSponsoredEvent.price)}
-          />
+        {activeTab !== "posts" && (activeTab !== "nearby" || mockSponsoredEvent.venue.toLowerCase().includes(currentLocation.toLowerCase())) && (
+          <div onClick={() => router.push(`/events/${mockSponsoredEvent.id}`)} className="cursor-pointer">
+            <SponsoredEventCard
+              event={mockSponsoredEvent}
+              onBookNow={(e) => handleBookNow(mockSponsoredEvent.title, mockSponsoredEvent.price, e)}
+            />
+          </div>
         )}
 
         {/* Feed List */}
         <div className="flex flex-col">
           {/* Posts */}
-          {(activeTab === "all" || activeTab === "posts" || activeTab === "nearby") && (
-            mockPosts.map((post) => (
-              <div key={post.id} onClick={() => setSelectedProfile(post.user.username)} className="cursor-pointer">
-                <SocialPostCard post={post} />
-              </div>
-            ))
+          {(activeTab === "all" || activeTab === "posts" || (activeTab === "nearby" && currentLocation)) && (
+            mockPosts
+              .filter(post => activeTab !== "nearby" || post.location?.toLowerCase().includes(currentLocation.toLowerCase()))
+              .map((post) => (
+                <div key={post.id} onClick={() => setSelectedProfile(post.user.username)} className="cursor-pointer">
+                  <SocialPostCard post={post} />
+                </div>
+              ))
           )}
 
           {/* Events */}
-          {(activeTab === "all" || activeTab === "events" || activeTab === "nearby") && (
-            mockEvents.map((event) => (
-              <div key={event.id} onClick={() => setSelectedEventPreview(event.title)} className="cursor-pointer">
-                <EventCard
-                  event={event}
-                  onBookNow={() => handleBookNow(event.title, event.price)}
-                />
-              </div>
-            ))
+          {(activeTab === "all" || activeTab === "events" || (activeTab === "nearby" && currentLocation)) && (
+            mockEvents
+              .filter(event => activeTab !== "nearby" || event.venue.toLowerCase().includes(currentLocation.toLowerCase()))
+              .map((event) => (
+                <div key={event.id} onClick={() => router.push(`/events/${event.id}`)} className="cursor-pointer">
+                  <EventCard
+                    event={event}
+                    onBookNow={(e) => handleBookNow(event.title, event.price, e)}
+                  />
+                </div>
+              ))
           )}
         </div>
       </main>

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ticket, TrendingUp, Sparkles, UserPlus, UserCheck, QrCode, LogOut } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { useLayout } from "@/components/layout/AppLayout";
 
 interface RightSidebarProps {
   onBookNow: (title: string, price: string) => void;
@@ -13,6 +14,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [showQR, setShowQR] = useState<string | null>(null);
   const router = useRouter();
+  const { bookedTickets } = useLayout();
 
   const handleLogout = async () => {
     try {
@@ -24,9 +26,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
     router.push("/signin");
   };
 
-  const upcomingTickets = [
-    { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" }
-  ];
+  const upcomingTickets = bookedTickets;
 
   const trendingEvents = [
     { id: "e1", title: "Club Utopia DJ Set", location: "C-Scheme, Jaipur", price: "₹999", distance: "2.4 km" },
@@ -56,7 +56,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
             Upcoming Tickets
           </h3>
           {upcomingTickets.map((t) => (
-            <div key={t.id} className="relative rounded-md bg-foreground/10 border border-border p-3 flex flex-col gap-2">
+            <div key={t.id} className="relative rounded-md bg-foreground/10 border border-border p-3 flex flex-col gap-2 mb-1">
               <div className="flex justify-between items-start">
                 <div className="min-w-0">
                   <h4 className="text-xs font-bold text-foreground truncate leading-tight">{t.eventTitle}</h4>

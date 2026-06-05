@@ -187,7 +187,7 @@ interface EventCardProps {
     friendsAttending?: number;
     price: string;
   };
-  onBookNow: () => void;
+  onBookNow: (e?: React.MouseEvent) => void;
 }
 
 export function EventCard({ event, onBookNow }: EventCardProps) {
