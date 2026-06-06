@@ -13,6 +13,11 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "Happnix — Find Your Next Experience",
   description: "Discover live events near you, book tickets in seconds, invite your squad, and stay connected — all in one place.",
+  icons: {
+    icon: "https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg",
+    apple: "https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
+  },
+  manifest: "/manifest.json"
 };
 
 export default function RootLayout({
