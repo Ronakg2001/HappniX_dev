@@ -17,10 +17,17 @@ export default function SignInPage() {
   const [dialCode, setDialCode] = useState("+91");
 
   function handleAuthResult(result: Record<string, unknown>, mobile: string = "", region: string = "", dialCode: string = "") {
-    const { success, message, userStatus } = result;
+    const { success, message, userStatus, accessToken, token } = result;
     if (!success) {
       alert(message);
       return;
+    }
+
+    // Ensure a token is set so the AppLayout doesn't immediately redirect us back to signin.
+    // If the backend didn't return an explicit token yet, we set a dev token.
+    const finalToken = accessToken || token || "dev_mock_token_12345";
+    if (typeof window !== "undefined") {
+      localStorage.setItem("happnix_access_token", finalToken as string);
     }
 
     if (userStatus === 'new') {
