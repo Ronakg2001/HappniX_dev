@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Settings,
   Edit3,
@@ -20,6 +21,7 @@ import {
   UserCheck,
   Grid3X3,
 } from "lucide-react";
+
 import {
   EditProfileModal,
   VerificationModal,
@@ -135,6 +137,8 @@ export default function ProfilePage() {
     following: 312,
   });
 
+  const router = useRouter();
+
   // Modal states
   const [showEdit, setShowEdit] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
@@ -198,23 +202,41 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* Edit Profile Button */}
-              <button
-                onClick={() => setShowEdit(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground/8 border border-border text-xs font-bold text-foreground/80 hover:bg-foreground/12 hover:text-foreground transition-all"
-              >
-                <Edit3 className="h-3.5 w-3.5" /> Edit Profile
-              </button>
+              {/* Action Buttons */}
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => router.push("/my-bookings")}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-xs font-bold text-foreground/80 hover:bg-foreground/12 hover:text-foreground transition-all"
+                >
+                  <Ticket className="h-3.5 w-3.5 animate-pulse" /> Bookings
+                </button>
+                
+                <button
+                  onClick={() => setShowEdit(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground/8 border border-border text-xs font-bold text-foreground/80 hover:bg-foreground/12 hover:text-foreground transition-all"
+                >
+                  <Edit3 className="h-3.5 w-3.5" /> Edit Profile
+                </button>
+              </div>
             </div>
 
             {/* Name + Badges */}
             <div className="mb-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-foreground leading-none">{profile.name}</h1>
-                {profile.verified && (
+                {profile.verified ? (
                   <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-cyan-400/15 border border-cyan-400/40 text-cyan-400 text-[10px] font-black">
                     <ShieldCheck className="h-3 w-3" /> Verified
                   </span>
+                ) : (
+                  <button 
+                    onClick={() => setShowVerify(true)}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-400/10 border border-red-400/30 text-red-400 text-[10px] font-black hover:bg-red-400/20 active:scale-95 transition-all cursor-pointer"
+                    title="Click to verify identity"
+                  >
+                    <ShieldAlert className="h-3 w-3 shrink-0" />
+                    <span>Unverified</span>
+                  </button>
                 )}
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-foreground/5 border border-border text-foreground/50 text-[10px] font-semibold">
                   {profile.isPrivate ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
@@ -247,33 +269,14 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ── Verify Banner (unverified only) ─────────── */}
-        {!profile.verified && (
-          <div className="flex items-center gap-3 p-3.5 rounded-lg bg-red-400/10 border border-red-400/30 mb-4">
-            <ShieldAlert className="h-5 w-5 text-red-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-foreground">Verify your identity</p>
-              <p className="text-[10px] text-foreground/55 mt-0.5">
-                Aadhaar verification unlocks hosting and joining parties.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowVerify(true)}
-              className="px-3 py-1.5 rounded-lg bg-brand-gradient text-white text-[10px] font-bold shadow-glow hover:scale-[1.02] shrink-0"
-            >
-              Verify Now
-            </button>
-          </div>
-        )}
-
         {/* ── Content Grid Header ─────────────────────── */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 mt-2">
           <Grid3X3 className="h-4 w-4 text-foreground/40" />
           <h2 className="text-xs font-black uppercase tracking-wider text-foreground/40">Vibes</h2>
           <span className="text-xs text-foreground/30 font-semibold">({MOCK_MEDIA.length})</span>
         </div>
 
-        {/* ── Media Grid ──────────────────────────────── */}
+        {/* ── Tabs Content ────────────────────────────── */}
         {MOCK_MEDIA.length === 0 ? (
           <div className="liquid-glass liquid-edge rounded-lg flex flex-col items-center justify-center py-16 text-center">
             <Sparkles className="h-10 w-10 text-foreground/20 mb-3 animate-pulse" />

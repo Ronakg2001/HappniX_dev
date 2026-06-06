@@ -13,14 +13,13 @@ interface BottomNavProps {
 export default function BottomNav({ onCreateClick }: BottomNavProps) {
   const pathname = usePathname();
 
-  // Find config items
   const homeItem = NAV_ITEMS.find(i => i.path === "/home");
   const discoverItem = NAV_ITEMS.find(i => i.path === "/discover");
-  const messagesItem = NAV_ITEMS.find(i => i.path === "/messages");
+  const myEventsItem = NAV_ITEMS.find(i => i.path === "/my-events");
   const profileItem = NAV_ITEMS.find(i => i.path === "/profile");
 
   const leftTabs = [homeItem, discoverItem].filter(Boolean);
-  const rightTabs = [messagesItem, profileItem].filter(Boolean);
+  const rightTabs = [myEventsItem, profileItem].filter(Boolean);
 
   const renderTab = (tab: any, idx: number) => {
     const Icon = tab.icon;
@@ -43,7 +42,7 @@ export default function BottomNav({ onCreateClick }: BottomNavProps) {
         <span className={`text-[10px] mt-0.5 font-medium transition-all ${
           isActive ? "text-foreground opacity-100" : "text-foreground/40 opacity-0 scale-90 h-0 w-0 overflow-hidden"
         }`}>
-          {tab.label.split(" ")[0]}
+          {tab.label === "My Events" ? "Events" : tab.label}
         </span>
         
         {isActive && (

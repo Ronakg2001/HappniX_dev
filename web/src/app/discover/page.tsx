@@ -192,7 +192,7 @@ export default function DiscoverPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col gap-5 select-none animate-in fade-in duration-300 min-h-screen pb-16">
+    <div className="flex-1 min-w-0 w-full overflow-hidden flex flex-col gap-5 select-none animate-in fade-in duration-300 min-h-screen pb-16">
       
       {/* Search Header Row */}
       <div className="flex items-center gap-3 w-full sticky top-0 bg-background/95 backdrop-blur-md pt-2 pb-3 z-30">
@@ -231,7 +231,7 @@ export default function DiscoverPage() {
 
       {/* Conditional Layout: Active Search Overlay vs Main Grid */}
       {searchFocused ? (
-        <div className="flex-1 flex flex-col gap-6 animate-in fade-in duration-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
           
           {/* Recent Searches (Reference Image 2 Right Panel) */}
           {searchHistory.length > 0 && (
@@ -301,12 +301,12 @@ export default function DiscoverPage() {
       ) : (
         <>
           {/* Horizontal Category Pill Bar (Reference Image 1 Top Row) */}
-          <div className="w-full flex items-center gap-2 pb-1 border-b border-white/5 scroll-x overflow-x-auto scrollbar-none">
+          <div className="w-full flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none scroll-smooth">
             {CATEGORY_PILLS.map((pill) => (
               <button
                 key={pill}
                 onClick={() => setActiveCategory(pill)}
-                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer border ${
+                className={`px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer border shrink-0 ${
                   activeCategory === pill 
                     ? "bg-white text-black border-white shadow-glow" 
                     : "bg-white/5 text-white/50 border-white/5 hover:border-white/20 hover:text-white"
@@ -349,15 +349,15 @@ export default function DiscoverPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4.5">
+            <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-3 xl:grid-cols-3 gap-3">
               {filteredItems.map((item) => (
                 <div 
                   key={item.id} 
                   onClick={() => item.type === "event" ? router.push(`/events/${item.id}`) : alert("Opening highlight clip...")}
-                  className="group relative flex flex-col rounded-[20px] overflow-hidden border border-white/10 bg-gradient-to-b from-[#14141d] to-[#08080c] shadow-glow hover:shadow-[0_0_25px_rgba(201,108,255,0.15)] hover:border-white/20 hover:-translate-y-1 cursor-pointer transition-all duration-300 min-h-[290px]"
+                  className="group relative flex flex-col rounded-[20px] overflow-hidden border border-white/10 bg-gradient-to-b from-[#14141d] to-[#08080c] shadow-glow hover:shadow-[0_0_25px_rgba(201,108,255,0.15)] hover:border-white/20 hover:-translate-y-1 cursor-pointer transition-all duration-300"
                 >
-                  {/* Vertical Image Card Cover */}
-                  <div className="relative flex-1 bg-black/40 overflow-hidden">
+                  {/* Vertical Image Card Cover - strict height boundaries */}
+                  <div className="relative w-full h-40 min-[390px]:h-44 sm:h-48 bg-black/40 overflow-hidden shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={item.image} 
@@ -391,9 +391,9 @@ export default function DiscoverPage() {
                     </div>
                   </div>
 
-                  {/* Descriptive overlay text & title info */}
-                  <div className="p-3.5 flex flex-col gap-2 relative z-10 bg-[#08080c]">
-                    <h4 className="text-xs font-black text-white leading-tight uppercase tracking-wider line-clamp-2 min-h-[2.5rem] group-hover:text-[var(--brand-3)] transition-colors">
+                  {/* Descriptive text & title info - compact padding */}
+                  <div className="p-2.5 flex flex-col gap-1.5 relative z-10 bg-[#08080c]">
+                    <h4 className="text-[11px] font-black text-white leading-tight uppercase tracking-wider line-clamp-1 group-hover:text-[var(--brand-3)] transition-colors">
                       {item.title}
                     </h4>
 
@@ -407,15 +407,15 @@ export default function DiscoverPage() {
                       </span>
                     </div>
 
-                    {/* Host user info at footer */}
-                    <div className="flex items-center gap-2 border-t border-white/5 pt-2.5 mt-1">
-                      <div className="h-6 w-6 rounded-full bg-brand-gradient flex items-center justify-center font-black text-[9px] text-white select-none">
+                    {/* Host user info at footer - tight spacing */}
+                    <div className="flex items-center gap-2 border-t border-white/5 pt-2 mt-0.5">
+                      <div className="h-5 w-5 rounded-full bg-brand-gradient flex items-center justify-center font-black text-[8px] text-white select-none">
                         {item.host[0]}
                       </div>
                       <div className="flex-1 min-w-0 flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-white/80 truncate">{item.host}</span>
+                        <span className="text-[9px] font-bold text-white/80 truncate">{item.host}</span>
                         {item.verified && (
-                          <ShieldCheck className="h-3 w-3 text-[var(--brand-3)] shrink-0" />
+                          <ShieldCheck className="h-2.5 w-2.5 text-[var(--brand-3)] shrink-0" />
                         )}
                       </div>
                     </div>
