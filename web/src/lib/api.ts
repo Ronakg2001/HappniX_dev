@@ -22,7 +22,11 @@ apiClient.interceptors.request.use((config) => {
     const accessToken = localStorage.getItem("happnix_access_token");
     const isAuthEndpoint = config.url?.includes("/api/auth");
     if (accessToken && !isAuthEndpoint) {
-      config.headers["Authorization"] = `Bearer ${accessToken}`;
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set("Authorization", `Bearer ${accessToken}`);
+      } else if (config.headers) {
+        config.headers["Authorization"] = `Bearer ${accessToken}`;
+      }
     }
     
     // Clear storage on logout request
