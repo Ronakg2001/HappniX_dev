@@ -77,3 +77,46 @@ jobs:
           echo "Invoking AuthSchemaInit to apply SQL schema to RDS..."
           aws lambda invoke --function-name HappniX-dev-AuthSchemaInit response.json
           cat response.json
+
+      # ── Post-deploy smoke test ───────────────────────────────────────
+      # Invoke every Lambda with a minimal event to verify cold-start
+      # succeeds (no import errors). If ANY function fails to start,
+      # this step fails the entire workflow so you know immediately.
+      - name: Smoke test — verify all Lambdas can cold-start
+        run: |
+          set -e
+          echo "🔍 Running cold-start smoke tests..."
+
+          FUNCTIONS=$(aws cloudformation list-stack-resources \
+            --stack-name "${STACK_NAME}" \
+            --query "StackResourceSummaries[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" \
+            --output text)
+
+          FAILED=0
+          for FUNC in $FUNCTIONS; do
+            echo ""
+            echo "━━━ Testing: $FUNC ━━━"
+
+            aws lambda invoke \
+              --function-name "$FUNC" \
+              --payload '{}' \
+              --log-type Tail \
+              /tmp/response.json 2>/tmp/invoke_err.txt || true
+
+            if grep -q "FunctionError" /tmp/invoke_err.txt 2>/dev/null; then
+              echo "❌ FAILED: $FUNC"
+              cat /tmp/response.json
+              FAILED=$((FAILED + 1))
+            else
+              STATUS=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('statusCode','N/A'))" 2>/dev/null || echo "N/A")
+              echo "✅ OK (status: $STATUS)"
+            fi
+          done
+
+          echo ""
+          if [ $FAILED -gt 0 ]; then
+            echo "❌ $FAILED Lambda(s) failed cold-start smoke test!"
+            exit 1
+          else
+            echo "✅ All Lambdas passed cold-start smoke test!"
+          fi

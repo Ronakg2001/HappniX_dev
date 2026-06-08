@@ -37,20 +37,81 @@ jobs:
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v2
 
-      - name: Install pip dependencies into backend
-        run: |
-          pip install \
-            --platform manylinux2014_x86_64 \
-            --implementation cp \
-            --python-version 3.12 \
-            --only-binary=:all: \
-            --target backend/ \
-            -r backend/requirements.txt
+      # ── Build all Lambda functions inside a Docker container ──────────
+      # This compiles C extensions (psycopg2, cryptography, etc.) for the
+      # exact Amazon Linux runtime that Lambda uses. This is the ONLY
+      # reliable way to package native dependencies for Lambda.
+      - name: Build with container
+        run: sam build --use-container --template-file infra/app/template.yaml
 
-      - name: Sync Lambda Code
+      # ── Sync only the Lambda code (no CloudFormation changes) ────────
+      - name: Sync Lambda code
         run: >
           echo "Y" | sam sync
           --stack-name "${STACK_NAME}"
-          --template-file infra/app/template.yaml
+          --template-file .aws-sam/build/template.yaml
           --code
           --region "ap-south-1"
+
+      # ── Post-deploy smoke test ───────────────────────────────────────
+      # Invoke every Lambda with a minimal event to verify cold-start
+      # succeeds (no import errors). If ANY function fails to start,
+      # this step fails the entire workflow so you know immediately.
+      - name: Smoke test — verify all Lambdas can cold-start
+        run: |
+          set -e
+          echo "🔍 Running cold-start smoke tests..."
+
+          # Get all Lambda function names from the CloudFormation stack
+          FUNCTIONS=$(aws cloudformation list-stack-resources \
+            --stack-name "${STACK_NAME}" \
+            --query "StackResourceSummaries[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" \
+            --output text)
+
+          FAILED=0
+          for FUNC in $FUNCTIONS; do
+            echo ""
+            echo "━━━ Testing: $FUNC ━━━"
+
+            # Invoke with a harmless empty event — we only care if the
+            # Lambda runtime can load all modules without crashing.
+            aws lambda invoke \
+              --function-name "$FUNC" \
+              --payload '{}' \
+              --log-type Tail \
+              /tmp/response.json 2>/tmp/invoke_err.txt || true
+
+            # Check for function errors (import failures, syntax errors, etc.)
+            if grep -q "FunctionError" /tmp/invoke_err.txt 2>/dev/null; then
+              echo "❌ FAILED: $FUNC"
+              echo "Response:"
+              cat /tmp/response.json
+              echo ""
+              # Decode and show the Lambda logs for debugging
+              LOGS=$(aws lambda invoke \
+                --function-name "$FUNC" \
+                --payload '{}' \
+                --log-type Tail \
+                --query 'LogResult' \
+                --output text /tmp/response2.json 2>/dev/null || echo "")
+              if [ -n "$LOGS" ] && [ "$LOGS" != "None" ]; then
+                echo "Logs:"
+                echo "$LOGS" | base64 --decode
+              fi
+              FAILED=$((FAILED + 1))
+            else
+              STATUS=$(cat /tmp/response.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('statusCode','N/A'))" 2>/dev/null || echo "N/A")
+              echo "✅ OK (status: $STATUS)"
+            fi
+          done
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ $FAILED -gt 0 ]; then
+            echo "❌ $FAILED Lambda(s) failed cold-start smoke test!"
+            echo "This usually means a package is missing from requirements.txt"
+            echo "or an import path is wrong."
+            exit 1
+          else
+            echo "✅ All Lambdas passed cold-start smoke test!"
+          fi
