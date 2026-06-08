@@ -134,7 +134,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const data = await apiClient.post("/api/profile/me", { actionItem: "GetUserProfile" });
+        const data: any = await apiClient.get("/api/profile/me");
         if (data && data.success && data.profile) {
           setProfile(data.profile);
         } else if (data && data.data) {

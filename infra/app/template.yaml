@@ -810,7 +810,7 @@ Resources:
     Condition: HasProfileApi
     Properties:
       CodeUri: ../../backend/
-      Handler: profile.lambda_handler
+      Handler: handlers.profile.lambda_handler
       Description: Deep profile operations — Aadhaar verification, settings, notifications.
       Policies:
         - AWSLambdaBasicExecutionRole
