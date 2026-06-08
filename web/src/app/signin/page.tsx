@@ -23,11 +23,11 @@ export default function SignInPage() {
       return;
     }
 
-    // Ensure a token is set so the AppLayout doesn't immediately redirect us back to signin.
-    // If the backend didn't return an explicit token yet, we set a dev token.
-    const finalToken = accessToken || token || "dev_mock_token_12345";
-    if (typeof window !== "undefined") {
-      localStorage.setItem("happnix_access_token", finalToken as string);
+    // Store the real access token if the backend returned one.
+    // Do NOT fall back to a fake token — that causes silent 401s on every API call.
+    const realToken = accessToken || token;
+    if (realToken && typeof window !== "undefined") {
+      localStorage.setItem("happnix_access_token", realToken as string);
     }
 
     if (userStatus === 'new') {
@@ -36,8 +36,12 @@ export default function SignInPage() {
       sessionStorage.setItem('signup_region', region);
       sessionStorage.setItem('signup_dialCode', dialCode);
       router.push('/signup');
-    } else {
+    } else if (realToken) {
+      // We have a real JWT — safe to enter the app
       router.push('/home');
+    } else {
+      // Existing user verified by OTP but no JWT yet — need to sign in with password
+      setView('password');
     }
   }
 
