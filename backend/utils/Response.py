@@ -1,4 +1,16 @@
 import json
+from decimal import Decimal
+
+
+class _DecimalEncoder(json.JSONEncoder):
+    """Handle DynamoDB Decimal values during JSON serialization."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # Return int if there's no fractional part, otherwise float
+            if obj % 1 == 0:
+                return int(obj)
+            return float(obj)
+        return super().default(obj)
 
 def _cors_headers() -> dict:
     """Standard CORS + content-type headers for all API responses."""
@@ -30,7 +42,7 @@ def success_response(body: dict, status: int = 200, trace_id: str = None) -> dic
     return {
         "statusCode": status,
         "headers": headers,
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=_DecimalEncoder),
     }
 
 
@@ -55,6 +67,6 @@ def error_response(message: str, status: int = 400, trace_id: str = None) -> dic
     return {
         "statusCode": status,
         "headers": headers,
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=_DecimalEncoder),
     }
 
