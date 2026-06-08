@@ -832,6 +832,9 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
+              Resource: "*"
+            - Effect: Allow
+              Action:
                 - cognito-idp:AdminDeleteUser # DeleteAccount action
               Resource:
                 Fn::GetAtt:
