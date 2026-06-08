@@ -1,32 +1,179 @@
 """
 handlers/profile.py — User profile endpoints for HappniX.
+
+Routes:
+    GET  /api/profile/me         → getUserProfile (own profile from DynamoDB)
+    GET  /api/profile/{id}       → getPublicProfile (other user's profile)
+    POST /api/profile/me         → actionItem-based dispatch
+
+Auth:
+    The lambda_handler validates the Bearer token against Cognito and looks up
+    the user in RDS. The extracted user context (userID, username, fullName,
+    cognitoSub) is passed to every action handler via **kwargs, so individual
+    handlers never touch auth logic directly.
+
+Self-healing:
+    If the PROFILE entity is missing from DynamoDB (e.g. the DynamoDB write
+    failed during signup), the getUserProfile handler will automatically
+    create it using the user context from kwargs, and then return it.
 """
 
 from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
+from integration import dynamo_db
 
-def handle_get_me(event):
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ACTION HANDLERS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def get_user_profile(**kwargs):
     """
-    Handle GET /api/profile/me
-    Currently a placeholder. Strict authentication is now handled by the Home Page API.
+    Fetch the authenticated user's profile from DynamoDB.
+
+    Uses ensure_user_profile() for self-healing: if the PROFILE entity is
+    missing (DynamoDB write failed during signup), it creates both PROFILE +
+    SETTINGS entities first, then returns the fresh profile.
+
+    Kwargs (injected by lambda_handler):
+        user_id      (str): HappniX UUIDv7 userID.
+        username     (str): Cognito / RDS username.
+        full_name    (str): User's display name.
+        cognito_sub  (str): AWS Cognito sub UUID.
     """
+    user_id     = kwargs.get("user_id")
+    username    = kwargs.get("username")
+    full_name   = kwargs.get("full_name")
+    cognito_sub = kwargs.get("cognito_sub")
+
+    # ── Fetch (or self-heal) the DynamoDB PROFILE ──────────────────────────────
+    profile_result = dynamo_db.ensure_user_profile(
+        user_id=user_id,
+        username=username,
+        full_name=full_name,
+        cognito_sub=cognito_sub,
+    )
+
+    if not profile_result.get("success"):
+        util.log("error", "get_user_profile",
+                 "Failed to fetch/create user profile in DynamoDB.",
+                 user_id=user_id, error=profile_result.get("error"))
+        return error_response("Failed to load profile. Please try again.", 500)
+
     return success_response({
         "success": True,
-        "message": "Profile fetching logic will be implemented here."
+        "profile": profile_result.get("data", {}),
     })
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ACTION REGISTRY
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACTION_HANDLERS = {
+    "getUserProfile": get_user_profile,
+    # Future: "updateProfile", "uploadAvatar", etc.
+}
+
+# Actions that map from GET path → action name
+GET_ROUTE_MAP = {
+    "/api/profile/me": "getUserProfile",
+    # Future: "/api/profile/{id}" → "getPublicProfile"
+}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# LAMBDA HANDLER
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 def lambda_handler(event, context):
+    """
+    Entry point for all profile actions.
+
+    Steps:
+        A. Validate the Bearer token against Cognito.
+        B. Look up the user in RDS to get userID, fullName, cognitoSub.
+        C. Determine the action (from GET path or POST actionItem).
+        D. Build a kwargs dict with the user context.
+        E. Call the matching action handler with **kwargs.
+    """
     try:
-        path = event.get("path", "")
+        # ── A. Validate Bearer token ───────────────────────────────────────────
+        headers = event.get("headers", {})
+        auth_header = headers.get("Authorization") or headers.get("authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return error_response("Missing or invalid Authorization header.", 401)
+
+        access_token = auth_header.split(" ")[1]
+
+        cognito_user = cognito.get_user(access_token)
+        if not cognito_user:
+            return error_response("Unauthorized. Invalid or expired token.", 401)
+
+        username = cognito_user.get("Username")
+        if not username:
+            return error_response("Unauthorized. Invalid Cognito user data.", 401)
+
+        # ── B. Look up the user in RDS ─────────────────────────────────────────
+        rds_result = rds.get_user_by_username(username)
+        if not rds_result.get("success"):
+            util.log("warning", "profile.lambda_handler",
+                     "User not found in RDS.", username=username)
+            return error_response("User not found in database.", 404)
+
+        user_data   = rds_result.get("data", {})
+        user_id     = user_data.get("userID")
+        full_name   = user_data.get("fullName", "")
+        cognito_sub = user_data.get("cognitoSub", "")
+
+        if not user_id:
+            return error_response("User ID not found in database.", 500)
+
+        # ── C. Determine the action ───────────────────────────────────────────
         http_method = event.get("httpMethod", "")
-        
-        if http_method == "GET" and path.endswith("/api/profile/me"):
-            return handle_get_me(event)
-            
-        return error_response("Profile handler not implemented yet.", 501)
+        path        = event.get("path", "")
+        action_name = None
+
+        if http_method == "GET":
+            # Match GET path to an action
+            action_name = GET_ROUTE_MAP.get(path)
+        elif http_method == "POST":
+            # Extract actionItem from the POST body
+            body = util.parse_body(event)
+            if body == "400":
+                return error_response("Malformed JSON in request body.", 400)
+            action_name = body.get("actionItem")
+
+        if not action_name:
+            return error_response(f"Unknown profile action for {http_method} {path}.", 400)
+
+        handler = ACTION_HANDLERS.get(action_name)
+        if not handler:
+            return error_response(f"Action '{action_name}' not implemented.", 501)
+
+        # ── D. Build kwargs with user context ──────────────────────────────────
+        kwargs = {
+            "user_id":      user_id,
+            "username":     username,
+            "full_name":    full_name,
+            "cognito_sub":  cognito_sub,
+            "access_token": access_token,
+        }
+
+        # Merge POST body fields into kwargs (if any)
+        if http_method == "POST":
+            body = util.parse_body(event)
+            if isinstance(body, dict):
+                for k, v in body.items():
+                    if k != "actionItem":
+                        kwargs[k] = v
+
+        # ── E. Call the action handler ─────────────────────────────────────────
+        return handler(**kwargs)
+
     except Exception as exc:
         util.log("error", "profile.lambda_handler", f"Unhandled exception: {exc}")
         return error_response("Internal server error.", 500)

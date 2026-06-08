@@ -25,6 +25,7 @@ from utils import dependencies
 from utils import uuid_generator as uuid_gen
 from integration import cognito_auth as cognito
 from integration import rds
+from integration import dynamo_db
 from services import preauth_session_service as preauth
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -330,6 +331,20 @@ def register_user_details(**kwargs):
 
     util.log("info", "register_user_details", "User inserted into RDS successfully",
         username=username, user_id=user_id)
+
+    # ── Create PROFILE + SETTINGS entities in DynamoDB ─────────────────────────
+    # If this fails, it is NOT fatal — the self-healing logic in the profile API
+    # will detect the missing rows and recreate them on first access.
+    dynamo_result = dynamo_db.create_user_entities(
+        user_id=user_id,
+        username=username,
+        full_name=full_name,
+        cognito_sub=cognito_sub,
+    )
+    if not dynamo_result.get("success"):
+        util.log("warning", "register_user_details",
+                 "DynamoDB entity creation failed (non-fatal, will self-heal on profile access)",
+                 user_id=user_id, error=dynamo_result.get("error"))
 
     # ── Cleanup preauth session — no longer needed ─────────────────────────────
     preauth.delete_session(token)
