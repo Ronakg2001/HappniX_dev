@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,8 @@ import {
   MediaViewerModal,
   type UserProfile,
 } from "@/components/modals/ProfileModals";
+
+import { apiClient } from "@/lib/api";
 
 // ─── MOCK DATA ─────────────────────────────────────────────────
 
@@ -125,17 +127,28 @@ function MediaGridItem({ item, onClick }: { item: (typeof MOCK_MEDIA)[0]; onClic
 
 // ─── MAIN PROFILE PAGE ─────────────────────────────────────────
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile>({
-    name: "Aarav Mehta",
-    username: "aaravm",
-    bio: "Chasing sunsets & soundwaves. Techno enthusiast. Jaipur nightlife explorer. 🎧",
-    avatar: null,
-    verified: false,
-    isPrivate: false,
-    vibes: 9,
-    followers: 843,
-    following: 312,
-  });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await apiClient.post("/api/profile/me", { actionItem: "GetUserProfile" });
+        if (data && data.success && data.profile) {
+          setProfile(data.profile);
+        } else if (data && data.data) {
+          // Fallback if data is inside the 'data' field
+          setProfile(data.data);
+        }
+      } catch (err: any) {
+        setError(err.message || "Failed to load profile.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const router = useRouter();
 
@@ -147,10 +160,33 @@ export default function ProfilePage() {
   const [selectedMedia, setSelectedMedia] = useState<(typeof MOCK_MEDIA)[0] | null>(null);
 
   const handleProfileSave = (updates: Partial<UserProfile>) =>
-    setProfile((prev) => ({ ...prev, ...updates }));
+    setProfile((prev) => (prev ? { ...prev, ...updates } : null));
 
   const handleVerified = () =>
-    setProfile((prev) => ({ ...prev, verified: true }));
+    setProfile((prev) => (prev ? { ...prev, verified: true } : null));
+
+  if (loading) {
+    return (
+      <main className="flex-1 min-w-0 flex flex-col gap-0 mx-auto w-full items-center justify-center min-h-[50vh]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-24 w-24 bg-foreground/10 rounded-full mb-4"></div>
+          <div className="h-4 w-32 bg-foreground/10 rounded mb-2"></div>
+          <div className="h-3 w-24 bg-foreground/10 rounded"></div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <main className="flex-1 min-w-0 flex flex-col gap-0 mx-auto w-full items-center justify-center min-h-[50vh]">
+        <p className="text-foreground/50">{error || "Failed to load profile."}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-foreground/10 rounded-lg">
+          Retry
+        </button>
+      </main>
+    );
+  }
 
   return (
     <>
