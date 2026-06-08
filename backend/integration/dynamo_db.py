@@ -23,20 +23,17 @@ from utils import utilities as util
 
 
 # ── DynamoDB client (single shared instance) ──────────────────────────────────
-_dynamodb_resource = None
+_dynamodb_resource = boto3.resource("dynamodb")
 _TABLE_NAME = None
 
 def _get_table():
     """Return the DynamoDB Table resource, or None if unavailable. Lazy loaded."""
     global _dynamodb_resource, _TABLE_NAME
-    
-    if _dynamodb_resource is None:
-        try:
-            _dynamodb_resource = boto3.resource("dynamodb")
-            _TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "")
-        except Exception as exc:
-            util.log("error", "dynamo_db._get_table", f"DynamoDB Init failed: {exc}")
-            return None
+    try:       
+        _TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "")
+    except Exception as exc:
+        util.log("error", "dynamo_db._get_table", f"DynamoDB Init failed: {exc}")
+        return None
 
     if not _dynamodb_resource or not _TABLE_NAME:
         util.log("error", "dynamo_db._get_table",
