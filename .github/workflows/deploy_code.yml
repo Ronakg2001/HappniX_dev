@@ -6,7 +6,6 @@ on:
       - dev
     paths:
       - "backend/**"
-      - "!backend/requirements.txt"
       - ".github/workflows/deploy_code.yml"
   workflow_dispatch:
 
@@ -37,6 +36,16 @@ jobs:
 
       - name: Set up AWS SAM
         uses: aws-actions/setup-sam@v2
+
+      - name: Install pip dependencies into backend
+        run: |
+          pip install \
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.12 \
+            --only-binary=:all: \
+            --target backend/ \
+            -r backend/requirements.txt
 
       - name: Sync Lambda Code
         run: >
