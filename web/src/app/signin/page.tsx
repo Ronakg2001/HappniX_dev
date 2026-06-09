@@ -30,7 +30,7 @@ export default function SignInPage() {
       localStorage.setItem("happnix_access_token", realToken as string);
     }
 
-    if (userStatus === 'new') {
+    if (userStatus === 'new' || result.redirectUrl === '/signup') {
       // Persist mobile & region so the signup page can display them read-only
       sessionStorage.setItem('signup_mobile', mobile);
       sessionStorage.setItem('signup_region', region);

@@ -181,6 +181,7 @@ def verify_mobile_otp(**kwargs):
                 "success": True,
                 "userStatus": "existing",
                 "message": "Mobile verified. Please sign in with your password.",
+                "redirectUrl": "/signin?view=password"
             })
 
         session["verified_mobile"] = mobile
@@ -191,6 +192,7 @@ def verify_mobile_otp(**kwargs):
             "success": True,
             "userStatus": "new",
             "message": "Mobile verified. Please complete your signup.",
+            "redirectUrl": "/signup"
         }, token)
     except Exception as exc:
         util.log("error", "verify_mobile_otp", f"Action failed: {exc}")
