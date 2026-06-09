@@ -7,6 +7,7 @@ import boto3
 from botocore.exceptions import ClientError
 from botocore.config import Config
 from utils import utilities as util
+from utils import dependencies
 
 # Global variables for caching the client
 _r2_client = None
@@ -17,16 +18,18 @@ def get_r2_client():
     if _r2_client is not None:
         return _r2_client, _bucket_name
 
-    account_id = os.environ.get("R2_ACCOUNT_ID")
-    access_key = os.environ.get("R2_ACCESS_KEY_ID")
-    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
-    _bucket_name = os.environ.get("R2_BUCKET_NAME", "happnix-media")
+    account_id = dependencies.enviroment_variable.get("CLOUDFLARE_ACCOUNT_ID")
+    access_key = dependencies.enviroment_variable.get("R2_ACCESS_KEY_ID")
+    secret_key = dependencies.enviroment_variable.get("R2_SECRET_ACCESS_KEY")
+    _bucket_name = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET", "happnix-media")
 
     if not all([account_id, access_key, secret_key]):
         util.log("error", "r2_bucket.get_r2_client", "Missing R2 credentials in environment.")
         return None, _bucket_name
 
-    endpoint_url = f"https://{account_id}.r2.cloudflarestorage.com"
+    endpoint_url = dependencies.enviroment_variable.get("R2_ENDPOINT")
+    if not endpoint_url:
+        endpoint_url = f"https://{account_id}.r2.cloudflarestorage.com"
 
     try:
         _r2_client = boto3.client(
