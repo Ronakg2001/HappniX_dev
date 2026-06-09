@@ -7,6 +7,7 @@ from utils import uuid_generator as uuid_gen
 from integration import cognito_auth as cognito
 from integration import rds
 from integration import dynamo_db
+from utils import manifest
 
 
 def check_user_exists(phone_e164: str) -> bool:
@@ -132,6 +133,8 @@ def create_user_entities(**kwargs) -> dict:
         util.log("info", "signup_signin_services.create_user_entities",
                  "PROFILE + SETTINGS created in DynamoDB",
                  user_id=user_id, username=username)
+        # Initialize R2 storage folders
+        manifest.init_user_storage(user_id)
     else:
         util.log("error", "signup_signin_services.create_user_entities",
                  f"DynamoDB batch write failed: {result.get('error')}",

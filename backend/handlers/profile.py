@@ -22,7 +22,10 @@ from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
+from integration import r2_bucket
 from services import profile_services
+from utils import manifest
+import time
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -71,6 +74,50 @@ def get_user_profile(**kwargs):
         util.log("error", "get_user_profile", f"Action failed: {exc}")
         return error_response(f"Action error: {str(exc)}", 500)
 
+def update_user_profile(**kwargs):
+    """
+    Updates the authenticated user's profile.
+    If 'updateAvatar' is true, generates a new avatar key and a presigned URL.
+    """
+    user_id = kwargs.get("user_id")
+    
+    # Extract allowed fields
+    allowed_fields = ["bio", "isPrivate", "accountType"]
+    updates = {}
+    for f in allowed_fields:
+        if f in kwargs:
+            updates[f] = kwargs[f]
+            
+    # Handle avatar update request
+    avatar_changed = kwargs.get("updateAvatar", False)
+    presigned_url = None
+    
+    if avatar_changed:
+        timestamp = int(time.time())
+        avatar_key = manifest.get_avatar_key(user_id, timestamp)
+        updates["avatar"] = avatar_key
+        
+        url_res = r2_bucket.generate_presigned_url(avatar_key)
+        if url_res.get("success"):
+            presigned_url = url_res.get("url")
+            
+    if not updates:
+        return success_response({"success": True, "message": "No updates provided."})
+        
+    update_res = profile_services.update_user_profile(user_id, updates)
+    if not update_res.get("success"):
+        return error_response(update_res.get("error"), 500)
+        
+    response_data = {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "profile": update_res.get("data")
+    }
+    if presigned_url:
+        response_data["avatarUploadUrl"] = presigned_url
+        
+    return success_response(response_data)
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
@@ -78,6 +125,7 @@ def get_user_profile(**kwargs):
 
 ACTION_HANDLERS = {
     "getUserProfile": get_user_profile,
+    "update_user_profile": update_user_profile,
     # Future: "updateProfile", "uploadAvatar", etc.
 }
 

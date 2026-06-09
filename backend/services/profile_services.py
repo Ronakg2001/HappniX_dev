@@ -45,3 +45,27 @@ def ensure_user_profile(**kwargs) -> dict:
 
     # 4. Some other DynamoDB error
     return result
+
+def update_user_profile(user_id: str, updates: dict) -> dict:
+    """
+    Updates the PROFILE entity with the given fields.
+    """
+    if not user_id:
+        return {"success": False, "error": "user_id is required"}
+
+    # Fetch existing to merge
+    fetch_res = dynamo_db.get_item(table_key="users", pk_value=user_id, sk_value="PROFILE")
+    if not fetch_res.get("success"):
+        return {"success": False, "error": "Profile not found to update."}
+        
+    current_profile = fetch_res.get("data", {})
+    current_profile.update(updates)
+    current_profile["updatedAt"] = util.now_iso()
+    
+    # We use put_item without entity_type to replace the item with merged data
+    put_res = dynamo_db.put_item("users", user_id, "PROFILE", **current_profile)
+    if not put_res.get("success"):
+        return {"success": False, "error": "Failed to save profile updates."}
+        
+    return {"success": True, "data": current_profile}
+
