@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BadgeCheck, Bell, Edit3, Lock, LogOut, ShieldCheck, X } from 'lucide-react-native';
+import { BadgeCheck, Bell, Calendar, Edit3, Lock, LogOut, Settings, ShieldCheck, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Avatar, BrandHeader, EmptyState, EventArt, Glass, GradientButton, GhostButton, Screen } from '@/components/happnix/kit';
 import { colors, fonts } from '@/constants/brand';
@@ -83,9 +83,14 @@ export default function ProfileScreen() {
           title="Profile"
           subtitle={`@${username}`}
           right={
-            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-              <Bell color={colors.text} size={19} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
+                <Bell color={colors.text} size={19} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/settings')}>
+                <Settings color={colors.text} size={19} />
+              </TouchableOpacity>
+            </View>
           }
         />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -122,15 +127,18 @@ export default function ProfileScreen() {
             </Glass>
           ) : null}
 
-          <Glass style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}><Lock color={colors.text} size={16} /> Private account</Text>
-                <Text style={styles.settingBody}>Only approved fans can view your profile activity.</Text>
-              </View>
-              <Switch value={isPrivate} onValueChange={togglePrivate} thumbColor={isPrivate ? colors.pink : '#d1d5db'} trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(255,79,216,0.42)' }} />
+          {/* Settings moved to dedicated screen */}
+
+          <Text style={styles.section}>Organizer</Text>
+          <TouchableOpacity style={styles.organizerCard} activeOpacity={0.8} onPress={() => router.push('/my-events')}>
+            <View style={styles.organizerIconBox}>
+              <Calendar color="#fff" size={18} />
             </View>
-          </Glass>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.organizerTitle}>Organizer Dashboard</Text>
+              <Text style={styles.organizerDesc}>Manage your events, guests, and analytics</Text>
+            </View>
+          </TouchableOpacity>
 
           <Text style={styles.section}>Vibes</Text>
           {events.length ? (
@@ -145,10 +153,7 @@ export default function ProfileScreen() {
             <EmptyState title="No vibes yet" body="Hosted events and your Happnix moments will collect here." />
           )}
 
-          <TouchableOpacity style={styles.logout} onPress={logout}>
-            <LogOut color={colors.danger} size={17} />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
+          {/* Logout moved to dedicated settings screen */}
         </ScrollView>
 
         <Modal transparent visible={editOpen} animationType="slide">
@@ -209,7 +214,11 @@ const styles = StyleSheet.create({
   settingText: { flex: 1 },
   settingTitle: { fontFamily: fonts.black, color: colors.text, fontSize: 14 },
   settingBody: { fontFamily: fonts.regular, color: colors.muted, fontSize: 12, marginTop: 4, lineHeight: 17 },
-  section: { fontFamily: fonts.black, color: colors.faint, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
+  section: { fontFamily: fonts.black, color: colors.faint, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, marginTop: 4 },
+  organizerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,79,216,0.1)', borderWidth: 1, borderColor: 'rgba(255,79,216,0.3)', borderRadius: 16, padding: 16, marginBottom: 20, gap: 14 },
+  organizerIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.pink, alignItems: 'center', justifyContent: 'center' },
+  organizerTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
+  organizerDesc: { fontFamily: fonts.semibold, color: colors.pink, fontSize: 12, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   gridItem: { width: '31.9%', borderRadius: 12, overflow: 'hidden' },
   logout: { marginTop: 20, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 15 },

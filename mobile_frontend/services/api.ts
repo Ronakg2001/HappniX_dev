@@ -118,6 +118,7 @@ export const eventApi = {
     api.get('/api/events/nearby', { params: { latitude, longitude, radiusKm } }),
   live: () => api.get('/api/events/live'),
   mine: () => api.get('/api/events/mine'),
+  getById: (eventId: number | string) => api.get(`/api/events/${eventId}`),
   create: (formData: FormData) =>
     api.post('/api/events/create', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

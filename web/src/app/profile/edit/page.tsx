@@ -130,18 +130,32 @@ export default function EditProfilePage() {
         }
       });
 
-      const updates = {
+      const file = fileRef.current?.files?.[0];
+      const updateAvatar = !!file;
+
+      const payload = {
+        actionItem: "update_user_profile",
         name,
         username,
         bio,
-        avatar: previewAvatar,
         pronoun,
         dob,
         gender,
-        socialLinks: socialLinksObj
+        socialLinks: socialLinksObj,
+        updateAvatar
       };
 
-      // await apiClient.put("/api/profile/me", updates); // In real app
+      const res: any = await apiClient.post("/api/profile/me", payload);
+
+      if (res && res.success && res.avatarUploadUrl && file) {
+        await fetch(res.avatarUploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: {
+            "Content-Type": file.type
+          }
+        });
+      }
 
       // Go back to profile page
       router.push("/profile");

@@ -82,7 +82,7 @@ def update_user_profile(**kwargs):
     user_id = kwargs.get("user_id")
     
     # Extract allowed fields
-    allowed_fields = ["bio", "isPrivate", "accountType"]
+    allowed_fields = ["bio", "isPrivate", "accountType", "pronoun", "socialLinks", "name", "username", "dob", "gender"]
     updates = {}
     for f in allowed_fields:
         if f in kwargs:
