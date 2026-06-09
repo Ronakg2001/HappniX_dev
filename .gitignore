@@ -1,5 +1,8 @@
 #APPS_secrets
 secrets_folder/
+web/package-lock.json
+mobile_app/package-lock.json
+
 #backend/utils/dependencies.py
 # wrangler files
 .wrangler

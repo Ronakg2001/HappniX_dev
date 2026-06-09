@@ -1,8 +1,17 @@
 import psycopg2
 import os
+import json
 from psycopg2.extras import RealDictCursor
 from utils import dependencies
 from utils import utilities as util
+
+_MANIFEST_PATH = os.path.join(os.path.dirname(__file__), "manifest.json")
+try:
+    with open(_MANIFEST_PATH, "r") as _f:
+        _MANIFEST = json.load(_f)
+except Exception as e:
+    util.log("error", "rds.init", f"Failed to load manifest.json: {e}")
+    _MANIFEST = {}
 
 def get_connection():
     """Establish a connection to the RDS PostgreSQL database."""
@@ -43,160 +52,114 @@ def execute_raw_sql(sql: str) -> dict:
         conn.close()
 
 
-def get_all_users() -> dict:
-    """Retrieve all users from the users table."""
-    conn = get_connection()
-    if not conn:
-        return {"success": False, "error": "Database connection failed."}
-    
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM users;")
-            rows = cur.fetchall()
-            # Convert UUIDs/dates to strings for JSON serialization
-            data = []
-            for row in rows:
-                data.append({k: str(v) if v is not None else None for k, v in row.items()})
-        return {"success": True, "data": data}
-    except Exception as exc:
-        util.log("error", "rds.get_all_users", f"Failed to fetch users: {exc}")
-        return {"success": False, "error": str(exc)}
-    finally:
-        conn.close()
-
-
-def record_exists(column_name: str, value: str) -> bool:
+def get_record(table_name: str, **kwargs) -> dict:
     """
-    Ultra-fast check to see if a record exists in the users table 
-    based on a specific column (e.g. "userName", "phoneNumber", "emailAddress").
+    Retrieve a single record based on matching kwargs conditions.
+    Example: get_record("users", userName="john_doe")
     """
     conn = get_connection()
     if not conn:
-        # If DB is down, return True to fail-safe and prevent duplicates/errors
-        return True
-    
-    # Whitelist allowed columns to prevent SQL injection
-    allowed_columns = {"userName", "phoneNumber", "emailAddress", "cognitoSub", "userID"}
-    if column_name not in allowed_columns:
-        util.log("error", "rds.record_exists", f"Invalid column name: {column_name}")
-        return True
-    
-    try:
-        with conn.cursor() as cur:
-            # We use f-string for the column name (safe because of the whitelist above), 
-            # and parameterized query %s for the value (safe from injection)
-            cur.execute(f'SELECT 1 FROM users WHERE "{column_name}" = %s LIMIT 1;', (value,))
-            return cur.fetchone() is not None
-    except Exception as exc:
-        util.log("error", "rds.record_exists", f"Failed to check {column_name}: {exc}")
-        return True # fail-safe
-    finally:
-        conn.close()
-
-
-def get_user_by_username(username: str) -> dict:
-    """Retrieve a specific user by username."""
-    conn = get_connection()
-    if not conn:
         return {"success": False, "error": "Database connection failed."}
+        
+    if not kwargs:
+        return {"success": False, "error": "No query conditions provided."}
+        
+    where_clauses = []
+    values = []
+    for k, v in kwargs.items():
+        where_clauses.append(f'"{k}" = %s')
+        values.append(v)
+        
+    where_str = " AND ".join(where_clauses)
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                'SELECT * FROM users WHERE "userName" = %s LIMIT 1;',
-                (username,)
-            )
+            cur.execute(f'SELECT * FROM {table_name} WHERE {where_str} LIMIT 1;', tuple(values))
             row = cur.fetchone()
             if row:
                 data = {k: str(v) if v is not None else None for k, v in row.items()}
                 return {"success": True, "data": data}
             else:
-                return {"success": False, "error": "User not found."}
+                return {"success": False, "error": "Record not found."}
     except Exception as exc:
-        util.log("error", "rds.get_user_by_username", f"Failed to fetch user: {exc}")
+        util.log("error", "rds.get_record", f"Failed to fetch record: {exc}")
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()
 
 
-def insert_user(
-    user_id:      str,
-    cognito_sub:  str,
-    username:     str,
-    email:        str,
-    phone_number: str,
-    full_name:    str,
-    dob:          str,
-    gender:       str,
-    region:       str,
-    email_verified: bool = True,
-) -> dict:
+def record_exists(table_name: str, **kwargs) -> bool:
     """
-    Insert a new user row into the `users` table.
+    Ultra-fast check to see if a record exists based on kwargs.
+    """
+    conn = get_connection()
+    if not conn:
+        return True # fail-safe
+        
+    if not kwargs:
+        return True
+        
+    where_clauses = []
+    values = []
+    for k, v in kwargs.items():
+        where_clauses.append(f'"{k}" = %s')
+        values.append(v)
+        
+    where_str = " AND ".join(where_clauses)
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f'SELECT 1 FROM {table_name} WHERE {where_str} LIMIT 1;', tuple(values))
+            return cur.fetchone() is not None
+    except Exception as exc:
+        util.log("error", "rds.record_exists", f"Failed to check record: {exc}")
+        return True
+    finally:
+        conn.close()
 
-    Called by the Cognito Post Confirmation Lambda after a user successfully
-    confirms their account. All required columns must be provided; optional
-    profile columns (bio, profilePictureUrl, etc.) default to NULL.
 
-    Args:
-        user_id:        UUIDv7 string — primary key, generated during signup.
-        cognito_sub:    Cognito sub UUID — unique identity bridge.
-        username:       Chosen username.
-        email:          Email address.
-        phone_number:   E.164 phone number (e.g. '+919876543210').
-        full_name:      Full display name (stored as userName).
-        dob:            Date of birth string in YYYY-MM-DD format.
-        gender:         Gender string (e.g. 'Male', 'Female', 'Other').
-        region:         ISO 3166-1 alpha-2 region code (e.g. 'IN').
-        email_verified: Whether the email is verified. Defaults to True.
-
-    Returns:
-        dict: {"success": True} on success, {"success": False, "error": ...} on failure.
+def insert_record(table_name: str, **kwargs) -> dict:
+    """
+    Dynamically insert a record into the table.
+    Uses manifest.json to pull allowed columns and default statuses.
     """
     conn = get_connection()
     if not conn:
         return {"success": False, "error": "Database connection failed."}
-
-    sql = """
-        INSERT INTO users (
-            "userID",
-            "cognitoSub",
-            "userName",
-            "fullName",
-            "emailAddress",
-            "phoneNumber",
-            "dateOfBirth",
-            "gender",
-            "region",
-            "emailVerified",
-            "status"
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active'
-        )
-        ON CONFLICT ("userID") DO NOTHING;
-    """
+        
+    table_config = _MANIFEST.get("rds", {}).get("tables", {}).get(table_name, {})
+    columns = table_config.get("columns", [])
+    
+    if not columns:
+        return {"success": False, "error": f"Table {table_name} not configured in manifest."}
+        
+    insert_data = {}
+    for col in columns:
+        if col in kwargs:
+            insert_data[col] = kwargs[col]
+        elif col == "status":
+            insert_data[col] = table_config.get("default_status", "Active")
+        else:
+            insert_data[col] = None
+            
+    cols_str = ", ".join([f'"{k}"' for k in insert_data.keys()])
+    placeholders = ", ".join(["%s"] * len(insert_data))
+    values = tuple(insert_data.values())
+    
+    # We assume 'userID' is primary key based on prior implementation. 
+    # For full genericness, could put pk in manifest, but DO NOTHING on conflict is standard for users.
+    pk = table_config.get("pk", "userID")
+    sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) ON CONFLICT ("{pk}") DO NOTHING;'
+    
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, (
-                user_id,
-                cognito_sub,
-                username,
-                full_name,
-                email,
-                phone_number,
-                dob,
-                gender,
-                region,
-                email_verified,
-            ))
+            cur.execute(sql, values)
             conn.commit()
-        util.log("info", "rds.insert_user", "User inserted into RDS",
-                 user_id=user_id, cognito_sub=cognito_sub)
+        util.log("info", "rds.insert_record", f"Record inserted into {table_name}")
         return {"success": True}
     except Exception as exc:
         conn.rollback()
-        util.log("error", "rds.insert_user", f"Failed to insert user: {exc}",
-                 user_id=user_id)
+        util.log("error", "rds.insert_record", f"Failed to insert: {exc}")
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()

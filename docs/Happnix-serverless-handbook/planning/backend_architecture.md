@@ -103,3 +103,10 @@ For standard CRUD (Create, Read, Update, Delete) features like Profiles, Events,
 - `GET /api/profile/me` ➡️ Triggers `profiles_api.py` to fetch your own data.
 - `GET /api/users/{id}/profile` ➡️ Triggers `profiles_api.py` to fetch someone else's public profile.
 - `POST /api/events/create` ➡️ Triggers `events_api.py`.
+
+#### 3. Layered Architecture & Code Organization
+The codebase strictly adheres to a separated, layered architecture to maintain clean boundaries between I/O, business logic, and database operations.
+
+- **Handlers (`handlers/`)**: The front door. Handlers extract and validate parameters, handle basic/short logic under the **"10-Line Rule"**, manage `try/except` safety blocks, and format the final HTTP `success_response` / `error_response`.
+- **Services (`services/`)**: Orchestrates complex business logic and multi-step workflows (e.g., syncing Cognito with RDS and DynamoDB). Expects clean, validated arguments from handlers.
+- **Integrations (`integration/`)**: Generic wrappers for AWS/DB operations (`rds.py`, `cognito_auth.py`, `dynamo_db.py`). Functions are fully generic, accept `**kwargs`, and dynamically rely on `integration/manifest.json` for schema columns and attribute mappings.

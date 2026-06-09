@@ -22,7 +22,7 @@ from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
-from integration import dynamo_db
+from services import profile_services
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -48,24 +48,28 @@ def get_user_profile(**kwargs):
     full_name   = kwargs.get("full_name")
     cognito_sub = kwargs.get("cognito_sub")
 
-    # ── Fetch (or self-heal) the DynamoDB PROFILE ──────────────────────────────
-    profile_result = dynamo_db.ensure_user_profile(
-        user_id=user_id,
-        username=username,
-        full_name=full_name,
-        cognito_sub=cognito_sub,
-    )
+    try:
+        # ── Fetch (or self-heal) the DynamoDB PROFILE ──────────────────────────────
+        profile_result = profile_services.ensure_user_profile(
+            user_id=user_id,
+            username=username,
+            full_name=full_name,
+            cognito_sub=cognito_sub,
+        )
 
-    if not profile_result.get("success"):
-        util.log("error", "get_user_profile",
-                 "Failed to fetch/create user profile in DynamoDB.",
-                 user_id=user_id, error=profile_result.get("error"))
-        return error_response("Failed to load profile. Please try again.", 500)
+        if not profile_result.get("success"):
+            util.log("error", "get_user_profile",
+                     "Failed to fetch/create user profile in DynamoDB.",
+                     user_id=user_id, error=profile_result.get("error"))
+            return error_response("Failed to load profile. Please try again.", 500)
 
-    return success_response({
-        "success": True,
-        "profile": profile_result.get("data", {}),
-    })
+        return success_response({
+            "success": True,
+            "profile": profile_result.get("data", {}),
+        })
+    except Exception as exc:
+        util.log("error", "get_user_profile", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -118,7 +122,7 @@ def lambda_handler(event, context):
             return error_response("Unauthorized. Invalid Cognito user data.", 401)
 
         # ── B. Look up the user in RDS ─────────────────────────────────────────
-        rds_result = rds.get_user_by_username(username)
+        rds_result = rds.get_record("users", userName=username)
         if not rds_result.get("success"):
             util.log("warning", "profile.lambda_handler",
                      "User not found in RDS.", username=username)
@@ -176,4 +180,4 @@ def lambda_handler(event, context):
 
     except Exception as exc:
         util.log("error", "profile.lambda_handler", f"Unhandled exception: {exc}")
-        return error_response("Internal server error.", 500)
+        return error_response(f"Internal server error: {str(exc)}", 500)

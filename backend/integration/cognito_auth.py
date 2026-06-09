@@ -13,16 +13,29 @@ Available functions:
 """
 
 import boto3
+import json
+import os
 
 from utils import utilities as util
 from utils import dependencies
+
+_MANIFEST_PATH = os.path.join(os.path.dirname(__file__), "manifest.json")
+try:
+    with open(_MANIFEST_PATH, "r") as _f:
+        _MANIFEST = json.load(_f)
+except Exception as e:
+    util.log("error", "cognito_auth.init", f"Failed to load manifest.json: {e}")
+    _MANIFEST = {}
 
 
 # ── Cognito client (single shared instance) ────────────────────────────────────
 try:
     _client = boto3.client("cognito-idp")
-    POOL_ID = dependencies.enviroment_variable.get("COGNITO_USER_POOL_ID", "")
-    CLIENT_ID = dependencies.enviroment_variable.get("COGNITO_USER_POOL_CLIENT_ID", "")
+    pool_config = _MANIFEST.get("cognito", {}).get("user_pool", {})
+    env_pool_id = pool_config.get("env_var_id", "COGNITO_USER_POOL_ID")
+    env_client_id = pool_config.get("env_var_client", "COGNITO_USER_POOL_CLIENT_ID")
+    POOL_ID = os.environ.get(env_pool_id) or dependencies.enviroment_variable.get(env_pool_id, "")
+    CLIENT_ID = os.environ.get(env_client_id) or dependencies.enviroment_variable.get(env_client_id, "")
 except Exception:
     _client = None
     POOL_ID = ""
@@ -33,19 +46,19 @@ except Exception:
 # COGNITO HELPERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def user_exists(attribute_name: str, value: str) -> bool:
+def user_exists(**kwargs) -> bool:
     """
-    Check whether a Cognito user with the given attribute exists.
-
-    Args:
-        attribute_name: The attribute to filter by (e.g., 'phone_number', 'username', 'email').
-        value: The value of the attribute to search for.
-
-    Returns:
-        True if a matching user exists, False otherwise.
+    Check whether a Cognito user exists based on a key-value attribute.
+    Expects exactly one kwarg, e.g. phone_number="+1234567890".
     """
     if not _client or not POOL_ID:
         return False
+        
+    if not kwargs:
+        return False
+        
+    attribute_name, value = list(kwargs.items())[0]
+    
     try:
         resp = _client.list_users(
             UserPoolId=POOL_ID,
@@ -59,23 +72,37 @@ def user_exists(attribute_name: str, value: str) -> bool:
         return False
 
 
-def create_user(username, email, phone_e164, password, user_id):
+def create_user(**kwargs):
     """
-    Create a new Cognito user with a permanent password.
+    Create a new Cognito user with a permanent password based on **kwargs.
+    Uses manifest.json to map kwargs to Cognito UserAttributes.
+    Requires 'username' and 'password' in kwargs.
     """
     if not _client or not POOL_ID:
         return None
+        
+    username = kwargs.get("username")
+    password = kwargs.get("password")
+    
+    if not username or not password:
+        util.log("error", "cognito_auth.create_user", "Missing username or password in kwargs")
+        raise ValueError("Missing username or password")
+        
+    pool_config = _MANIFEST.get("cognito", {}).get("user_pool", {})
+    attr_mapping = pool_config.get("create_user_attributes", {})
+    
+    user_attributes = []
+    for cognito_attr, kwarg_key in attr_mapping.items():
+        if kwarg_key in ["true", "false"]:
+            user_attributes.append({"Name": cognito_attr, "Value": kwarg_key})
+        elif kwarg_key in kwargs:
+            user_attributes.append({"Name": cognito_attr, "Value": str(kwargs[kwarg_key])})
+
     try:
         resp = _client.admin_create_user(
             UserPoolId=POOL_ID,
             Username=username,
-            UserAttributes=[
-                {"Name": "email",                 "Value": email},
-                {"Name": "phone_number",          "Value": phone_e164},
-                {"Name": "custom:userId",         "Value": user_id},
-                {"Name": "email_verified",        "Value": "true"},  # must be "true" — Cognito rejects "false" on admin_create_user
-                {"Name": "phone_number_verified", "Value": "true"},
-            ],
+            UserAttributes=user_attributes,
             MessageAction="SUPPRESS",
         )
         attrs = {
@@ -98,26 +125,21 @@ def create_user(username, email, phone_e164, password, user_id):
         raise  # re-raise so the handler can catch the real error
 
 
-def delete_user(username):
+def delete_user(**kwargs):
     """
-    Deletes a Cognito user by username.
-    Used for rollback when RDS insert fails after a successful Cognito creation.
-
-    Args:
-        username: Cognito username to delete.
+    Deletes a Cognito user by username via kwargs.
     """
     if not _client or not POOL_ID:
         return
-    _client.admin_delete_user(UserPoolId=POOL_ID, Username=username)
+    username = kwargs.get("username")
+    if username:
+        _client.admin_delete_user(UserPoolId=POOL_ID, Username=username)
 
 
 def global_sign_out(access_token):
     """
     Signs out users from all devices.
     Invalidates all access tokens and refresh tokens.
-
-    Args:
-        access_token: A valid active access token for the user.
     """
     if not _client:
         return
@@ -128,24 +150,17 @@ def global_sign_out(access_token):
                  f"global_sign_out failed: {exc}")
 
 
-def authenticate_user(username, password):
+def authenticate_user(**kwargs):
     """
-    Authenticate a user with username + password via Cognito.
-
-    Args:
-        username: Cognito username or email.
-        password: Plain-text password.
-
-    Returns:
-        dict with keys: accessToken, refreshToken, idToken, expiresIn
-        None if authentication failed (wrong credentials, user not found, etc.)
-
-    Raises:
-        CognitoNotAuthorized: if credentials are wrong (caller should handle 401)
-        CognitoUserNotFound:  if the user does not exist (caller should handle 404)
+    Authenticate a user with username + password via Cognito using kwargs.
+    Expects 'username' and 'password' in kwargs.
     """
     if not _client or not POOL_ID or not CLIENT_ID:
         return None
+        
+    username = kwargs.get("username")
+    password = kwargs.get("password")
+    
     resp = _client.admin_initiate_auth(
         UserPoolId=POOL_ID,
         ClientId=CLIENT_ID,

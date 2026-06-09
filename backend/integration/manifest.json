@@ -1,0 +1,65 @@
+{
+  "dynamodb": {
+    "tables": {
+      "users": {
+        "env_var": "USERS_TABLE_NAME",
+        "keys": {
+          "pk": "userID",
+          "sk": "userEntity"
+        },
+        "entities": {
+          "PROFILE": {
+            "userEntity": "PROFILE",
+            "avatar": null,
+            "bio": null,
+            "verified": false,
+            "isPrivate": false,
+            "vibes": 0,
+            "followers": 0,
+            "following": 0,
+            "accountType": "general"
+          },
+          "SETTINGS": {
+            "userEntity": "SETTINGS",
+            "notifications": {
+              "push": true,
+              "email": true,
+              "sms": false
+            },
+            "privacy": {
+              "showOnlineStatus": true,
+              "showLastSeen": true,
+              "allowDMs": "everyone"
+            },
+            "preferences": {
+              "theme": "system",
+              "language": "en"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rds": {
+    "tables": {
+      "users": {
+        "columns": [
+          "userID", "cognitoSub", "userName", "fullName", "emailAddress",
+          "phoneNumber", "dateOfBirth", "gender", "region", "emailVerified", "status"
+        ],
+        "default_status": "Active"
+      }
+    }
+  },
+  "cognito": {
+    "user_pool": {
+      "env_var_id": "COGNITO_USER_POOL_ID",
+      "env_var_client": "COGNITO_USER_POOL_CLIENT_ID",
+      "create_user_attributes": {
+        "email": "email",
+        "phone_number": "phone_e164",
+        "custom:userId": "user_id"
+      }
+    }
+  }
+}
