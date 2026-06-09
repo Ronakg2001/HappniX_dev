@@ -36,101 +36,20 @@ export interface UserProfile {
   username: string;
   bio: string;
   avatar: string | null;
+  pronoun?: string;
+  dob?: string;
+  gender?: string;
+  socialLinks?: {
+    x?: string;
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+  };
   verified: boolean;
   isPrivate: boolean;
   vibes: number;
   followers: number;
   following: number;
-}
-
-// ─── EDIT PROFILE MODAL ────────────────────────────────────────
-interface EditProfileModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  profile: UserProfile;
-  onSave: (updates: Partial<UserProfile>) => void;
-}
-
-export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfileModalProps) {
-  const [bio, setBio] = useState(profile.bio);
-  const [previewAvatar, setPreviewAvatar] = useState<string | null>(profile.avatar);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const MAX_BIO = 150;
-
-  if (!isOpen) return null;
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setPreviewAvatar(ev.target?.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const handleSave = () => {
-    onSave({ bio, avatar: previewAvatar });
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-lg liquid-glass liquid-edge border border-border p-6 shadow-card animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-            <Camera className="h-4 w-4 text-[var(--brand-1)]" />
-            Edit Profile
-          </h3>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-foreground/10 text-foreground/50 hover:text-foreground transition-all">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Avatar Upload */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative group cursor-pointer" onClick={() => fileRef.current?.click()}>
-            <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-border bg-brand-gradient flex items-center justify-center shadow-glow">
-              {previewAvatar ? (
-                <img src={previewAvatar} alt="Preview" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-3xl font-black text-white">{profile.name[0]}</span>
-              )}
-            </div>
-            <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera className="h-6 w-6 text-white" />
-            </div>
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          <button onClick={() => fileRef.current?.click()} className="mt-2 text-xs font-bold text-[var(--brand-1)] hover:underline">
-            Change Photo
-          </button>
-        </div>
-
-        {/* Bio */}
-        <div className="mb-6">
-          <label className="block text-xs font-bold text-foreground/50 uppercase tracking-wider mb-1.5">Bio</label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value.slice(0, MAX_BIO))}
-            rows={3}
-            placeholder="Write something about yourself..."
-            className="w-full px-4 py-3 rounded-lg bg-foreground/5 border border-border text-sm text-foreground focus:outline-none focus:border-[var(--brand-1)] transition-all placeholder-foreground/30 resize-none"
-          />
-          <p className={`text-[10px] mt-1 text-right font-semibold ${bio.length >= MAX_BIO ? "text-red-400" : "text-foreground/40"}`}>
-            {bio.length}/{MAX_BIO}
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-foreground/5 border border-border text-xs font-bold text-foreground/70 hover:bg-foreground/10 transition-all">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="flex-1 py-3 rounded-lg bg-brand-gradient text-white text-xs font-bold shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all">
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── AADHAAR VERIFICATION MODAL ────────────────────────────────
