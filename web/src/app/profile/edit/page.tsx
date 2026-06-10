@@ -190,17 +190,24 @@ export default function EditProfilePage() {
       };
 
       const res: any = await apiClient.post("/api/profile/me", payload);
+      console.log("Profile update response:", res);
 
-      if (res && res.success && res.avatarUploadUrl && croppedBlobToUpload) {
-        const uploadRes = await fetch(res.avatarUploadUrl, {
-          method: "PUT",
-          body: croppedBlobToUpload,
-          headers: {
-            "Content-Type": "image/jpeg"
+      if (res && res.success && croppedBlobToUpload) {
+        if (!res.avatarUploadUrl) {
+          console.error("Backend did not return avatarUploadUrl — R2 credentials may be missing on the server.");
+        } else {
+          const uploadRes = await fetch(res.avatarUploadUrl, {
+            method: "PUT",
+            body: croppedBlobToUpload,
+            headers: {
+              "Content-Type": "image/jpeg"
+            }
+          });
+          if (!uploadRes.ok) {
+            console.error("Failed to upload avatar to R2:", uploadRes.status, await uploadRes.text());
+          } else {
+            console.log("Avatar uploaded successfully to R2");
           }
-        });
-        if (!uploadRes.ok) {
-          console.error("Failed to upload avatar to R2:", await uploadRes.text());
         }
       }
 

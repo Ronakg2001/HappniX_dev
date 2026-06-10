@@ -57,7 +57,17 @@ Parameters:
     Default: "true"
     Description: When true, accepts 123456 as valid OTP in dev environment.
 
-  # ─── Media storage ─────────────────────────────────────────────────
+  # ─── Media storage (Cloudflare R2) ──────────────────────────────────
+  CloudflareAccountId:
+    Type: String
+    Default: ""
+  R2AccessKeyId:
+    Type: String
+    Default: ""
+  R2SecretAccessKey:
+    Type: String
+    NoEcho: true
+    Default: ""
   R2BucketName:
     Type: String
     Default: ""
@@ -157,7 +167,13 @@ Globals:
           Ref: AuthDbConnectTimeout
         COGNITO_REGION:
           Ref: AWS::Region
-        R2_BUCKET_NAME:
+        CLOUDFLARE_ACCOUNT_ID:
+          Ref: CloudflareAccountId
+        R2_ACCESS_KEY_ID:
+          Ref: R2AccessKeyId
+        R2_SECRET_ACCESS_KEY:
+          Ref: R2SecretAccessKey
+        R2_USERMEDIA_BUCKET:
           Ref: R2BucketName
         R2_ENDPOINT:
           Ref: R2Endpoint

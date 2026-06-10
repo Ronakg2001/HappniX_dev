@@ -95,6 +95,12 @@ def update_user_profile(**kwargs):
     presigned_url = None
     
     if avatar_changed:
+        # Ensure the user's R2 folder structure exists before uploading
+        init_res = manifest.init_user_storage(user_id)
+        if not init_res.get("success"):
+            util.log("warning", "update_user_profile",
+                     "Failed to init R2 storage folders (non-fatal)", user_id=user_id)
+
         timestamp = int(time.time())
         avatar_key = manifest.get_avatar_key(user_id, timestamp)
         updates["avatar"] = avatar_key
@@ -102,6 +108,10 @@ def update_user_profile(**kwargs):
         url_res = r2_bucket.generate_presigned_url(avatar_key, content_type="image/jpeg")
         if url_res.get("success"):
             presigned_url = url_res.get("url")
+        else:
+            util.log("error", "update_user_profile",
+                     f"Failed to generate presigned URL: {url_res.get('error')}",
+                     user_id=user_id, avatar_key=avatar_key)
             
     if not updates:
         return success_response({"success": True, "message": "No updates provided."})
