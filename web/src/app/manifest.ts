@@ -19,7 +19,7 @@ export default function manifest(): MetadataRoute.Manifest {
         src: logoUrl,
         sizes: "any",
         type: "image/svg+xml",
-        purpose: "any maskable"
+        purpose: "maskable"
       },
       {
         src: "/Happnix.png",
