@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { STATIC_MEDIA_URL } from "@/lib/utils";
 import AuroraBackground from "@/components/landing/AuroraBackground";
 import MobileStep from "./components/MobileView";
 import OtpStep from "./components/OTPView";
@@ -57,7 +58,7 @@ export default function SignInPage() {
       <div className="relative z-10 w-full max-w-[440px] mx-auto px-6 py-12">
         <a href="/signin" className="flex items-center justify-center mb-8">
           <Image
-            src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
+            src={`${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`}
             alt="Happnix Logo"
             width={400}
             height={100}

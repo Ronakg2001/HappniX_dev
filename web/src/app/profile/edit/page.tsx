@@ -9,10 +9,13 @@ import {
   ChevronDown,
   Plus,
   Trash2,
-  Check
+  Check,
+  X,
+  Loader2
 } from "lucide-react";
 import { UserProfile } from "@/components/modals/ProfileModals";
 import { ImageCropperModal } from "@/components/modals/ImageCropperModal";
+import { getMediaUrl } from "@/lib/utils";
 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -96,7 +99,7 @@ export default function EditProfilePage() {
       } finally {
         setCheckingUsername(false);
       }
-    }, 500);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [username, originalUsername]);
@@ -109,7 +112,7 @@ export default function EditProfilePage() {
     setPronoun(data.pronoun || "");
     setDob(data.dob || "");
     setGender(data.gender || "");
-    setPreviewAvatar(data.avatar || null);
+    setPreviewAvatar(getMediaUrl(data.avatar) || null);
 
     // Convert existing socialLinks object to array for dynamic UI
     if (data.socialLinks && typeof data.socialLinks === 'object' && !Array.isArray(data.socialLinks)) {
@@ -189,13 +192,16 @@ export default function EditProfilePage() {
       const res: any = await apiClient.post("/api/profile/me", payload);
 
       if (res && res.success && res.avatarUploadUrl && croppedBlobToUpload) {
-        await fetch(res.avatarUploadUrl, {
+        const uploadRes = await fetch(res.avatarUploadUrl, {
           method: "PUT",
           body: croppedBlobToUpload,
           headers: {
             "Content-Type": "image/jpeg"
           }
         });
+        if (!uploadRes.ok) {
+          console.error("Failed to upload avatar to R2:", await uploadRes.text());
+        }
       }
 
       // Go back to profile page
@@ -280,15 +286,19 @@ export default function EditProfilePage() {
               />
             </Field>
             <Field label="Username">
-              <Input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className={usernameAvailable === false ? "border-red-500/50 focus-visible:ring-red-500/50" : ""}
-              />
-              {checkingUsername && <p className="text-xs text-foreground/50 mt-1">Checking availability...</p>}
-              {usernameAvailable === false && <p className="text-xs text-red-400 mt-1">Username is already taken</p>}
-              {usernameAvailable === true && <p className="text-xs text-green-400 mt-1">Username is available!</p>}
+              <div className="relative">
+                <Input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={usernameAvailable === false ? "border-red-500/50 focus-visible:ring-red-500/50 pr-10" : "pr-10"}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                  {checkingUsername && <Loader2 className="h-4 w-4 animate-spin text-foreground/50" />}
+                  {usernameAvailable === false && !checkingUsername && <X className="h-4 w-4 text-red-500" />}
+                  {usernameAvailable === true && !checkingUsername && <Check className="h-4 w-4 text-green-500" />}
+                </div>
+              </div>
             </Field>
           </div>
 

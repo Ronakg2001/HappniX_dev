@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Field } from "@/components/ui/field";
 import { Toast } from "@/components/ui/toast";
-import { PrimaryBtn } from "@/components/ui/button";
+import { Button, PrimaryBtn } from "@/components/ui/button";
+import { STATIC_MEDIA_URL } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 import { strongPassword } from "@/constants/regex";
 import Image from "next/image";
@@ -39,7 +40,7 @@ const BrandSection = () => {
         <div>
           <a href="/signin">
             <Image
-              src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
+              src={`${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`}
               alt="Happnix Logo"
               width={400}
               height={100}

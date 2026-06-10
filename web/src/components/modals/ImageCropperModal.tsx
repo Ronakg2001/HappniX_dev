@@ -106,10 +106,10 @@ export function ImageCropperModal({ isOpen, imageSrc, onClose, onCropComplete }:
         </div>
         
         <div className="p-4 flex gap-3">
-          <Button variant="ghost" onClick={onClose} className="flex-1">
+          <Button variant="outline" onClick={onClose} className="flex-1 text-sm h-10 border-border/50 hover:bg-white/5">
             Cancel
           </Button>
-          <PrimaryBtn onClick={handleSave} loading={isProcessing} className="flex-1 text-sm h-10">
+          <PrimaryBtn onClick={handleSave} loading={isProcessing} className="flex-1 text-sm h-10 flex items-center justify-center">
             Apply
           </PrimaryBtn>
         </div>

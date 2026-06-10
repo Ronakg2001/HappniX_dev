@@ -18,16 +18,16 @@ def get_r2_client():
     if _r2_client is not None:
         return _r2_client, _bucket_name
 
-    account_id = dependencies.enviroment_variable.get("CLOUDFLARE_ACCOUNT_ID")
-    access_key = dependencies.enviroment_variable.get("R2_ACCESS_KEY_ID")
-    secret_key = dependencies.enviroment_variable.get("R2_SECRET_ACCESS_KEY")
-    _bucket_name = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET", "happnix-media")
+    account_id = dependencies.enviroment_variable.get("CLOUDFLARE_ACCOUNT_ID") or ""
+    access_key = dependencies.enviroment_variable.get("R2_ACCESS_KEY_ID") or ""
+    secret_key = dependencies.enviroment_variable.get("R2_SECRET_ACCESS_KEY") or ""
+    _bucket_name = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET") or "happnix-usersmedia-dev"
 
     if not all([account_id, access_key, secret_key]):
         util.log("error", "r2_bucket.get_r2_client", "Missing R2 credentials in environment.")
         return None, _bucket_name
 
-    endpoint_url = dependencies.enviroment_variable.get("R2_ENDPOINT")
+    endpoint_url = dependencies.enviroment_variable.get("R2_ENDPOINT") or ""
     if not endpoint_url:
         endpoint_url = f"https://{account_id}.r2.cloudflarestorage.com"
 
@@ -64,7 +64,7 @@ def create_folder(folder_key: str) -> dict:
         util.log("error", "r2_bucket.create_folder", f"Failed to create folder {folder_key}: {exc}")
         return {"success": False, "error": str(exc)}
 
-def generate_presigned_url(object_key: str, method: str = 'put_object', expires_in: int = 3600) -> dict:
+def generate_presigned_url(object_key: str, method: str = 'put_object', expires_in: int = 3600, content_type: str = None) -> dict:
     """
     Generates a presigned URL for uploading or viewing files.
     method: 'put_object' for upload, 'get_object' for download/viewing private files.
@@ -74,9 +74,13 @@ def generate_presigned_url(object_key: str, method: str = 'put_object', expires_
         return {"success": False, "error": "R2 Client not initialized"}
 
     try:
+        params = {'Bucket': bucket, 'Key': object_key}
+        if content_type:
+            params['ContentType'] = content_type
+            
         url = client.generate_presigned_url(
             ClientMethod=method,
-            Params={'Bucket': bucket, 'Key': object_key},
+            Params=params,
             ExpiresIn=expires_in
         )
         return {"success": True, "url": url}

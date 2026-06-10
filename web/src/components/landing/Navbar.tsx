@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { STATIC_MEDIA_URL } from "@/lib/utils";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -38,7 +40,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0 no-underline">
           <Image
-            src="https://pub-4c14689c2e3349dd83f26b79045c7c84.r2.dev/Happnix_logo_full_transparent.svg"
+            src={`${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`}
             alt="Happnix Logo"
             width={400}
             height={100}

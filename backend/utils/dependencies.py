@@ -24,6 +24,8 @@ enviroment_variable = {
     "R2_ENDPOINT": os.environ.get("R2_ENDPOINT", ""),
     "R2_USERMEDIA_BUCKET": os.environ.get("R2_USERMEDIA_BUCKET", ""),
     "R2_STATIC_MEDIA_BUCKET": os.environ.get("R2_STATIC_MEDIA_BUCKET", ""),
+    "R2_USERMEDIA_BUCKET_PUBID": os.environ.get("R2_USERMEDIA_BUCKET_PUBID", ""),
+    "R2_STATIC_MEDIA_BUCKET_PUBID": os.environ.get("R2_STATIC_MEDIA_BUCKET_PUBID", ""),
     "TEST_OTP_MODE": "true",
     "APP_ENVIRONMENT": "dev",
 }
