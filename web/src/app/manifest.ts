@@ -1,11 +1,6 @@
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
-  const staticPubId = process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID || "";
-  const logoUrl = staticPubId && staticPubId !== "undefined" 
-    ? `${staticPubId}/Happnix_logo_full_transparent.svg` 
-    : "/Happnix.png"; // Fallback to local image
-
   return {
     name: "Happnix",
     short_name: "Happnix",
@@ -16,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#050508",
     icons: [
       {
-        src: logoUrl,
+        src: "/Happnix.svg",
         sizes: "any",
         type: "image/svg+xml",
         purpose: "maskable"
