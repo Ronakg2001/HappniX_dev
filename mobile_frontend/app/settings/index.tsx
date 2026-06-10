@@ -1,11 +1,11 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Bell, ChevronRight, Lock, LogOut, Moon, ShieldCheck, Tag, Trash2, Users } from 'lucide-react-native';
 import { BrandHeader, Glass, Screen } from '@/components/happnix/kit';
 import { colors, fonts } from '@/constants/brand';
-import { clearSession } from '@/services/api';
+import { clearSession, profileApi } from '@/services/api';
 
 export default function SettingsScreen() {
   async function handleLogout() {
@@ -43,7 +43,25 @@ export default function SettingsScreen() {
 
           <SettingSection title="Account">
             <SettingRow icon={<LogOut color={colors.danger} size={18} />} label="Sign Out" onPress={handleLogout} danger />
-            <SettingRow icon={<Trash2 color={colors.danger} size={18} />} label="Delete Account" onPress={() => {}} danger />
+            <SettingRow icon={<Trash2 color={colors.danger} size={18} />} label="Delete Account" onPress={() => {
+              Alert.alert(
+                "Delete Account",
+                "Are you sure you want to permanently delete your account? This action cannot be undone.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: async () => {
+                    try {
+                      await profileApi.deleteAccount();
+                      await clearSession();
+                      Alert.alert("Success", "Account deleted successfully.");
+                      router.replace('/(auth)/login');
+                    } catch (error) {
+                      Alert.alert("Error", "Failed to delete account. Please try again.");
+                    }
+                  }}
+                ]
+              );
+            }} danger />
           </SettingSection>
 
         </ScrollView>

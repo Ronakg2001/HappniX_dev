@@ -485,11 +485,16 @@ export default function SettingsPage() {
             icon={<Trash2 className="h-4 w-4" />}
             label="Delete Account"
             description="Permanently remove your account and all data"
-            onClick={() => {
+            onClick={async () => {
               if (confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
-                localStorage.clear();
-                alert("Account deleted successfully.");
-                router.push("/signup");
+                try {
+                  await apiClient.post("/api/profile/me", { actionItem: "deleteAccount" });
+                  localStorage.clear();
+                  alert("Account deleted successfully.");
+                  router.push("/signup");
+                } catch (err) {
+                  alert("Failed to delete account. Please try again.");
+                }
               }
             }}
             danger

@@ -111,6 +111,7 @@ export const profileApi = {
   sendAadhaarOtp: (aadhaarNumber: string) =>
     api.post('/api/auth/aadhaar/send-otp', { aadhaarNumber }),
   verifyAadhaarOtp: (otp: string) => api.post('/api/auth/aadhaar/verify-otp', { otp }),
+  deleteAccount: () => api.post('/api/profile/me', { actionItem: 'deleteAccount' }),
 };
 
 export const eventApi = {
