@@ -65,7 +65,8 @@ jobs:
           ParameterKey=AuthDbConnectTimeout,ParameterValue=5
           ParameterKey=TestOtpMode,ParameterValue=true
           ParameterKey=AllowFixedTestOtp,ParameterValue=true
-          ParameterKey=R2BucketName,ParameterValue='${{ secrets.R2_USERMEDIA_BUCKET }}'
+          ParameterKey=R2UserMediaBucketName,ParameterValue='${{ secrets.R2_USERMEDIA_BUCKET }}'
+          ParameterKey=R2StaticMediaBucketName,ParameterValue='${{ secrets.R2_STATIC_MEDIA_BUCKET }}'
           ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'
           ParameterKey=CloudflareAccountId,ParameterValue='${{ secrets.CLOUDFLARE_ACCOUNT_ID }}'
           ParameterKey=R2AccessKeyId,ParameterValue='${{ secrets.R2_ACCESS_KEY_ID }}'

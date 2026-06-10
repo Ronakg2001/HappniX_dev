@@ -68,7 +68,10 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
-  R2BucketName:
+  R2UserMediaBucketName:
+    Type: String
+    Default: ""
+  R2StaticMediaBucketName:
     Type: String
     Default: ""
   R2Endpoint:
@@ -174,7 +177,9 @@ Globals:
         R2_SECRET_ACCESS_KEY:
           Ref: R2SecretAccessKey
         R2_USERMEDIA_BUCKET:
-          Ref: R2BucketName
+          Ref: R2UserMediaBucketName
+        R2_STATIC_MEDIA_BUCKET:
+          Ref: R2StaticMediaBucketName
         R2_ENDPOINT:
           Ref: R2Endpoint
         USERS_TABLE_NAME:
