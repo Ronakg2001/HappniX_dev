@@ -12,6 +12,7 @@ import {
   Check
 } from "lucide-react";
 import { UserProfile } from "@/components/modals/ProfileModals";
+import { ImageCropperModal } from "@/components/modals/ImageCropperModal";
 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -36,6 +37,10 @@ export default function EditProfilePage() {
   const [socialLinks, setSocialLinks] = useState<{ platform: string, url: string }[]>([]);
 
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
+  const [croppedBlobToUpload, setCroppedBlobToUpload] = useState<Blob | null>(null);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const MAX_BIO = 150;
 
@@ -97,8 +102,12 @@ export default function EditProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPreviewAvatar(ev.target?.result as string);
+    reader.onload = (ev) => {
+      setRawImageSrc(ev.target?.result as string);
+      setShowCropper(true);
+    };
     reader.readAsDataURL(file);
+    e.target.value = ""; // Reset to allow selecting the same file again
   };
 
   const handleAddLink = () => {
@@ -130,8 +139,7 @@ export default function EditProfilePage() {
         }
       });
 
-      const file = fileRef.current?.files?.[0];
-      const updateAvatar = !!file;
+      const updateAvatar = !!croppedBlobToUpload;
 
       const payload = {
         actionItem: "update_user_profile",
@@ -147,12 +155,12 @@ export default function EditProfilePage() {
 
       const res: any = await apiClient.post("/api/profile/me", payload);
 
-      if (res && res.success && res.avatarUploadUrl && file) {
+      if (res && res.success && res.avatarUploadUrl && croppedBlobToUpload) {
         await fetch(res.avatarUploadUrl, {
           method: "PUT",
-          body: file,
+          body: croppedBlobToUpload,
           headers: {
-            "Content-Type": file.type
+            "Content-Type": "image/jpeg"
           }
         });
       }
@@ -349,6 +357,17 @@ export default function EditProfilePage() {
           </div>
         </div>
       </div>
+
+      <ImageCropperModal
+        isOpen={showCropper}
+        imageSrc={rawImageSrc}
+        onClose={() => setShowCropper(false)}
+        onCropComplete={(blob) => {
+          setCroppedBlobToUpload(blob);
+          setPreviewAvatar(URL.createObjectURL(blob));
+          setShowCropper(false);
+        }}
+      />
     </main>
   );
 }
