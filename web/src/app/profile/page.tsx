@@ -227,7 +227,7 @@ export default function ProfilePage() {
 
             {/* Bio */}
             {profile.bio ? (
-              <p className="text-sm text-foreground/80 leading-relaxed mb-4 max-w-md">{profile.bio}</p>
+              <p className="text-sm text-foreground/80 leading-relaxed mb-4 max-w-md whitespace-pre-wrap">{profile.bio}</p>
             ) : (
               <p
                 className="text-sm text-foreground/35 italic mb-4 cursor-pointer hover:text-foreground/60 transition-colors"
