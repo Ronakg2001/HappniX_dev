@@ -848,6 +848,12 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/profile/me
             Method: GET
+        UpdateMyProfile:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/profile/me
+            Method: POST
         GetProfile:
           Type: Api
           Properties:

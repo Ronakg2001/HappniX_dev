@@ -44,14 +44,11 @@ def check_username(**kwargs):
         if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", username):
             return success_response({"success": True, "available": False, "message": "Invalid username format."})
 
-        cognito_exists = cognito.user_exists(username=username)
-        rds_exists = rds.record_exists("users", userName=username)
-        
-        user_exists = cognito_exists or rds_exists
+        available = signup_signin_services.is_username_available(username)
         
         return success_response({
             "success": True,
-            "available": not user_exists
+            "available": available
         })
     except Exception as exc:
         util.log("error", "check_username", f"Action failed: {exc}")

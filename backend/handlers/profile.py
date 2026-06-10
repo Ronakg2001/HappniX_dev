@@ -24,8 +24,10 @@ from integration import cognito_auth as cognito
 from integration import rds
 from integration import r2_bucket
 from services import profile_services
+from services import signup_signin_services
 from utils import manifest
 import time
+import re
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -119,6 +121,32 @@ def update_user_profile(**kwargs):
     return success_response(response_data)
 
 
+def check_username(**kwargs):
+    """
+    Checks if a username is available for profile updates.
+    Frontend should pass 'target_username' or 'new_username' to avoid clashing with the authenticated user's 'username'.
+    """
+    try:
+        target_username = str(kwargs.get("target_username") or kwargs.get("new_username") or kwargs.get("username", "")).strip()
+        
+        if not target_username:
+            return success_response({"success": True, "available": False, "message": "Username is required."})
+
+        if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", target_username):
+            return success_response({"success": True, "available": False, "message": "Invalid username format."})
+
+        available = signup_signin_services.is_username_available(target_username)
+        
+        return success_response({
+            "success": True,
+            "available": available
+        })
+    except Exception as exc:
+        util.log("error", "profile.check_username", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -126,6 +154,7 @@ def update_user_profile(**kwargs):
 ACTION_HANDLERS = {
     "getUserProfile": get_user_profile,
     "update_user_profile": update_user_profile,
+    "check_username": check_username,
     # Future: "updateProfile", "uploadAvatar", etc.
 }
 

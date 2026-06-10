@@ -28,6 +28,9 @@ export default function EditProfilePage() {
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [originalUsername, setOriginalUsername] = useState("");
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [bio, setBio] = useState("");
   const [pronoun, setPronoun] = useState("");
   const [dob, setDob] = useState("");
@@ -72,9 +75,36 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    if (!username || username === originalUsername) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingUsername(true);
+      try {
+        const res: any = await apiClient.post("/api/profile/me", {
+          actionItem: "check_username",
+          new_username: username
+        });
+        if (res && res.success) {
+          setUsernameAvailable(res.available);
+        }
+      } catch (err) {
+        console.error("Username check failed", err);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username, originalUsername]);
+
   const initForm = (data: UserProfile) => {
     setName(data.name || "");
     setUsername(data.username || "");
+    setOriginalUsername(data.username || "");
     setBio(data.bio || "");
     setPronoun(data.pronoun || "");
     setDob(data.dob || "");
@@ -127,6 +157,9 @@ export default function EditProfilePage() {
   };
 
   const handleSave = async () => {
+    if (usernameAvailable === false) {
+      return; // Prevent saving if username is taken
+    }
     setSaving(true);
     try {
       // Convert array back to object if backend expects it
@@ -251,7 +284,11 @@ export default function EditProfilePage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                className={usernameAvailable === false ? "border-red-500/50 focus-visible:ring-red-500/50" : ""}
               />
+              {checkingUsername && <p className="text-xs text-foreground/50 mt-1">Checking availability...</p>}
+              {usernameAvailable === false && <p className="text-xs text-red-400 mt-1">Username is already taken</p>}
+              {usernameAvailable === true && <p className="text-xs text-green-400 mt-1">Username is available!</p>}
             </Field>
           </div>
 

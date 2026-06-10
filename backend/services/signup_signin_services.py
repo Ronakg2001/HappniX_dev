@@ -19,6 +19,16 @@ def check_user_exists(phone_e164: str) -> bool:
     return cognito_exists and rds_exists
 
 
+def is_username_available(username: str) -> bool:
+    """
+    Checks both Cognito and RDS to see if a username is available.
+    Returns True if available, False if already taken.
+    """
+    cognito_exists = cognito.user_exists(username=username)
+    rds_exists = rds.record_exists("users", userName=username)
+    return not (cognito_exists or rds_exists)
+
+
 def execute_user_registration(
     username: str,
     full_name: str,
