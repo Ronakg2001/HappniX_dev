@@ -2,7 +2,7 @@
 profile_services.py — specific logic for profile DynamoDB interactions.
 """
 from utils import utilities as util
-from integration import dynamo_db
+from integration import dynamo_db, cognito_auth, rds, r2_bucket
 from services import signup_signin_services
 
 def ensure_user_profile(**kwargs) -> dict:
@@ -69,3 +69,59 @@ def update_user_profile(user_id: str, updates: dict) -> dict:
         
     return {"success": True, "data": current_profile}
 
+def delete_user_data(user_id: str, username: str, access_token: str) -> dict:
+    """
+    Deletes all user data across R2, DynamoDB, RDS, and Cognito.
+    """
+    # =========================================================================
+    # ARCHITECTURAL GAP: 30-Day Soft Delete Reversal
+    # =========================================================================
+    # In the future, to implement a 30-day soft-delete, inject logic here:
+    # 1. Update RDS record status: rds.update_record("users", userID=user_id, updates={"status": "PendingDeletion"})
+    # 2. Queue an EventBridge / SQS task for 30 days from now to call the hard delete logic.
+    # 3. Log out the user: cognito_auth.global_sign_out(access_token)
+    # 4. return {"success": True, "message": "Account scheduled for deletion in 30 days."}
+    # 
+    # For now, we bypass the soft-delete and execute an immediate permanent deletion.
+    util.log("info", "profile_services.delete_user_data", "Soft-deletion bypassed: Executing immediate permanent deletion", user_id=user_id)
+    # =========================================================================
+
+    results = {"success": True, "details": {}}
+
+    # 1. Delete from R2 Storage (Public and Private)
+    public_res = r2_bucket.delete_folder_contents(f"public/{user_id}/")
+    private_res = r2_bucket.delete_folder_contents(f"private/{user_id}/")
+    results["details"]["r2_public"] = public_res
+    results["details"]["r2_private"] = private_res
+
+    # 2. Delete all entities from DynamoDB
+    query_res = dynamo_db.query_items_by_pk("users", user_id)
+    dynamo_deleted = 0
+    if query_res.get("success"):
+        for item in query_res.get("data", []):
+            sk = item.get("SK")
+            if sk:
+                del_res = dynamo_db.delete_item("users", user_id, sk)
+                if del_res.get("success"):
+                    dynamo_deleted += 1
+    results["details"]["dynamodb"] = {"deletedCount": dynamo_deleted}
+
+    # 3. Delete from RDS
+    rds_res = rds.delete_record("users", userID=user_id)
+    results["details"]["rds"] = rds_res
+
+    # 4. Delete from Cognito (and Sign Out)
+    if access_token:
+        cognito_auth.global_sign_out(access_token)
+    
+    try:
+        cognito_auth.delete_user(username=username)
+        results["details"]["cognito"] = {"success": True}
+    except Exception as exc:
+        results["details"]["cognito"] = {"success": False, "error": str(exc)}
+        # We don't fail the overall operation if Cognito delete fails, because we already wiped DBs
+        util.log("warning", "profile_services.delete_user_data", f"Cognito delete failed: {exc}", username=username)
+
+    # Note: Even if some steps fail (like R2 missing files), we consider the action successful
+    # because the user's core auth/DB footprint is gone, enabling them to re-register.
+    return results

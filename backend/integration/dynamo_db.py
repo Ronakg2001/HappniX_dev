@@ -185,3 +185,51 @@ def batch_write_items(table_key: str, items_config: list, **kwargs) -> dict:
         util.log("error", "dynamo_db.batch_write_items",
                  f"Unexpected error: {exc}", table_key=table_key)
         return {"success": False, "error": str(exc)}
+
+def query_items_by_pk(table_key: str, pk_value: str) -> dict:
+    """
+    Query all items with the given Partition Key.
+    """
+    from boto3.dynamodb.conditions import Key
+    table = _get_table(table_key)
+    if not table:
+        return {"success": False, "error": f"DynamoDB table {table_key} not available."}
+
+    table_config = _MANIFEST.get("dynamodb", {}).get("tables", {}).get(table_key, {})
+    pk_name = table_config.get("keys", {}).get("pk", "PK")
+
+    try:
+        response = table.query(
+            KeyConditionExpression=Key(pk_name).eq(pk_value)
+        )
+        return {"success": True, "data": response.get("Items", [])}
+    except ClientError as exc:
+        util.log("error", "dynamo_db.query_items_by_pk",
+                 f"DynamoDB query failed: {exc}", table_key=table_key, pk_value=pk_value)
+        return {"success": False, "error": str(exc)}
+
+def delete_item(table_key: str, pk_value: str, sk_value: str) -> dict:
+    """
+    Delete a single item by PK and SK.
+    """
+    table = _get_table(table_key)
+    if not table:
+        return {"success": False, "error": f"DynamoDB table {table_key} not available."}
+
+    table_config = _MANIFEST.get("dynamodb", {}).get("tables", {}).get(table_key, {})
+    pk_name = table_config.get("keys", {}).get("pk", "PK")
+    sk_name = table_config.get("keys", {}).get("sk", "SK")
+
+    try:
+        table.delete_item(
+            Key={
+                pk_name: pk_value,
+                sk_name: sk_value,
+            }
+        )
+        return {"success": True}
+    except ClientError as exc:
+        util.log("error", "dynamo_db.delete_item",
+                 f"DynamoDB delete_item failed: {exc}",
+                 table_key=table_key, pk_value=pk_value, sk_value=sk_value)
+        return {"success": False, "error": str(exc)}

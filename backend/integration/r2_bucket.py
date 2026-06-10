@@ -87,3 +87,49 @@ def generate_presigned_url(object_key: str, method: str = 'put_object', expires_
     except ClientError as exc:
         util.log("error", "r2_bucket.generate_presigned_url", f"Failed to generate presigned URL for {object_key}: {exc}")
         return {"success": False, "error": str(exc)}
+
+def delete_folder_contents(prefix: str) -> dict:
+    """
+    Deletes all objects under a specific prefix (folder).
+    """
+    client, bucket = get_r2_client()
+    if not client:
+        return {"success": False, "error": "R2 Client not initialized"}
+
+    # Ensure trailing slash to only delete folder contents, not similarly named folders
+    if not prefix.endswith('/'):
+        prefix += '/'
+
+    try:
+        # First, list all objects with the prefix
+        response = client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        objects = response.get('Contents', [])
+        
+        while response.get('IsTruncated'):
+            response = client.list_objects_v2(
+                Bucket=bucket, 
+                Prefix=prefix, 
+                ContinuationToken=response.get('NextContinuationToken')
+            )
+            objects.extend(response.get('Contents', []))
+
+        if not objects:
+            return {"success": True, "deletedCount": 0, "message": "No objects found"}
+
+        # Format for delete_objects
+        delete_keys = [{'Key': obj['Key']} for obj in objects]
+        
+        # Boto3 delete_objects limits to 1000 keys per request, chunk it
+        for i in range(0, len(delete_keys), 1000):
+            chunk = delete_keys[i:i + 1000]
+            client.delete_objects(
+                Bucket=bucket,
+                Delete={'Objects': chunk}
+            )
+
+        util.log("info", "r2_bucket.delete_folder_contents", f"Deleted {len(delete_keys)} objects under {prefix}")
+        return {"success": True, "deletedCount": len(delete_keys)}
+
+    except ClientError as exc:
+        util.log("error", "r2_bucket.delete_folder_contents", f"Failed to delete folder {prefix}: {exc}")
+        return {"success": False, "error": str(exc)}

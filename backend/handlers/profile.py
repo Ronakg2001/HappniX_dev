@@ -156,6 +156,30 @@ def check_username(**kwargs):
         return error_response(f"Action error: {str(exc)}", 500)
 
 
+def delete_account(**kwargs):
+    """
+    Deletes the authenticated user's account permanently from all systems.
+    """
+    user_id = kwargs.get("user_id")
+    username = kwargs.get("username")
+    access_token = kwargs.get("access_token")
+
+    if not user_id or not username:
+        return error_response("Missing user identifiers.", 400)
+
+    try:
+        result = profile_services.delete_user_data(user_id, username, access_token)
+        if not result.get("success"):
+            return error_response("Failed to completely delete account.", 500)
+
+        return success_response({
+            "success": True,
+            "message": "Account has been successfully deleted."
+        })
+    except Exception as exc:
+        util.log("error", "profile.delete_account", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
@@ -165,6 +189,7 @@ ACTION_HANDLERS = {
     "getUserProfile": get_user_profile,
     "update_user_profile": update_user_profile,
     "check_username": check_username,
+    "deleteAccount": delete_account,
     # Future: "updateProfile", "uploadAvatar", etc.
 }
 

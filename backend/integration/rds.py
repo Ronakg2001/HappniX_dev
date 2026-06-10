@@ -164,3 +164,37 @@ def insert_record(table_name: str, **kwargs) -> dict:
     finally:
         conn.close()
 
+
+def delete_record(table_name: str, **kwargs) -> dict:
+    """
+    Delete records from the table based on kwargs conditions.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    if not kwargs:
+        return {"success": False, "error": "No query conditions provided for deletion."}
+
+    where_clauses = []
+    values = []
+    for k, v in kwargs.items():
+        where_clauses.append(f'"{k}" = %s')
+        values.append(v)
+
+    where_str = " AND ".join(where_clauses)
+    sql = f'DELETE FROM {table_name} WHERE {where_str};'
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, tuple(values))
+            deleted_count = cur.rowcount
+            conn.commit()
+        util.log("info", "rds.delete_record", f"Deleted {deleted_count} records from {table_name}")
+        return {"success": True, "deletedCount": deleted_count}
+    except Exception as exc:
+        conn.rollback()
+        util.log("error", "rds.delete_record", f"Failed to delete record: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
