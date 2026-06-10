@@ -26,6 +26,7 @@ import {
 } from "@/components/modals/ProfileModals";
 
 import { apiClient } from "@/lib/api";
+import { getMediaUrl } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { ProfileStat } from "@/components/ui/profile-stat";
@@ -157,7 +158,7 @@ export default function ProfilePage() {
               <div className="relative group">
                 <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background bg-brand-gradient flex items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-glow overflow-hidden">
                   {profile.avatar ? (
-                    <img src={profile.avatar} alt={profile.name} className="h-full w-full object-cover" />
+                    <img src={getMediaUrl(profile.avatar) || ""} alt={profile.name} className="h-full w-full object-cover" />
                   ) : (
                     profile.name[0]
                   )}
