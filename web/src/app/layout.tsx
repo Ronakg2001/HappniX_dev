@@ -14,8 +14,8 @@ export const metadata: Metadata = {
   title: "Happnix — Find Your Next Experience",
   description: "Discover live events near you, book tickets in seconds, invite your squad, and stay connected — all in one place.",
   icons: {
-    icon: `${process.env.R2_STATIC_MEDIA_BUCKET_PUBID}/Happnix_logo_full_transparent.svg`,
-    apple: `${process.env.R2_STATIC_MEDIA_BUCKET_PUBID}/Happnix_logo_full_transparent.svg`
+    icon: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID}/Happnix_logo_full_transparent.svg`,
+    apple: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID}/Happnix_logo_full_transparent.svg`
   },
   manifest: "/manifest.json"
 };
