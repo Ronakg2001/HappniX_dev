@@ -16,7 +16,8 @@ export const metadata: Metadata = {
   icons: {
     icon: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID && process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID !== "undefined" ? process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID : ""}/Happnix_logo_full_transparent.svg`,
     apple: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID && process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID !== "undefined" ? process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID : ""}/Happnix_logo_full_transparent.svg`
-  }
+  },
+  manifest: "/manifest.json"
 };
 
 export default function RootLayout({
