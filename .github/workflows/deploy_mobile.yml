@@ -35,4 +35,5 @@ jobs:
         run: npm install
 
       - name: Publish update
-        run: eas update --branch ${{ github.ref_name }} --message "CI update: ${{ github.event.head_commit.message }}" --non-interactive
+        run: |
+          eas update --branch ${{ github.ref_name }} --message "CI update: ${{ github.event.head_commit.message }}" --non-interactive
