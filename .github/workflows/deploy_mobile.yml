@@ -1,0 +1,38 @@
+name: Deploy Mobile Update
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "mobile_frontend/**"
+      - ".github/workflows/deploy_mobile.yml"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile_frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Publish update
+        run: eas update --branch ${{ github.ref_name }} --message "CI update: ${{ github.event.head_commit.message }}" --non-interactive

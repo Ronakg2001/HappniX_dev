@@ -29,6 +29,7 @@ enviroment_variable = {
     "R2_STATIC_MEDIA_BUCKET_PUBID": os.environ.get("NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID", ""),
     "TEST_OTP_MODE": "true",
     "APP_ENVIRONMENT": "dev",
+    "EXPO_TOKEN": os.environ.get("EXPO_TOKEN", "")
 }
 
 # ── Region / Country-Code Mapping ─────────────────────────────────────────────
