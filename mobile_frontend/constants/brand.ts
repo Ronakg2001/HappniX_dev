@@ -1,4 +1,5 @@
-export const LOGO_URL = 'PLACEHOLDER_MOBILE_LOGO_URL';
+import HappnixLogo from '../assets/images/Happnix_logo_full_transparent';
+export const Logo = HappnixLogo;
 
 export const colors = {
   bg: '#050508',

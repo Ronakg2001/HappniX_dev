@@ -35,5 +35,8 @@ jobs:
         run: npm install
 
       - name: Publish update
+        env:
+          EXPO_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID: ${{ vars.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID }}
+          EXPO_PUBLIC_R2_USERMEDIA_BUCKET_PUBID: ${{ vars.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID }}
         run: |
           eas update --branch ${{ github.ref_name }} --message "CI update: ${{ github.event.head_commit.message }}" --non-interactive

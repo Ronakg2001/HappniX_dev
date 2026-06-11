@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, Check, Clock, Heart, MapPin, MessageCircle, Music2, Ticket } from 'lucide-react-native';
-import { colors, fonts, gradient, LOGO_URL } from '@/constants/brand';
+import { colors, fonts, gradient, Logo } from '@/constants/brand';
 
 export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
@@ -40,7 +40,7 @@ export function BrandHeader({
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <Image source={{ uri: LOGO_URL }} style={styles.logo} resizeMode="contain" accessibilityLabel="Happnix logo" />
+        <Logo style={styles.logo} width={96} height={34} />
         <View style={{ flex: 1 }}>
           {title ? <Text style={styles.headerTitle}>{title}</Text> : null}
           {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
