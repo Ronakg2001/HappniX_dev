@@ -69,14 +69,26 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {        
-        const data: any = await apiClient.get("/api/profile/me");
-        if (data && data.success && data.profile) {
-          setProfile(data.profile);
-        } else if (data && data.data) {
-          // Fallback if data is inside the 'data' field
-          setProfile(data.data);
+        const response: any = await apiClient.get("/api/profile/me");
+        console.log("[Profile] Fetched raw response:", response);
+        
+        let profileData = null;
+        if (response && response.success && response.profile) {
+          profileData = response.profile;
+        } else if (response && response.data) {
+          profileData = response.data.profile || response.data;
+        } else if (response && !response.success) {
+          throw new Error(response.message || "Failed to load profile.");
+        }
+        
+        if (profileData) {
+          console.log("[Profile] Parsed profile data:", profileData);
+          setProfile(profileData);
+        } else {
+          throw new Error("Invalid profile data format received from API.");
         }
       } catch (err: any) {
+        console.error("[Profile] Error fetching profile:", err);
         setError(err.message || "Failed to load profile.");
       } finally {
         setLoading(false);
@@ -158,9 +170,9 @@ export default function ProfilePage() {
               <div className="relative group">
                 <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background bg-brand-gradient flex items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-glow overflow-hidden">
                   {profile.avatar ? (
-                    <img src={getMediaUrl(profile.avatar) || ""} alt={profile.name} className="h-full w-full object-cover" />
+                    <img src={getMediaUrl(profile.avatar) || ""} alt={profile.name || profile.username || "User"} className="h-full w-full object-cover" />
                   ) : (
-                    profile.name[0]
+                    (profile.name || profile.username || "U")[0].toUpperCase()
                   )}
                 </div>
                 <Button

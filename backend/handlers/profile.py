@@ -68,9 +68,15 @@ def get_user_profile(**kwargs):
                      user_id=user_id, error=profile_result.get("error"))
             return error_response("Failed to load profile. Please try again.", 500)
 
+        profile_data = profile_result.get("data", {})
+        if "name" not in profile_data and full_name:
+            profile_data["name"] = full_name
+        if "username" not in profile_data and username:
+            profile_data["username"] = username
+            
         return success_response({
             "success": True,
-            "profile": profile_result.get("data", {}),
+            "profile": profile_data,
         })
     except Exception as exc:
         util.log("error", "get_user_profile", f"Action failed: {exc}")
