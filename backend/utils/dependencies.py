@@ -19,6 +19,7 @@ enviroment_variable = {
     "COGNITO_USER_POOL_CLIENT_ID": os.environ.get("COGNITO_USER_POOL_CLIENT_ID", ""),
     "COGNITO_USER_POOL_ID": os.environ.get("COGNITO_USER_POOL_ID", ""),
     "CLOUDFLARE_ACCOUNT_ID": os.environ.get("CLOUDFLARE_ACCOUNT_ID", ""),
+    "CLOUDFLARE_API_TOKEN": os.environ.get("CLOUDFLARE_API_TOKEN", ""),
     "R2_ACCESS_KEY_ID": os.environ.get("R2_ACCESS_KEY_ID", ""),
     "R2_SECRET_ACCESS_KEY": os.environ.get("R2_SECRET_ACCESS_KEY", ""),
     "R2_ENDPOINT": os.environ.get("R2_ENDPOINT", ""),
