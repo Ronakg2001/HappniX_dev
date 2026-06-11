@@ -1,7 +1,5 @@
 {
   "name": "happnix-dev-new",
   "compatibility_date": "2026-04-15",
-  "assets": {
-    "directory": "out"
-  }
+  "pages_build_output_dir": "out"
 }
