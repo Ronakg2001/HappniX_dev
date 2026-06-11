@@ -74,6 +74,20 @@ apiClient.interceptors.response.use(
     return data;
   },
   (error) => {
+    if (error.response && error.response.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("happnix_access_token");
+        localStorage.removeItem("happnix_pre_auth_token");
+        localStorage.removeItem("happnix_refresh_token");
+        localStorage.removeItem("happnix_session_id");
+        
+        // Prevent infinite reload loops if already on auth pages
+        if (!window.location.pathname.includes("/signin") && !window.location.pathname.includes("/signup")) {
+          window.location.href = "/signin";
+        }
+      }
+    }
+
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||
