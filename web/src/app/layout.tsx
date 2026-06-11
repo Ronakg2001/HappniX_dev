@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import AppLayout from "@/components/layout/AppLayout";
+import { STATIC_MEDIA_URL } from "@/lib/utils";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -14,8 +15,8 @@ export const metadata: Metadata = {
   title: "Happnix — Find Your Next Experience",
   description: "Discover live events near you, book tickets in seconds, invite your squad, and stay connected — all in one place.",
   icons: {
-    icon: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID && process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID !== "undefined" ? process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID : ""}/Happnix_logo_full_transparent.svg`,
-    apple: `${process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID && process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID !== "undefined" ? process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID : ""}/Happnix_logo_full_transparent.svg`
+    icon: `${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`,
+    apple: `${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`
   },
   manifest: "/manifest.json"
 };

@@ -1,0 +1,27 @@
+// IMPORTANT: manifest.ts is NOT compatible with Next.js static export (output: "export").
+// The web manifest is served from public/manifest.json instead.
+// This file has been renamed to _manifest.ts.disabled to prevent Next.js from processing it.
+//
+// If you ever switch away from static export, rename this back to manifest.ts and
+// use the dynamic approach below:
+//
+// import type { MetadataRoute } from 'next'
+//
+// export default async function manifest(): Promise<MetadataRoute.Manifest> {
+//   const pubId = process.env.NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID || "";
+//   const logoSvg = pubId ? `${pubId}/Happnix_logo_full_transparent.svg` : "/Happnix.svg";
+//   const logoPng = pubId ? `${pubId}/Happnix.png` : "/Happnix.png";
+//   return {
+//     name: "Happnix",
+//     short_name: "Happnix",
+//     description: "Find Your Next Experience",
+//     start_url: "/",
+//     display: "standalone",
+//     background_color: "#050508",
+//     theme_color: "#050508",
+//     icons: [
+//       { src: logoSvg, sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+//       { src: logoPng, sizes: "512x512", type: "image/png", purpose: "any" }
+//     ]
+//   }
+// }
