@@ -10,6 +10,8 @@ from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
+from integration import dynamo_db
+from integration import r2_bucket
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -131,7 +133,7 @@ def wipe_all_users(**kwargs):
             return error_response("Failed to wipe Cognito users. Check logs.", 500)
     
     # 2. Wipe RDS Users
-    rds_result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
+    rds_result = rds.execute_raw_sql("DELETE FROM users;")
     if not rds_result.get("success"):
         util.log("error", "dev_only.wipe_all_users", f"RDS wipe failed: {rds_result.get('error')}")
         return error_response("Failed to wipe RDS users. Check logs.", 500)
@@ -144,7 +146,7 @@ def wipe_all_users(**kwargs):
 
 def wipe_dev_rds_users(**kwargs):
     """Wipe only the RDS users (leaves Cognito intact)."""
-    rds_result = rds.execute_raw_sql("DELETE FROM user_devices; DELETE FROM users;")
+    rds_result = rds.execute_raw_sql("DELETE FROM users;")
     if not rds_result.get("success"):
         util.log("error", "dev_only.wipe_dev_rds_users", f"RDS wipe failed: {rds_result.get('error')}")
         return error_response("Failed to wipe RDS users. Check logs.", 500)
@@ -157,14 +159,25 @@ def wipe_dev_rds_users(**kwargs):
 
 def get_dev_all_users(**kwargs):
     """Retrieve all users from RDS."""
-    result = rds.get_all_users()
-    if not result.get("success"):
-        return error_response(f"Failed to fetch users: {result.get('error')}", 500)
-    
-    return success_response({
-        "success": True,
-        "users": result.get("data", [])
-    })
+    import psycopg2.extras
+    conn = rds.get_connection()
+    if not conn:
+        return error_response("Database connection failed.", 500)
+        
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users;")
+            rows = cur.fetchall()
+            data = [{k: str(v) if v is not None else None for k, v in row.items()} for row in rows]
+            
+        return success_response({
+            "success": True,
+            "users": data
+        })
+    except Exception as exc:
+        return error_response(f"Failed to fetch users: {exc}", 500)
+    finally:
+        conn.close()
 
 
 def get_dev_rds_user(**kwargs):
@@ -173,13 +186,51 @@ def get_dev_rds_user(**kwargs):
     if not username:
         return error_response("Username is required.", 400)
     
-    result = rds.get_user_by_username(username)
+    result = rds.get_record("users", userName=username)
     if not result.get("success"):
         return error_response(f"Failed to fetch user: {result.get('error')}", 404)
     
     return success_response({
         "success": True,
         "user": result.get("data")
+    })
+
+def delete_account(**kwargs):
+    """Delete a specific user permanently and instantly across all systems."""
+    username = str(kwargs.get("username", "")).strip()
+    if not username:
+        return error_response("Username is required.", 400)
+        
+    # 1. Delete from Cognito
+    cognito.delete_user(username=username)
+    
+    # Fetch user_id before deleting from RDS
+    user_id = None
+    rds_user = rds.get_record("users", userName=username)
+    if rds_user.get("success") and rds_user.get("data"):
+        user_id = rds_user["data"].get("userID")
+    
+    # 2. Delete from RDS
+    rds_result = rds.delete_record("users", userName=username)
+    if not rds_result.get("success"):
+        util.log("error", "dev_only.delete_account", f"Failed to delete RDS user: {rds_result.get('error')}")
+        
+    if user_id:
+        # 3. Delete from DynamoDB instantly
+        dynamo_result = dynamo_db.query_items_by_pk("users", user_id)
+        if dynamo_result.get("success"):
+            for item in dynamo_result.get("data", []):
+                entity = item.get("userEntity")
+                if entity:
+                    dynamo_db.delete_item("users", user_id, entity)
+                    
+        # 4. Delete from R2 instantly
+        r2_bucket.delete_folder_contents(f"public/{user_id}/")
+        r2_bucket.delete_folder_contents(f"private/{user_id}/")
+        
+    return success_response({
+        "success": True,
+        "message": f"Successfully deleted user '{username}' permanently from all systems."
     })
 
 
@@ -237,6 +288,7 @@ ACTION_HANDLERS = {
     "GetDevAllUsers":    get_dev_all_users,
     "GetDevRDSUser":     get_dev_rds_user,
     "TestDBConnection":  test_db_connection,
+    "DeleteAccount":     delete_account,
 }
 
 
