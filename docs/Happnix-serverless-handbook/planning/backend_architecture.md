@@ -2,7 +2,7 @@
 
 Here is a flowchart mapping out exactly how requests flow from the frontend through the AWS API Gateway, and down to specific Lambda functions and databases. 
 
-Notice how **Auth** uses a single `POST /api/auth` endpoint and routes internally based on the `actionItem`, whereas other services like **Profiles** and **Events** use traditional RESTful routing (e.g. `GET /api/profile/me`).
+Notice how **Auth** uses a single `POST /api/auth` endpoint and routes internally based on the `actionItem`, whereas **ProfileApi** uses a hybrid approach (GET path routing + POST actionItem routing), and other services like **HomePageApi** use traditional RESTful routing.
 
 ```mermaid
 flowchart TD
@@ -13,6 +13,7 @@ flowchart TD
     classDef db fill:#10b981,stroke:#047857,color:white,font-weight:bold,rx:8px
     classDef authMethod fill:#f3f4f6,stroke:#d1d5db,color:#374151
     classDef restMethod fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    classDef stub fill:#fecaca,stroke:#ef4444,color:#7f1d1d
 
     %% Clients
     Browser["🌐 Web App / Browser"]:::client
@@ -30,46 +31,66 @@ flowchart TD
     %% ----------------------------------------------------
     subgraph Auth Stack ["Auth Stack (Action-Based)"]
         AuthRoute["POST /api/auth"]:::restMethod
-        SignupSigninLambda["⚙️ SignupSignin.py Lambda"]:::lambda
+        SignupSigninLambda["⚙️ signup_signin.py Lambda"]:::lambda
         
         %% Action Items
-        ActionMobile["SendMobileOtp\nVerifyMobileOtp"]:::authMethod
-        ActionLogin["LoginWithPassword"]:::authMethod
-        ActionProfile["RegisterUserDetails\nCompleteProfileSetup"]:::authMethod
-        ActionGov["SendAadhaarOtp\nVerifyAadhaarOtp"]:::authMethod
-        ActionDev["GetDevAuthStatus\nWipeDevUsers\nGetDevAllUsers"]:::authMethod
+        ActionMobile["SendMobileOtp\nVerifyMobileOtp\nResendMobileOtp"]:::authMethod
+        ActionLogin["LoginWithPassword\nRefreshToken"]:::authMethod
+        ActionProfile["RegisterUserDetails\nCheckUsername"]:::authMethod
+        ActionUtils["GetCountryCodes"]:::authMethod
         
         AuthRoute --> SignupSigninLambda
         SignupSigninLambda -. "actionItem" .-> ActionMobile
         SignupSigninLambda -. "actionItem" .-> ActionLogin
         SignupSigninLambda -. "actionItem" .-> ActionProfile
-        SignupSigninLambda -. "actionItem" .-> ActionGov
-        SignupSigninLambda -. "actionItem" .-> ActionDev
+        SignupSigninLambda -. "actionItem" .-> ActionUtils
     end
 
     APIGateway --> AuthRoute
 
     %% ----------------------------------------------------
-    %% Feature Flows (RESTful Pattern)
+    %% Profile Flow (Hybrid: GET path + POST actionItem)
     %% ----------------------------------------------------
-    subgraph Feature Stack ["Feature Stack (RESTful)"]
-        ProfilesRoute["/api/profile/*\n/api/users/*"]:::restMethod
-        ProfilesLambda["⚙️ profiles_api.py Lambda"]:::lambda
-        
-        EventsRoute["/api/events/*"]:::restMethod
-        EventsLambda["⚙️ events_api.py Lambda"]:::lambda
-        
-        TicketsRoute["/api/tickets/*"]:::restMethod
-        TicketsLambda["⚙️ tickets_api.py Lambda"]:::lambda
+    subgraph Profile Stack ["Profile Stack (Hybrid Routing)"]
+        ProfileRoute["GET /api/profile/me\nPOST /api/profile/me"]:::restMethod
+        ProfileLambda["⚙️ profile.py Lambda"]:::lambda
 
-        ProfilesRoute --> ProfilesLambda
-        EventsRoute --> EventsLambda
-        TicketsRoute --> TicketsLambda
+        ProfileActions["getUserProfile\nupdate_user_profile\ncheck_username\ndeleteAccount"]:::authMethod
+
+        ProfileRoute --> ProfileLambda
+        ProfileLambda -. "GET → getUserProfile\nPOST → actionItem" .-> ProfileActions
     end
 
-    APIGateway --> ProfilesRoute
+    APIGateway --> ProfileRoute
+
+    %% ----------------------------------------------------
+    %% Home Page Flow (RESTful)
+    %% ----------------------------------------------------
+    subgraph Home Stack ["Home Stack (RESTful)"]
+        HomeRoute["/api/home/*\n/api/tickets/*\n/api/notifications/*"]:::restMethod
+        HomeLambda["⚙️ home_page.py Lambda"]:::lambda
+
+        HomeRoute --> HomeLambda
+    end
+
+    APIGateway --> HomeRoute
+
+    %% ----------------------------------------------------
+    %% Stub Lambdas (Not Yet Implemented)
+    %% ----------------------------------------------------
+    subgraph Stubs ["Feature Stubs (501)"]
+        EventsRoute["/api/events/*"]:::restMethod
+        EventsLambda["⚙️ events.py Lambda\n(501 stub)"]:::stub
+
+        MessagingRoute["/api/messages/*"]:::restMethod
+        MessagingLambda["⚙️ messaging.py Lambda\n(501 stub)"]:::stub
+
+        EventsRoute --> EventsLambda
+        MessagingRoute --> MessagingLambda
+    end
+
     APIGateway --> EventsRoute
-    APIGateway --> TicketsRoute
+    APIGateway --> MessagingRoute
 
     %% ----------------------------------------------------
     %% Data Layer
@@ -77,8 +98,9 @@ flowchart TD
     subgraph Data Layer ["Serverless Data Layer"]
         Cognito["🔐 AWS Cognito\n(Identity & Tokens)"]:::aws
         RDS["🐘 PostgreSQL RDS\n(Core Identity / users table)"]:::db
-        DynamoUsers["⚡ DynamoDB: Happnix-userInfoTable\n(Scalable Profiles)"]:::db
-        DynamoSessions["⚡ DynamoDB: HappniX-sessions-v2\n(Session & OTP TTL)"]:::db
+        DynamoUsers["⚡ DynamoDB: HappniX-User\n(PROFILE + SETTINGS entities)"]:::db
+        DynamoSessions["⚡ DynamoDB: HappniX-sessions-v2\n(PreAuth Session & OTP TTL)"]:::db
+        R2["📦 Cloudflare R2\n(User Media Storage)"]:::db
     end
 
     %% Wiring Lambdas to Data
@@ -87,10 +109,13 @@ flowchart TD
     SignupSigninLambda == "Set OTP/Session" ==> DynamoSessions
     SignupSigninLambda == "Create User" ==> Cognito
 
-    ProfilesLambda -. "Query" .-> DynamoUsers
-    ProfilesLambda -. "Lookup" .-> RDS
-    
-    EventsLambda -. "Query" .-> DynamoUsers
+    ProfileLambda == "Query / Delete" ==> DynamoUsers
+    ProfileLambda == "Lookup / Delete" ==> RDS
+    ProfileLambda == "Delete User" ==> Cognito
+    ProfileLambda -. "Upload / Delete" .-> R2
+
+    HomeLambda -. "Validate Token" .-> Cognito
+    HomeLambda -. "Lookup" .-> RDS
 ```
 
 ### Breakdown of the Request Patterns
@@ -98,13 +123,18 @@ flowchart TD
 #### 1. The Auth Approach (`actionItem`)
 Because Auth involves complex multi-step state machines (e.g. asking for mobile -> getting OTP -> verifying -> registering details), we route all requests to a single `POST /api/auth` endpoint. The Lambda inspects the `actionItem` in the body to decide which python function to run.
 
-#### 2. The Feature Approach (RESTful)
-For standard CRUD (Create, Read, Update, Delete) features like Profiles, Events, and Tickets, the API Gateway inspects the URL path and HTTP Method to route directly to specific handlers. For example:
-- `GET /api/profile/me` ➡️ Triggers `profiles_api.py` to fetch your own data.
-- `GET /api/users/{id}/profile` ➡️ Triggers `profiles_api.py` to fetch someone else's public profile.
-- `POST /api/events/create` ➡️ Triggers `events_api.py`.
+#### 2. The Profile Approach (Hybrid)
+The `ProfileApi` Lambda uses a hybrid pattern:
+- **GET** requests are mapped via `GET_ROUTE_MAP` (e.g. `GET /api/profile/me` → `getUserProfile`).
+- **POST** requests use `actionItem` dispatch (e.g. `{ "actionItem": "update_user_profile" }`).
+All endpoints require `Authorization: Bearer` tokens validated against Cognito.
 
-#### 3. Layered Architecture & Code Organization
+#### 3. The Home Page Approach (RESTful)
+For standard CRUD features like feed, logout, tickets, and notifications, the API Gateway inspects the URL path and HTTP Method to route directly to specific handlers. For example:
+- `GET /api/home/feed` → `handle_home_feed()` — validates Bearer token, returns profile + feed.
+- `POST /api/home/logout` → `handle_logout()` — triggers Cognito `GlobalSignOut`.
+
+#### 4. Layered Architecture & Code Organization
 The codebase strictly adheres to a separated, layered architecture to maintain clean boundaries between I/O, business logic, and database operations.
 
 - **Handlers (`handlers/`)**: The front door. Handlers extract and validate parameters, handle basic/short logic under the **"10-Line Rule"**, manage `try/except` safety blocks, and format the final HTTP `success_response` / `error_response`.

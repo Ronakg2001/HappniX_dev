@@ -180,7 +180,8 @@ def delete_account(**kwargs):
 
         return success_response({
             "success": True,
-            "message": "Account has been successfully deleted."
+            "message": "Account has been successfully deleted.",
+            "redirectUrl": "/signin"
         })
     except Exception as exc:
         util.log("error", "profile.delete_account", f"Action failed: {exc}")
@@ -235,19 +236,26 @@ def lambda_handler(event, context):
         if not cognito_user:
             return error_response("Unauthorized. Invalid or expired token.", 401)
 
-        username = cognito_user.get("Username")
-        if not username:
+        cognito_username = cognito_user.get("Username")
+        if not cognito_username:
             return error_response("Unauthorized. Invalid Cognito user data.", 401)
 
         # ── B. Look up the user in RDS ─────────────────────────────────────────
-        rds_result = rds.get_record("users", userName=username)
+        # Try to look up by userID first (for modern users where Cognito username == UUID)
+        rds_result = rds.get_record("users", userID=cognito_username)
+        
+        if not rds_result.get("success"):
+            # Fallback for legacy users (where Cognito username == display userName)
+            rds_result = rds.get_record("users", userName=cognito_username)
+
         if not rds_result.get("success"):
             util.log("warning", "profile.lambda_handler",
-                     "User not found in RDS.", username=username)
+                     "User not found in RDS.", cognito_username=cognito_username)
             return error_response("User not found in database.", 404)
 
         user_data   = rds_result.get("data", {})
         user_id     = user_data.get("userID")
+        username    = user_data.get("userName")  # Use the real username from RDS
         full_name   = user_data.get("fullName", "")
         cognito_sub = user_data.get("cognitoSub", "")
 

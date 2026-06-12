@@ -98,7 +98,7 @@ The user enters the OTP:
   "otp": "123456"
 }
 ```
-**Response (200 OK):** `{"success": true, "userStatus": "existing" | "new", "message": "..."}`
+**Response (200 OK):** `{"success": true, "userStatus": "existing" | "new", "redirectUrl": "/signin?view=password" | "/signup", "message": "..."}`
 
 ### 3. Register User Details (Sign Up)
 **Action Item:** `RegisterUserDetails`
@@ -111,7 +111,7 @@ For new users, after verifying the OTP, they provide their profile details (User
 5. It creates the user in **Amazon Cognito** as the primary identity store.
 6. It inserts the user's full profile into **RDS PostgreSQL** (`happnixdb`).
    - If RDS insertion fails, it rolls back by deleting the Cognito user to prevent zombie accounts.
-7. The PreAuth session is deleted, and the user is redirected to the login page.
+7. The PreAuth session is deleted, and the server returns **JWT tokens directly** (auto-login), along with a redirect URL.
 
 **Payload:**
 ```json
@@ -127,7 +127,7 @@ For new users, after verifying the OTP, they provide their profile details (User
   "region": "IN"
 }
 ```
-**Response (200 OK):** `{"success": true, "message": "Account created successfully. Please sign in.", "redirectUrl": "/login.html"}`
+**Response (200 OK):** `{"success": true, "message": "Account created successfully.", "accessToken": "...", "refreshToken": "...", "idToken": "...", "expiresIn": 3600, "tokenType": "Bearer", "redirectUrl": "/login.html"}`
 
 ### 4. Login With Password
 **Action Item:** `LoginWithPassword`
@@ -147,7 +147,7 @@ Once registered (or if the user already existed), they log in:
   "password": "StrongPassword123!"
 }
 ```
-**Response (200 OK):** `{"success": true, "accessToken": "...", "idToken": "...", "refreshToken": "...", "expiresIn": 3600, ...}`
+**Response (200 OK):** `{"success": true, "accessToken": "...", "idToken": "...", "refreshToken": "...", "expiresIn": 3600, "tokenType": "Bearer", "redirectUrl": "/home_page.html"}`
 
 ### 5. Account Deletion
 **Action Item:** `deleteAccount`
@@ -168,7 +168,7 @@ When a user chooses to delete their account:
   "actionItem": "deleteAccount"
 }
 ```
-**Response (200 OK):** `{"success": true, "message": "Account has been successfully deleted."}`
+**Response (200 OK):** `{"success": true, "message": "Account has been successfully deleted.", "redirectUrl": "/signin"}`
 
 ---
 

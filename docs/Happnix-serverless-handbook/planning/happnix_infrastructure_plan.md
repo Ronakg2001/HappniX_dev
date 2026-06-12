@@ -18,8 +18,10 @@
 | Infra — Network Stack | ✅ Template ready | CloudFormation (VPC, subnets, NAT, SGs) |
 | Infra — Data Stack | ✅ Template ready | CloudFormation (RDS PostgreSQL `db.t4g.micro` + DynamoDB tables) |
 | Infra — App Stack | ✅ Template ready | CloudFormation (Cognito, API Gateway, Lambdas) |
-| Backend — Auth | ✅ Working | `SignupSignin` Lambda + `dev_store.py` (session-based) |
-| Backend — Core APIs | ❌ Not migrated | Events, Tickets, Guests, Profiles, Messaging — all still in old Django codebase |
+| Backend — Auth | ✅ Working | `SignupSignin` Lambda + DynamoDB sessions (JWT-based) |
+| Backend — Profile | ✅ Working | `ProfileApi` Lambda (self-healing DynamoDB + R2 + account deletion) |
+| Backend — Home Page | 🟡 Partial | `HomePageApi` Lambda (feed + logout implemented, rest are stubs) |
+| Backend — Core APIs | ❌ Not migrated | Events, Tickets, Guests, Messaging — all returning 501 stubs |
 | CI/CD | 🟡 Partial | GitHub Actions for 3 stack deploys, no frontend CI |
 | Media Storage | 🟡 Config exists | R2 params in template, no upload Lambda |
 | Real-time / WebSocket | ❌ Not migrated | Was Django Channels, needs API Gateway WebSocket |
@@ -351,33 +353,36 @@ Globals:
 
 ### 2.1 PostgreSQL — Existing Tables (Already Deployed via AuthSchemaInit)
 
-These tables are created automatically by the `AuthSchemaInit` Lambda from [happnix_auth_schema.sql](file:///e:/project/HappniX_dev/backend/sql/happnix_auth_schema.sql):
+These tables are created automatically by the `AuthSchemaInit` Lambda from [happnix_auth_schema.sql](file:///e:/project/HappniX_dev/backend/schemas/happnix_auth_schema.sql):
 
 #### `users` table
 
 ```sql
-CREATE TYPE user_type_enum AS ENUM ('Admin', 'Business', 'General');
+CREATE TYPE user_type_enum AS ENUM ('Authority', 'Admin', 'Business', 'General', 'Temporary');
+CREATE TYPE "userStatus" AS ENUM ('Active', 'Deactivated', 'Deleted');
+CREATE TYPE sex_enum AS ENUM ('Male', 'Female', 'Other');
 
 CREATE TABLE IF NOT EXISTS users (
-    "userID"              CHAR(8) PRIMARY KEY,
+    "userID"              UUID PRIMARY KEY,
     "cognitoSub"          UUID NOT NULL UNIQUE,
-    "userName"            VARCHAR(150) NOT NULL,
+    "userName"            VARCHAR(150) NOT NULL UNIQUE,
+    "fullName"            VARCHAR(255) NOT NULL,
     "emailAddress"        VARCHAR(255) NOT NULL,
     "userType"            user_type_enum NOT NULL DEFAULT 'General',
     "phoneNumber"         VARCHAR(20) NOT NULL UNIQUE,
-    "adharNumber"         VARCHAR(20),
-    "adharVerified"       BOOLEAN,
+    "uniqueNationalID"    VARCHAR(20),
+    "unidIsVerified"      BOOLEAN,
     "emailVerified"       BOOLEAN NOT NULL,
-    "isActive"            BOOLEAN NOT NULL,
+    "status"              "userStatus" NOT NULL DEFAULT 'Active',
+    "region"              VARCHAR(5),
     "dateOfBirth"         DATE NOT NULL,
+    "gender"              sex_enum,
+    "bio"                 TEXT,
+    "profilePictureUrl"   VARCHAR(500),
+    "privacyMode"         VARCHAR(10) NOT NULL DEFAULT 'public',
     "createdAt"           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastLogin"           TIMESTAMPTZ,
-    "loginDeviceCount"    INTEGER NOT NULL DEFAULT 0,
-    "cognitoIdToken"      TEXT,
-    "cognitoAccessToken"  TEXT,
-    "cognitoRefreshToken" TEXT,
-    CONSTRAINT users_userid_format_chk CHECK ("userID" ~ '^[A-Z0-9]{8}$')
+    "lastLogin"           TIMESTAMPTZ
 );
 -- Indexes: cognitoSub, emailAddress, phoneNumber
 ```
@@ -387,7 +392,7 @@ CREATE TABLE IF NOT EXISTS users (
 ```sql
 CREATE TABLE IF NOT EXISTS user_devices (
     "deviceID"                     BIGSERIAL PRIMARY KEY,
-    "userID"                       CHAR(8) NOT NULL REFERENCES users ("userID") ON DELETE CASCADE,
+    "userID"                       UUID NOT NULL REFERENCES users ("userID") ON DELETE CASCADE,
     "deviceFingerprintHash"        TEXT NOT NULL,
     "deviceName"                   VARCHAR(255),
     "isTrusted"                    BOOLEAN NOT NULL DEFAULT FALSE,
@@ -401,7 +406,7 @@ CREATE TABLE IF NOT EXISTS user_devices (
 ```
 
 > [!NOTE]
-> These two tables are the **foundation** that all new application tables will reference via `"userID" CHAR(8)` foreign keys.
+> The `userID` uses a **Custom UUIDv7** format (see `utils/uuid_generator.py`) that embeds timestamp, region, entity type, and randomness. All new tables should reference `"userID" UUID`.
 
 ### 2.2 PostgreSQL — Future Tables
 
@@ -418,18 +423,18 @@ CREATE TABLE IF NOT EXISTS user_devices (
 
 ### 2.3 DynamoDB — Users Table ✅ ACTIVE
 
-The `happnix-users-dev` table mirrors user identity data from RDS for fast key-value lookups and **username uniqueness enforcement**.
+The `HappniX-User-{env}` table uses a **single-table design** with `userEntity` as the sort key, storing `PROFILE` and `SETTINGS` entities per user. Schema is defined in `integration/manifest.json`.
 
 | Property | Value |
 |----------|-------|
-| **Table Name** | `happnix-users-{env}` |
-| **Partition Key** | `userID` (S) — same `CHAR(8)` from RDS `users` table |
-| **GSI** | `userName-index` — partition key: `userName` (S) |
+| **Table Name** | `HappniX-User-{env}` (env var: `USERS_TABLE_NAME`) |
+| **Partition Key** | `userID` (S) — Custom UUIDv7 from RDS `users` table |
+| **Sort Key** | `userEntity` (S) — Entity type: `PROFILE`, `SETTINGS` |
 | **Billing** | PAY_PER_REQUEST (on-demand) |
 
 **Why both RDS and DynamoDB for users?**
-- **RDS** → source of truth for auth, Cognito links, tokens, relational queries
-- **DynamoDB** → sub-millisecond username lookups, profile reads, no VPC latency
+- **RDS** → source of truth for auth, Cognito links, relational queries
+- **DynamoDB** → sub-millisecond profile reads, settings storage, self-healing on read
 
 #### CloudFormation (already added to [data template](file:///e:/project/HappniX_dev/infra/data/template.yaml)):
 
@@ -537,7 +542,7 @@ Each suggestion is checked against the GSI before returning.
 | Users in DynamoDB? | **Yes** | Fast username lookups + uniqueness checks without hitting RDS |
 | Username uniqueness | **DynamoDB GSI** (`userName-index`) | Sub-ms query, no table scan, decoupled from RDS |
 | Additional tables | **On hold** | Will be created when schemas are finalized |
-| ID format | Keep `CHAR(8)` for users | Matches existing auth schema |
+| ID format | Custom UUIDv7 for users | Sortable, region-aware, collision-free across Lambda instances |
 
 ### Deliverables
 - [x] RDS `users` + `user_devices` tables (via `AuthSchemaInit`)
