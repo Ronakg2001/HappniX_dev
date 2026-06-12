@@ -46,7 +46,38 @@ api.interceptors.response.use(
 
     return response;
   },
-  (error: AxiosError<any>) => {
+  async (error: AxiosError<any>) => {
+    const originalRequest = error.config as any;
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.refresh);
+      if (refreshToken) {
+        try {
+          const response = await axios.post(API_BASE_URL + '/api/auth', {
+            actionItem: 'RefreshToken',
+            refreshToken: refreshToken
+          });
+          const data = response.data;
+          if (data.success && data.accessToken) {
+            await SecureStore.setItemAsync(TOKEN_KEYS.access, data.accessToken);
+            if (data.refreshToken) {
+              await SecureStore.setItemAsync(TOKEN_KEYS.refresh, data.refreshToken);
+            }
+            if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+              originalRequest.headers.set("Authorization", `Bearer ${data.accessToken}`);
+            } else if (originalRequest.headers) {
+              originalRequest.headers["Authorization"] = `Bearer ${data.accessToken}`;
+            }
+            return api(originalRequest);
+          }
+        } catch (refreshError) {
+          // refresh token is probably expired too
+        }
+      }
+
+      await clearSession();
+    }
+
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||
@@ -95,6 +126,7 @@ export const authApi = {
     await clearSession();
     return { success: true };
   },
+  refreshToken: (token: string) => api.post('/api/auth', { actionItem: 'RefreshToken', refreshToken: token }),
 };
 
 export const profileApi = {

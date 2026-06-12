@@ -107,7 +107,20 @@ def execute_user_registration(
     if not dynamo_result.get("success"):
         util.log("warning", "execute_user_registration", "DynamoDB entity creation failed (non-fatal)", user_id=user_id, error=dynamo_result.get("error"))
 
-    return {"success": True, "redirectUrl": "/login.html"}
+    try:
+        auth_result = cognito.authenticate_user(username=username, password=password)
+    except Exception as exc:
+        util.log("error", "execute_user_registration", f"Auto-login failed after signup: {exc}")
+        auth_result = None
+
+    return {
+        "success": True, 
+        "redirectUrl": "/home_page.html",
+        "accessToken": auth_result.get("accessToken") if auth_result else None,
+        "refreshToken": auth_result.get("refreshToken") if auth_result else None,
+        "idToken": auth_result.get("idToken") if auth_result else None,
+        "expiresIn": auth_result.get("expiresIn") if auth_result else None,
+    }
 
 
 def create_user_entities(**kwargs) -> dict:

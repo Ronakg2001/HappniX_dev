@@ -73,9 +73,36 @@ apiClient.interceptors.response.use(
     }
     return data;
   },
-  (error) => {
-    if (error.response && error.response.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
       if (typeof window !== "undefined") {
+        const refreshToken = localStorage.getItem("happnix_refresh_token");
+        if (refreshToken) {
+          try {
+            const response = await axios.post(API_BASE + "/api/auth", {
+              actionItem: "RefreshToken",
+              refreshToken: refreshToken
+            });
+            const data = response.data;
+            if (data.success && data.accessToken) {
+              localStorage.setItem("happnix_access_token", data.accessToken);
+              if (data.refreshToken) {
+                localStorage.setItem("happnix_refresh_token", data.refreshToken);
+              }
+              if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+                originalRequest.headers.set("Authorization", `Bearer ${data.accessToken}`);
+              } else if (originalRequest.headers) {
+                originalRequest.headers["Authorization"] = `Bearer ${data.accessToken}`;
+              }
+              return apiClient(originalRequest);
+            }
+          } catch (refreshError) {
+            // refresh token is probably expired too
+          }
+        }
+
         localStorage.removeItem("happnix_access_token");
         localStorage.removeItem("happnix_pre_auth_token");
         localStorage.removeItem("happnix_refresh_token");

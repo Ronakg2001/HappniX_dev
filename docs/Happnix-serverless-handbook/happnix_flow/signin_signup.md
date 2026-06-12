@@ -149,6 +149,27 @@ Once registered (or if the user already existed), they log in:
 ```
 **Response (200 OK):** `{"success": true, "accessToken": "...", "idToken": "...", "refreshToken": "...", "expiresIn": 3600, ...}`
 
+### 5. Account Deletion
+**Action Item:** `deleteAccount`
+
+When a user chooses to delete their account:
+1. The client sends a `POST /api/profile/me` request with `actionItem: "deleteAccount"` and the `Authorization: Bearer` header.
+2. The Lambda routes this to the `delete_account` handler.
+3. The service completely wipes the user's data across all storage layers instantly to comply with data privacy policies:
+   - Removes files from **R2 Storage** (Public and Private buckets).
+   - Deletes all entities associated with the user in **DynamoDB**.
+   - Removes the user record from **RDS PostgreSQL**.
+   - Deletes the identity from **Amazon Cognito**.
+4. The user is logged out and the account is permanently removed.
+
+**Payload:**
+```json
+{
+  "actionItem": "deleteAccount"
+}
+```
+**Response (200 OK):** `{"success": true, "message": "Account has been successfully deleted."}`
+
 ---
 
 ## The Custom UUIDv7 Architecture

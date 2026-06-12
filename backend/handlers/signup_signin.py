@@ -255,7 +255,13 @@ def register_user_details(**kwargs):
 
         return success_response({
             "success": True,
-            "message": "Account created successfully. Please sign in.",
+            "message": "Account created successfully.",
+            "accessToken": result.get("accessToken"),
+            "refreshToken": result.get("refreshToken"),
+            "idToken": result.get("idToken"),
+            "expiresIn": result.get("expiresIn"),
+            "tokenType": "Bearer",
+            "userStatus": "existing",
             "redirectUrl": result.get("redirectUrl", "/login.html"),
         })
     except Exception as exc:
@@ -303,6 +309,38 @@ def login_with_password(**kwargs):
         return error_response(f"Action error: {str(exc)}", 500)
 
 
+def refresh_token_action(**kwargs):
+    """
+    Refreshes an expired access token using a valid refresh token.
+    """
+    try:
+        refresh_token_str = str(kwargs.get("refreshToken", "")).strip()
+
+        if not refresh_token_str:
+            return error_response("Refresh token is required.", 400)
+
+        result = cognito.refresh_token(refresh_token_str)
+        if not result or not result.get("accessToken"):
+            return error_response("Invalid or expired refresh token.", 401)
+
+        return success_response({
+            "success": True,
+            "message": "Token refreshed successfully.",
+            "accessToken": result["accessToken"],
+            "refreshToken": result["refreshToken"],
+            "idToken": result["idToken"],
+            "expiresIn": result["expiresIn"],
+            "tokenType": "Bearer",
+        })
+    except Exception as exc:
+        if hasattr(exc, '__class__'):
+            name = exc.__class__.__name__
+            if name in ["NotAuthorizedException", "UserNotFoundException"]:
+                return error_response("Invalid or expired refresh token.", 401)
+        util.log("error", "refresh_token_action", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -315,6 +353,7 @@ ACTION_HANDLERS = {
     "VerifyMobileOtp":      verify_mobile_otp,
     "RegisterUserDetails":  register_user_details,
     "LoginWithPassword":    login_with_password,
+    "RefreshToken":         refresh_token_action,
 }
 
 
@@ -358,7 +397,7 @@ def lambda_handler(event, context):
         if action_item == "SendMobileOtp":
             # Always create / retrieve a session — no prior token required
             token, session = preauth.get_or_create_session(incoming_token)
-        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername"}:
+        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername", "RefreshToken"}:
             # These actions do not use a preauth session
             pass
         else:

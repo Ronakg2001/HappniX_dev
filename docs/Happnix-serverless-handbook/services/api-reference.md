@@ -44,6 +44,8 @@
 | `/api/profile/picture/upload` | POST | `Content-Type: multipart/form-data`*<br>`Cookie: happnix_session`* | `file`* | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Profile picture uploaded."}`<br>`{"message": "Upload failed."}`<br>`{"message": "Please sign in first."}`<br>`{"message": "Internal server error"}` |
 | `/api/profile/notifications` | GET | `Cookie: happnix_session`* | `None` | **200** (OK)<br>**401** (Unauth)<br>**500** (Error) | `{"count": 2, "notifications": [...]}`<br>`{"message": "Please sign in first."}`<br>`{"message": "Internal server error"}` |
 | `/api/profile/notifications/read` | POST | `Content-Type: application/json`*<br>`Cookie: happnix_session`* | `{ "notificationIds": []* }` | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Notifications marked as read."}`<br>`{"message": "Please sign in first."}`<br>`{"message": "Internal server error"}` |
+| `/api/profile/me` | POST | `Content-Type: application/json`*<br>`Authorization: Bearer`* | `{ "actionItem": "update_user_profile", ...updates }` | **200** (OK)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Profile updated successfully."}` |
+| `/api/profile/me` | POST | `Content-Type: application/json`*<br>`Authorization: Bearer`* | `{ "actionItem": "deleteAccount"* }` | **200** (OK)<br>**400** (Bad Req)<br>**401** (Unauth)<br>**500** (Error) | `{"message": "Account has been successfully deleted."}`<br>`{"message": "Missing user identifiers."}`<br>`{"message": "Unauthorized."}`<br>`{"message": "Internal server error"}` |
 
 ## Messaging APIs
 *(Note: These are handled by the `MessagingApi` Lambda).*

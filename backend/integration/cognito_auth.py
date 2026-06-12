@@ -179,6 +179,31 @@ def authenticate_user(**kwargs):
     }
 
 
+def refresh_token(refresh_token_str):
+    """
+    Get a new access token using a refresh token.
+    """
+    if not _client or not POOL_ID or not CLIENT_ID:
+        return None
+        
+    resp = _client.admin_initiate_auth(
+        UserPoolId=POOL_ID,
+        ClientId=CLIENT_ID,
+        AuthFlow="REFRESH_TOKEN_AUTH",
+        AuthParameters={
+            "REFRESH_TOKEN": refresh_token_str,
+        },
+    )
+    result = resp.get("AuthenticationResult", {})
+    return {
+        "accessToken":  result.get("AccessToken"),
+        "idToken":      result.get("IdToken"),
+        "expiresIn":    result.get("ExpiresIn", 3600),
+        # Refresh tokens are not returned in REFRESH_TOKEN_AUTH, so pass the same back
+        "refreshToken": refresh_token_str, 
+    }
+
+
 def describe_pool():
     """
     Fetch metadata about the configured Cognito User Pool.

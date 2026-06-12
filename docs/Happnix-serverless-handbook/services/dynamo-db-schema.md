@@ -4,7 +4,7 @@ DynamoDB runs in **PAY_PER_REQUEST (On-Demand)** mode for optimal free-tier usag
 
 | Table Name (Environment suffixed) | Partition Key (HASH) | Sort Key (RANGE) | Purpose / Status | TTL Field |
 | --- | --- | --- | --- | --- |
-| **Happnix-userInfoTable** | `userID` (String) | `userName` (String) | Fast username and profile metadata lookups. | N/A |
+| **users** (via USERS_TABLE_NAME) | `userID` (String) | `userEntity` (String) | Single-table design for `PROFILE` and `SETTINGS` metadata. | N/A |
 | **HappniX-sessions-v2** | `sessionToken` (String) | None | Replaces file-based session storage. Tracks active user sessions. | `expiresAt` |
 | **HappniX-otp-v2** | `mobile` (String) | None | Stores OTPs temporarily with a 5-minute expiry. | `expiresAt` |
 | **HappniX-connections-v2** | `connectionId` (String) | None | WebSocket connections registry. Includes `userId-index` GSI. | N/A |
