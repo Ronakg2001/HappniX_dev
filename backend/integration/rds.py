@@ -198,3 +198,53 @@ def delete_record(table_name: str, **kwargs) -> dict:
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()
+
+
+def update_record(table_name: str, pk_name: str, pk_value: str, updates: dict) -> dict:
+    """
+    Update a record in the RDS table based on its primary key.
+    Only updates columns that are defined in the manifest for the table.
+    """
+    if not updates:
+        return {"success": False, "error": "No updates provided."}
+
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    table_config = _MANIFEST.get("rds", {}).get("tables", {}).get(table_name, {})
+    columns = table_config.get("columns", [])
+    
+    if not columns:
+        conn.close()
+        return {"success": False, "error": f"Table {table_name} not configured in manifest."}
+
+    set_clauses = []
+    values = []
+    
+    for k, v in updates.items():
+        if k in columns:
+            set_clauses.append(f'"{k}" = %s')
+            values.append(v)
+            
+    if not set_clauses:
+        conn.close()
+        return {"success": False, "error": "No valid columns to update."}
+        
+    set_str = ", ".join(set_clauses)
+    sql = f'UPDATE {table_name} SET {set_str} WHERE "{pk_name}" = %s;'
+    values.append(pk_value)
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, tuple(values))
+            updated_count = cur.rowcount
+            conn.commit()
+        util.log("info", "rds.update_record", f"Updated {updated_count} records in {table_name}", pk_value=pk_value)
+        return {"success": True, "updatedCount": updated_count}
+    except Exception as exc:
+        conn.rollback()
+        util.log("error", "rds.update_record", f"Failed to update record: {exc}", pk_value=pk_value)
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()

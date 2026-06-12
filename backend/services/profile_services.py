@@ -67,6 +67,24 @@ def update_user_profile(user_id: str, updates: dict) -> dict:
     if not put_res.get("success"):
         return {"success": False, "error": "Failed to save profile updates."}
         
+    # Synchronize shared fields to RDS
+    rds_updates = {}
+    if "name" in updates:
+        rds_updates["fullName"] = updates["name"]
+    if "dob" in updates:
+        rds_updates["dateOfBirth"] = updates["dob"]
+    if "gender" in updates:
+        rds_updates["gender"] = updates["gender"]
+    if "username" in updates:
+        rds_updates["userName"] = updates["username"]
+
+    if rds_updates:
+        rds_res = rds.update_record("users", "userID", user_id, rds_updates)
+        if not rds_res.get("success"):
+            util.log("warning", "profile_services.update_user_profile",
+                     f"Failed to sync updates to RDS (non-fatal): {rds_res.get('error')}",
+                     user_id=user_id)
+
     return {"success": True, "data": current_profile}
 
 def delete_user_data(user_id: str, username: str, access_token: str) -> dict:

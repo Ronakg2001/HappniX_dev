@@ -58,7 +58,8 @@
       "create_user_attributes": {
         "email": "email",
         "phone_number": "phone_e164",
-        "custom:userId": "user_id"
+        "custom:userId": "user_id",
+        "preferred_username": "preferred_username"
       }
     }
   }

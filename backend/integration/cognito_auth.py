@@ -246,3 +246,36 @@ def get_user(access_token):
                  f"get_user failed or token invalid: {exc}")
         return None
 
+
+def update_user_attributes(username: str, attributes: dict) -> dict:
+    """
+    Update a user's mutable attributes in Cognito.
+    
+    Args:
+        username: The immutable Cognito username (which is the user_id).
+        attributes: Dictionary mapping attribute names to their new values.
+                    e.g. {"email": "new@email.com", "preferred_username": "new_name"}
+    """
+    if not _client or not POOL_ID:
+        return {"success": False, "error": "Cognito client not initialized"}
+
+    user_attributes = [
+        {"Name": k, "Value": str(v)}
+        for k, v in attributes.items()
+    ]
+    
+    if not user_attributes:
+        return {"success": True}
+
+    try:
+        _client.admin_update_user_attributes(
+            UserPoolId=POOL_ID,
+            Username=username,
+            UserAttributes=user_attributes
+        )
+        util.log("info", "cognito_auth.update_user_attributes", "Successfully updated attributes", username=username)
+        return {"success": True}
+    except Exception as exc:
+        util.log("error", "cognito_auth.update_user_attributes", f"Failed to update attributes: {exc}", username=username)
+        return {"success": False, "error": str(exc)}
+

@@ -55,11 +55,12 @@ def execute_user_registration(
 
     try:
         cognito_sub = cognito.create_user(
-            username=username,
+            username=user_id,
             email=email,
             phone_e164=phone_e164,
             password=password,
             user_id=user_id,
+            preferred_username=username,
         )
     except Exception as exc:
         exc_name = exc.__class__.__name__
@@ -91,9 +92,9 @@ def execute_user_registration(
     if not rds_result.get("success"):
         util.log("error", "execute_user_registration", f"RDS insert failed after Cognito success. Error: {rds_result.get('error')}", username=username, user_id=user_id)
         try:
-            cognito.delete_user(username=username)
+            cognito.delete_user(username=user_id)
         except Exception as del_exc:
-            util.log("error", "execute_user_registration", f"Cognito rollback also failed: {del_exc}", username=username)
+            util.log("error", "execute_user_registration", f"Cognito rollback also failed: {del_exc}", username=user_id)
         return {"success": False, "error": "Account creation failed at database step. Please try again.", "code": 500}
 
     util.log("info", "execute_user_registration", "User inserted into RDS successfully", username=username, user_id=user_id)
@@ -103,12 +104,17 @@ def execute_user_registration(
         username=username,
         full_name=full_name,
         cognitoSub=cognito_sub,
+        dob=dob,
+        gender=gender,
+        email=email,
+        phone_number=phone_e164,
+        region=region,
     )
     if not dynamo_result.get("success"):
         util.log("warning", "execute_user_registration", "DynamoDB entity creation failed (non-fatal)", user_id=user_id, error=dynamo_result.get("error"))
 
     try:
-        auth_result = cognito.authenticate_user(username=username, password=password)
+        auth_result = cognito.authenticate_user(username=user_id, password=password)
     except Exception as exc:
         util.log("error", "execute_user_registration", f"Auto-login failed after signup: {exc}")
         auth_result = None
