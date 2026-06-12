@@ -2,9 +2,10 @@
 
 import React from "react";
 import { Archive, Copy, RotateCcw } from "lucide-react";
-import { CreatedEventType } from "@/components/layout/AppLayout";
+import { CreatedEventType } from "@/types/event";
 import { StatCard } from "@/components/ui/stat-card";
 import { fmt, fmtRev } from "../constants";
+import { useLayout } from "@/components/layout/AppLayout";
 
 export function ArchivedWorkspace({
   ev,
@@ -15,7 +16,16 @@ export function ArchivedWorkspace({
   onUpdate: (p: Partial<CreatedEventType>) => void;
   onDuplicate: () => void;
 }) {
-  const totalSold = ev.tickets.reduce((s, t) => s + t.sold, 0);
+  const { eventStats } = useLayout();
+  const stats = eventStats[ev.id] || {
+    eventId: ev.id,
+    revenue: 0,
+    views: 0,
+    hype: "0 Hype",
+    feedback: [],
+  };
+
+  const totalSold = ev.ticketing.tiers.reduce((s, t) => s + t.sold, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,10 +39,10 @@ export function ArchivedWorkspace({
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Total Revenue" value={fmtRev(ev.revenue)} color="text-[var(--brand-3)]" />
-        <StatCard label="Tickets Sold" value={String(totalSold)} sub={`of ${ev.capacity}`} />
-        <StatCard label="Event Views" value={fmt(ev.views)} />
-        <StatCard label="Reviews" value={String(ev.feedback.length)} />
+        <StatCard label="Total Revenue" value={fmtRev(stats.revenue)} color="text-[var(--brand-3)]" />
+        <StatCard label="Tickets Sold" value={String(totalSold)} sub={`of ${ev.ticketing.capacity}`} />
+        <StatCard label="Event Views" value={fmt(stats.views)} />
+        <StatCard label="Reviews" value={String(stats.feedback.length)} />
       </div>
 
       {/* Summary */}
@@ -40,10 +50,10 @@ export function ArchivedWorkspace({
         <h3 className="text-[10px] font-black uppercase tracking-wider text-white/50 mb-4">Event Summary</h3>
         <div className="grid grid-cols-2 gap-3 text-xs">
           {[
-            { label: "Date", value: ev.date },
-            { label: "Venue", value: ev.venue },
+            { label: "Date", value: ev.schedule.startDate },
+            { label: "Venue", value: ev.location.venue },
             { label: "Category", value: ev.category },
-            { label: "Price", value: ev.price },
+            { label: "Price", value: ev.ticketing.price },
           ].map((row) => (
             <div key={row.label}>
               <span className="text-[8px] font-black uppercase tracking-wider text-white/30 block">{row.label}</span>
