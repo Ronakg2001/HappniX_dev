@@ -73,6 +73,10 @@ def get_user_profile(**kwargs):
             profile_data["name"] = full_name
         if "username" not in profile_data and username:
             profile_data["username"] = username
+        if "dob" not in profile_data and kwargs.get("dob"):
+            profile_data["dob"] = kwargs.get("dob")
+        if "gender" not in profile_data and kwargs.get("gender"):
+            profile_data["gender"] = kwargs.get("gender")
             
         return success_response({
             "success": True,
@@ -258,6 +262,8 @@ def lambda_handler(event, context):
         username    = user_data.get("userName")  # Use the real username from RDS
         full_name   = user_data.get("fullName", "")
         cognito_sub = user_data.get("cognitoSub", "")
+        dob         = user_data.get("dateOfBirth", "")
+        gender      = user_data.get("gender", "")
 
         if not user_id:
             return error_response("User ID not found in database.", 500)
@@ -290,6 +296,8 @@ def lambda_handler(event, context):
             "username":     username,
             "full_name":    full_name,
             "cognito_sub":  cognito_sub,
+            "dob":          dob,
+            "gender":       gender,
             "access_token": access_token,
         }
 
