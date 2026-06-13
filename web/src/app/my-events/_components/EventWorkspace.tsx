@@ -2,7 +2,7 @@
 
 import React from "react";
 import { ArrowLeft, MapPin, Calendar, Clock } from "lucide-react";
-import { CreatedEventType } from "@/components/layout/AppLayout";
+import { CreatedEventType } from "@/types/event";
 import { STATUS_CONFIG } from "./constants";
 import { DraftWorkspace } from "./workspaces/DraftWorkspace";
 import { UpcomingWorkspace } from "./workspaces/UpcomingWorkspace";
@@ -49,16 +49,17 @@ export function EventWorkspace({
             </div>
             <h2 className="text-lg font-black text-white uppercase tracking-wide leading-tight">{ev.title}</h2>
             <div className="flex items-center gap-3 mt-1.5 text-[10px] text-white/40 font-bold flex-wrap">
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{ev.venue}</span>
-              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{ev.date}</span>
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{ev.time}</span>
+              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{ev.location.venue}</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{ev.schedule.startDate}</span>
+              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{ev.schedule.startTime}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Stage-specific workspace */}
-      {ev.status === "Draft"     && <DraftWorkspace     ev={ev} onUpdate={onUpdate} />}
+      {ev.status === "Draft"     && <DraftWorkspace     ev={ev} onUpdate={onUpdate} onPublished={onBack} />}
+
       {ev.status === "Upcoming"  && <UpcomingWorkspace  ev={ev} onUpdate={onUpdate} />}
       {ev.status === "Live"      && <LiveWorkspace      ev={ev} onUpdate={onUpdate} />}
       {ev.status === "Completed" && <CompletedWorkspace ev={ev} onUpdate={onUpdate} />}

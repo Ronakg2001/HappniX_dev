@@ -20,7 +20,7 @@ export default function LeftSidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex flex-col w-[80px] xl:w-[260px] shrink-0 sticky top-20 pb-6 self-start transition-all duration-300">
+    <aside className="hidden md:flex flex-col w-[80px] xl:w-[200px] shrink-0 sticky top-20 pb-6 self-start transition-all duration-300">
       <div className="flex flex-col gap-6">
         {/* Main Menu */}
         <nav className="flex flex-col gap-1.5 p-2 rounded-lg liquid-glass liquid-border">

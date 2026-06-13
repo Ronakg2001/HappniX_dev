@@ -1,29 +1,31 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import { Plus, Search, Calendar } from "lucide-react";
 import { FILTERS, FilterType } from "./_components/constants";
 import { EventCard } from "./_components/EventCard";
-import { EventWorkspace } from "./_components/EventWorkspace";
 
 export default function MyEventsPage() {
-  const { createdEvents, openCreateEvent, updateCreatedEvent, duplicateCreatedEvent } = useLayout();
+  const router = useRouter();
+  const { createdEvents, duplicateCreatedEvent, pendingActiveEventId, clearPendingActiveEventId } = useLayout();
   const [filter, setFilter]           = useState<FilterType>("All");
   const [search, setSearch]           = useState("");
-  const [activeEventId, setActiveEventId] = useState<string | null>(null);
-
-  const activeEvent = useMemo(
-    () => createdEvents.find((e) => e.id === activeEventId) ?? null,
-    [createdEvents, activeEventId]
-  );
+  // Auto-open the newly created Draft after redirect from CreateEventModal
+  useEffect(() => {
+    if (pendingActiveEventId) {
+      router.push(`/my-events/create?id=${pendingActiveEventId}`);
+      clearPendingActiveEventId();
+    }
+  }, [pendingActiveEventId, clearPendingActiveEventId, router]);
 
   const filtered = useMemo(() =>
     createdEvents.filter((ev) => {
       const matchFilter = filter === "All" || ev.status === filter;
       const matchSearch =
         ev.title.toLowerCase().includes(search.toLowerCase()) ||
-        ev.venue.toLowerCase().includes(search.toLowerCase());
+        ev.location.venue.toLowerCase().includes(search.toLowerCase());
       return matchFilter && matchSearch;
     }),
     [createdEvents, filter, search]
@@ -39,20 +41,6 @@ export default function MyEventsPage() {
   }), [createdEvents]);
 
   const liveCount = counts.Live;
-
-  // ── Workspace view ──────────────────────────────────────────────────────────
-  if (activeEvent) {
-    return (
-      <div className="flex-1 flex flex-col gap-6 select-none min-w-0 w-full">
-        <EventWorkspace
-          ev={activeEvent}
-          onBack={() => setActiveEventId(null)}
-          onUpdate={(patch) => updateCreatedEvent(activeEvent.id, patch)}
-          onDuplicate={() => { duplicateCreatedEvent(activeEvent.id); setActiveEventId(null); }}
-        />
-      </div>
-    );
-  }
 
   // ── Dashboard view ──────────────────────────────────────────────────────────
   return (
@@ -72,7 +60,7 @@ export default function MyEventsPage() {
           )}
         </div>
         <button
-          onClick={openCreateEvent}
+          onClick={() => router.push("/my-events/create")}
           className="px-5 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] cursor-pointer transition-all uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="h-4 w-4" /> Create Event
@@ -122,7 +110,7 @@ export default function MyEventsPage() {
           </p>
           {!search && (
             <button
-              onClick={openCreateEvent}
+              onClick={() => router.push("/my-events/create")}
               className="mt-5 px-5 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-102 cursor-pointer transition-all uppercase tracking-wider flex items-center gap-1.5"
             >
               <Plus className="h-4 w-4" /> Create Your First Event
@@ -135,7 +123,13 @@ export default function MyEventsPage() {
             <EventCard
               key={ev.id}
               ev={ev}
-              onView={() => setActiveEventId(ev.id)}
+              onView={() => {
+                if (ev.status === "Draft") {
+                  router.push(`/my-events/create?id=${ev.id}`);
+                } else {
+                  router.push(`/my-events/details?id=${ev.id}`);
+                }
+              }}
               onDuplicate={() => duplicateCreatedEvent(ev.id)}
             />
           ))}

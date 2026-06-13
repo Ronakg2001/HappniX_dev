@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import { Search, Check, X, Radio, ToggleLeft, ToggleRight, Send } from "lucide-react";
-import { CreatedEventType, AttendeeType } from "@/components/layout/AppLayout";
+import { CreatedEventType } from "@/types/event";
+import { AttendeeType } from "@/types/booking";
 import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { UPCOMING_TABS, UpcomingTab, fmt, fmtRev } from "../constants";
+import { useLayout } from "@/components/layout/AppLayout";
 
 export function UpcomingWorkspace({
   ev,
@@ -14,6 +16,7 @@ export function UpcomingWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
+  const { eventLiveStates, eventStats, updateEventLiveState } = useLayout();
   const [tab, setTab] = useState<UpcomingTab>("Overview");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
@@ -21,10 +24,29 @@ export function UpcomingWorkspace({
   const [channel, setChannel] = useState<"email" | "push" | "both">("both");
   const [msgSent, setMsgSent] = useState(false);
 
-  const totalSold = ev.tickets.reduce((s, t) => s + t.sold, 0);
-  const totalRevenue = ev.tickets.reduce((s, t) => s + t.price * t.sold, 0);
+  const liveState = eventLiveStates[ev.id] || {
+    eventId: ev.id,
+    registrationOpen: false,
+    isPublic: false,
+    attendees: [],
+    sessions: [],
+    speakers: [],
+    announcements: [],
+    media: [],
+  };
 
-  const filteredAttendees = ev.attendees.filter((a) => {
+  const stats = eventStats[ev.id] || {
+    eventId: ev.id,
+    revenue: 0,
+    views: 0,
+    hype: "0 Hype",
+    feedback: [],
+  };
+
+  const totalSold = ev.ticketing.tiers.reduce((s, t) => s + t.sold, 0);
+  const totalRevenue = ev.ticketing.tiers.reduce((s, t) => s + t.price * t.sold, 0);
+
+  const filteredAttendees = liveState.attendees.filter((a) => {
     const matchSearch =
       a.name.toLowerCase().includes(search.toLowerCase()) ||
       a.email.toLowerCase().includes(search.toLowerCase());
@@ -33,17 +55,26 @@ export function UpcomingWorkspace({
   });
 
   const updateAttendeeStatus = (id: string, status: AttendeeType["status"]) => {
-    onUpdate({ attendees: ev.attendees.map((a) => (a.id === id ? { ...a, status } : a)) });
+    updateEventLiveState(ev.id, {
+      attendees: liveState.attendees.map((a) => (a.id === id ? { ...a, status } : a)),
+    });
   };
 
   const toggleTicketPause = (id: string) => {
-    onUpdate({ tickets: ev.tickets.map((t) => (t.id === id ? { ...t, paused: !t.paused } : t)) });
+    onUpdate({
+      ticketing: {
+        ...ev.ticketing,
+        tiers: ev.ticketing.tiers.map((t) => (t.id === id ? { ...t, paused: !t.paused } : t)),
+      },
+    });
   };
 
   const sendAnnouncement = () => {
     if (!announcement.trim()) return;
     const newAnn = { id: `ann_${Date.now()}`, content: announcement, timestamp: "Just now", channel };
-    onUpdate({ announcements: [newAnn, ...ev.announcements] });
+    updateEventLiveState(ev.id, {
+      announcements: [newAnn, ...liveState.announcements],
+    });
     setAnnouncement("");
     setMsgSent(true);
     setTimeout(() => setMsgSent(false), 2000);
@@ -59,15 +90,15 @@ export function UpcomingWorkspace({
       {tab === "Overview" && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Registrations" value={`${totalSold}`} sub={`of ${ev.capacity}`} />
+            <StatCard label="Registrations" value={`${totalSold}`} sub={`of ${ev.ticketing.capacity}`} />
             <StatCard label="Revenue" value={fmtRev(totalRevenue)} color="text-[var(--brand-3)]" />
-            <StatCard label="Capacity Fill" value={`${Math.round((totalSold / ev.capacity) * 100)}%`} color="text-blue-400" />
-            <StatCard label="Views" value={fmt(ev.views)} sub="event page" />
+            <StatCard label="Capacity Fill" value={`${Math.round((totalSold / ev.ticketing.capacity) * 100)}%`} color="text-blue-400" />
+            <StatCard label="Views" value={fmt(stats.views)} sub="event page" />
           </div>
           <div className="p-5 rounded-[20px] bg-white/[0.03] border border-white/[0.06]">
             <h3 className="text-[10px] font-black uppercase tracking-wider text-white/50 mb-4">Ticket Sales Breakdown</h3>
             <div className="flex flex-col gap-3">
-              {ev.tickets.map((t) => {
+              {ev.ticketing.tiers.map((t) => {
                 const pct = t.inventory > 0 ? Math.round((t.sold / t.inventory) * 100) : 0;
                 return (
                   <div key={t.id}>
@@ -87,10 +118,10 @@ export function UpcomingWorkspace({
             <h3 className="text-[10px] font-black uppercase tracking-wider text-white/50 mb-3">Event Info</h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
               {[
-                { label: "Date", value: ev.date },
-                { label: "Time", value: `${ev.time} – ${ev.endTime}` },
-                { label: "Venue", value: ev.venue },
-                { label: "Visibility", value: ev.isPublic ? "Public" : "Private" },
+                { label: "Date", value: ev.schedule.startDate },
+                { label: "Time", value: `${ev.schedule.startTime} – ${ev.schedule.endTime}` },
+                { label: "Venue", value: ev.location.venue },
+                { label: "Visibility", value: liveState.isPublic ? "Public" : "Private" },
               ].map((row) => (
                 <div key={row.label}>
                   <span className="text-[8px] font-black uppercase tracking-wider text-white/30 block">{row.label}</span>
@@ -175,7 +206,7 @@ export function UpcomingWorkspace({
       {/* ── Schedule ─────────────────────────────────────────────────────────── */}
       {tab === "Schedule" && (
         <div className="flex flex-col gap-3">
-          {ev.sessions.map((s, i) => (
+          {liveState.sessions.map((s, i) => (
             <div key={s.id} className="flex items-start gap-3 p-4 rounded-[16px] bg-white/[0.03] border border-white/[0.06]">
               <div className="h-8 w-8 rounded-full bg-[var(--brand-1)]/10 border border-[var(--brand-1)]/20 flex items-center justify-center text-[10px] font-black text-[var(--brand-1)] shrink-0">
                 {i + 1}
@@ -186,7 +217,7 @@ export function UpcomingWorkspace({
               </div>
             </div>
           ))}
-          {ev.sessions.length === 0 && (
+          {liveState.sessions.length === 0 && (
             <div className="text-center py-8 text-white/30 text-xs font-bold">No sessions added yet</div>
           )}
         </div>
@@ -195,7 +226,7 @@ export function UpcomingWorkspace({
       {/* ── Tickets ──────────────────────────────────────────────────────────── */}
       {tab === "Tickets" && (
         <div className="flex flex-col gap-3">
-          {ev.tickets.map((t) => (
+          {ev.ticketing.tiers.map((t) => (
             <div key={t.id} className="p-4 rounded-[16px] bg-white/[0.03] border border-white/[0.06]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-black text-white">{t.name}</span>
@@ -252,7 +283,7 @@ export function UpcomingWorkspace({
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="text-[10px] font-black uppercase tracking-wider text-white/50">Sent Announcements</h3>
-            {ev.announcements.map((a) => (
+            {liveState.announcements.map((a) => (
               <div key={a.id} className="p-3.5 rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
                 <p className="text-xs text-white/80">{a.content}</p>
                 <div className="flex items-center justify-between mt-2">
@@ -270,16 +301,19 @@ export function UpcomingWorkspace({
         <div className="flex flex-col gap-4">
           <div className="p-4 rounded-[16px] bg-white/[0.03] border border-white/[0.06] flex flex-col gap-4">
             {[
-              { label: "Public Event", desc: "Visible in discover and search", key: "isPublic" },
-              { label: "Registration Open", desc: "Allow new attendee sign-ups", key: "registrationOpen" },
+              { label: "Public Event", desc: "Visible in discover and search", key: "isPublic" as const },
+              { label: "Registration Open", desc: "Allow new attendee sign-ups", key: "registrationOpen" as const },
             ].map((item) => (
               <div key={item.key} className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black text-white">{item.label}</p>
                   <p className="text-[10px] text-white/40">{item.desc}</p>
                 </div>
-                <button onClick={() => onUpdate({ [item.key]: !(ev as any)[item.key] })} className="cursor-pointer">
-                  {(ev as any)[item.key]
+                <button
+                  onClick={() => updateEventLiveState(ev.id, { [item.key]: !liveState[item.key] })}
+                  className="cursor-pointer"
+                >
+                  {liveState[item.key]
                     ? <ToggleRight className="h-7 w-7 text-[var(--brand-1)]" />
                     : <ToggleLeft className="h-7 w-7 text-white/30" />}
                 </button>

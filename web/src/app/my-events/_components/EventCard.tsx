@@ -2,8 +2,9 @@
 
 import React from "react";
 import { Calendar, MapPin, Clock, Copy, ChevronRight } from "lucide-react";
-import { CreatedEventType } from "@/components/layout/AppLayout";
+import { CreatedEventType } from "@/types/event";
 import { STATUS_CONFIG, fmtRev } from "./constants";
+import { useLayout } from "@/components/layout/AppLayout";
 
 export function EventCard({
   ev,
@@ -14,9 +15,11 @@ export function EventCard({
   onView: () => void;
   onDuplicate: () => void;
 }) {
+  const { eventStats } = useLayout();
   const cfg = STATUS_CONFIG[ev.status];
   const StatusIcon = cfg.icon;
-  const totalSold = ev.tickets.reduce((s, t) => s + t.sold, 0);
+  const totalSold = ev.ticketing.tiers.reduce((s, t) => s + t.sold, 0);
+  const revenue = eventStats[ev.id]?.revenue ?? 0;
 
   return (
     <div className="group relative flex flex-col rounded-[20px] overflow-hidden border border-white/10 bg-gradient-to-b from-[#14141d] to-[#08080c] hover:border-white/20 hover:shadow-[0_0_30px_rgba(201,108,255,0.12)] transition-all duration-300">
@@ -56,11 +59,11 @@ export function EventCard({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 text-[10px] text-white/40 font-bold">
             <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{ev.venue}</span>
+            <span className="truncate">{ev.location.venue}</span>
           </div>
           <div className="flex items-center gap-3 text-[10px] text-white/40 font-bold">
-            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{ev.date}</span>
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{ev.time}</span>
+            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{ev.schedule.startDate}</span>
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{ev.schedule.startTime}</span>
           </div>
         </div>
 
@@ -69,12 +72,12 @@ export function EventCard({
           <div className="flex gap-4">
             <div>
               <span className="text-[7px] font-black uppercase tracking-wider text-white/30 block">Registrations</span>
-              <span className="text-xs font-black text-white">{totalSold} / {ev.capacity}</span>
+              <span className="text-xs font-black text-white">{totalSold} / {ev.ticketing.capacity}</span>
             </div>
             {ev.status !== "Draft" && (
               <div>
                 <span className="text-[7px] font-black uppercase tracking-wider text-white/30 block">Revenue</span>
-                <span className="text-xs font-black text-[var(--brand-3)]">{fmtRev(ev.revenue)}</span>
+                <span className="text-xs font-black text-[var(--brand-3)]">{fmtRev(revenue)}</span>
               </div>
             )}
           </div>

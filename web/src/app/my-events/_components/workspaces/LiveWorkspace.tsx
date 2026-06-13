@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { Search, Check, CheckCircle2, QrCode, Bell } from "lucide-react";
-import { CreatedEventType } from "@/components/layout/AppLayout";
+import { CreatedEventType } from "@/types/event";
 import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { LIVE_TABS, LiveTab, fmtRev } from "../constants";
+import { useLayout } from "@/components/layout/AppLayout";
 
 export function LiveWorkspace({
   ev,
@@ -14,21 +15,43 @@ export function LiveWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
+  const { eventLiveStates, eventStats, updateEventLiveState } = useLayout();
   const [tab, setTab] = useState<LiveTab>("Check-In");
   const [search, setSearch] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [scanning, setScanning] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
 
-  const checkedIn = ev.attendees.filter((a) => a.checkedIn).length;
-  const totalApproved = ev.attendees.filter((a) => a.status === "Approved").length;
+  const liveState = eventLiveStates[ev.id] || {
+    eventId: ev.id,
+    registrationOpen: false,
+    isPublic: false,
+    attendees: [],
+    sessions: [],
+    speakers: [],
+    announcements: [],
+    media: [],
+  };
+
+  const stats = eventStats[ev.id] || {
+    eventId: ev.id,
+    revenue: 0,
+    views: 0,
+    hype: "0 Hype",
+    feedback: [],
+  };
+
+  const checkedIn = liveState.attendees.filter((a) => a.checkedIn).length;
+  const totalApproved = liveState.attendees.filter((a) => a.status === "Approved").length;
 
   const simulateScan = () => {
     setScanning(true);
-    const pending = ev.attendees.find((a) => a.status === "Approved" && !a.checkedIn);
+    const pending = liveState.attendees.find((a) => a.status === "Approved" && !a.checkedIn);
     setTimeout(() => {
       if (pending) {
-        onUpdate({ attendees: ev.attendees.map((a) => (a.id === pending.id ? { ...a, checkedIn: true } : a)) });
+        updateEventLiveState(ev.id, {
+          attendees: liveState.attendees.map((a) => (a.id === pending.id ? { ...a, checkedIn: true } : a)),
+        });
         setLastScanned(pending.name);
       }
       setScanning(false);
@@ -36,17 +59,23 @@ export function LiveWorkspace({
   };
 
   const manualCheckIn = (id: string) => {
-    onUpdate({ attendees: ev.attendees.map((a) => (a.id === id ? { ...a, checkedIn: true } : a)) });
+    updateEventLiveState(ev.id, {
+      attendees: liveState.attendees.map((a) => (a.id === id ? { ...a, checkedIn: true } : a)),
+    });
   };
 
   const toggleSession = (id: string) => {
-    onUpdate({ sessions: ev.sessions.map((s) => (s.id === id ? { ...s, active: !s.active } : s)) });
+    updateEventLiveState(ev.id, {
+      sessions: liveState.sessions.map((s) => (s.id === id ? { ...s, active: !s.active } : s)),
+    });
   };
 
   const sendAnnouncement = () => {
     if (!announcement.trim()) return;
     const newAnn = { id: `ann_${Date.now()}`, content: announcement, timestamp: "Just now", channel: "push" as const };
-    onUpdate({ announcements: [newAnn, ...ev.announcements] });
+    updateEventLiveState(ev.id, {
+      announcements: [newAnn, ...liveState.announcements],
+    });
     setAnnouncement("");
   };
 
@@ -94,7 +123,7 @@ export function LiveWorkspace({
               />
             </div>
             <div className="flex flex-col gap-2">
-              {ev.attendees
+              {liveState.attendees
                 .filter((a) => a.status === "Approved" && (a.name.toLowerCase().includes(search.toLowerCase()) || !search))
                 .map((a) => (
                   <div key={a.id} className="flex items-center justify-between p-3 rounded-[12px] bg-white/[0.03] border border-white/[0.06]">
@@ -122,7 +151,7 @@ export function LiveWorkspace({
       {/* ── Sessions ─────────────────────────────────────────────────────────── */}
       {tab === "Sessions" && (
         <div className="flex flex-col gap-3">
-          {ev.sessions.map((s) => (
+          {liveState.sessions.map((s) => (
             <div key={s.id} className={`flex items-center gap-3 p-4 rounded-[16px] border transition-all ${s.active ? "bg-green-500/5 border-green-500/20" : "bg-white/[0.03] border-white/[0.06]"}`}>
               <div className={`h-2 w-2 rounded-full shrink-0 ${s.active ? "bg-green-400 animate-pulse shadow-[0_0_6px_rgba(34,197,94,0.5)]" : "bg-white/20"}`} />
               <div className="flex-1">
@@ -155,7 +184,7 @@ export function LiveWorkspace({
               <Bell className="h-4 w-4" /> Push Live Announcement
             </button>
           </div>
-          {ev.announcements.map((a) => (
+          {liveState.announcements.map((a) => (
             <div key={a.id} className="p-3.5 rounded-[14px] bg-white/[0.03] border border-white/[0.06]">
               <p className="text-xs text-white/80">{a.content}</p>
               <span className="text-[9px] text-white/30 mt-1 block">{a.timestamp}</span>
@@ -169,9 +198,9 @@ export function LiveWorkspace({
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <StatCard label="Checked In" value={String(checkedIn)} sub={`of ${totalApproved} approved`} color="text-green-400" />
-            <StatCard label="Capacity Fill" value={`${Math.round((checkedIn / Math.max(ev.capacity, 1)) * 100)}%`} color="text-blue-400" />
-            <StatCard label="Revenue" value={fmtRev(ev.revenue)} color="text-[var(--brand-3)]" />
-            <StatCard label="Live Sessions" value={String(ev.sessions.filter((s) => s.active).length)} sub="active" />
+            <StatCard label="Capacity Fill" value={`${Math.round((checkedIn / Math.max(ev.ticketing.capacity, 1)) * 100)}%`} color="text-blue-400" />
+            <StatCard label="Revenue" value={fmtRev(stats.revenue)} color="text-[var(--brand-3)]" />
+            <StatCard label="Live Sessions" value={String(liveState.sessions.filter((s) => s.active).length)} sub="active" />
           </div>
           <button
             onClick={markCompleted}

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { Archive } from "lucide-react";
-import { CreatedEventType } from "@/components/layout/AppLayout";
+import { Archive, Image } from "lucide-react";
+import { CreatedEventType } from "@/types/event";
 import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { StarRating } from "@/components/ui/star-rating";
 import { COMPLETED_TABS, CompletedTab, fmt, fmtRev } from "../constants";
-import { Image } from "lucide-react";
+import { useLayout } from "@/components/layout/AppLayout";
 
 export function CompletedWorkspace({
   ev,
@@ -16,14 +16,34 @@ export function CompletedWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
+  const { eventLiveStates, eventStats } = useLayout();
   const [tab, setTab] = useState<CompletedTab>("Analytics");
 
+  const liveState = eventLiveStates[ev.id] || {
+    eventId: ev.id,
+    registrationOpen: false,
+    isPublic: false,
+    attendees: [],
+    sessions: [],
+    speakers: [],
+    announcements: [],
+    media: [],
+  };
+
+  const stats = eventStats[ev.id] || {
+    eventId: ev.id,
+    revenue: 0,
+    views: 0,
+    hype: "0 Hype",
+    feedback: [],
+  };
+
   const avgRating =
-    ev.feedback.length
-      ? (ev.feedback.reduce((s, f) => s + f.rating, 0) / ev.feedback.length).toFixed(1)
+    stats.feedback.length
+      ? (stats.feedback.reduce((s, f) => s + f.rating, 0) / stats.feedback.length).toFixed(1)
       : "—";
-  const checkedIn = ev.attendees.filter((a) => a.checkedIn).length;
-  const totalSold = ev.tickets.reduce((s, t) => s + t.sold, 0);
+  const checkedIn = liveState.attendees.filter((a) => a.checkedIn).length;
+  const totalSold = ev.ticketing.tiers.reduce((s, t) => s + t.sold, 0);
 
   const archiveEvent = () => onUpdate({ status: "Archived" });
 
@@ -35,14 +55,14 @@ export function CompletedWorkspace({
       {tab === "Analytics" && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Total Revenue" value={fmtRev(ev.revenue)} color="text-[var(--brand-3)]" />
-            <StatCard label="Tickets Sold" value={String(totalSold)} sub={`of ${ev.capacity}`} />
+            <StatCard label="Total Revenue" value={fmtRev(stats.revenue)} color="text-[var(--brand-3)]" />
+            <StatCard label="Tickets Sold" value={String(totalSold)} sub={`of ${ev.ticketing.capacity}`} />
             <StatCard label="Check-In Rate" value={totalSold > 0 ? `${Math.round((checkedIn / totalSold) * 100)}%` : "0%"} color="text-green-400" />
-            <StatCard label="Avg Rating" value={String(avgRating)} sub={`${ev.feedback.length} reviews`} color="text-amber-400" />
+            <StatCard label="Avg Rating" value={String(avgRating)} sub={`${stats.feedback.length} reviews`} color="text-amber-400" />
           </div>
           <div className="p-5 rounded-[20px] bg-white/[0.03] border border-white/[0.06]">
             <h3 className="text-[10px] font-black uppercase tracking-wider text-white/50 mb-4">Ticket Performance</h3>
-            {ev.tickets.map((t) => (
+            {ev.ticketing.tiers.map((t) => (
               <div key={t.id} className="mb-4">
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="font-black text-white">{t.name}</span>
@@ -66,7 +86,7 @@ export function CompletedWorkspace({
       {/* ── Reviews ──────────────────────────────────────────────────────────── */}
       {tab === "Reviews" && (
         <div className="flex flex-col gap-3">
-          {ev.feedback.length === 0 ? (
+          {stats.feedback.length === 0 ? (
             <div className="text-center py-8 text-white/30 text-xs font-bold">No reviews yet</div>
           ) : (
             <>
@@ -75,9 +95,9 @@ export function CompletedWorkspace({
                 <div className="flex justify-center mt-2 mb-1">
                   <StarRating rating={Math.round(parseFloat(avgRating as string) || 0)} />
                 </div>
-                <span className="text-[10px] text-white/40">{ev.feedback.length} reviews</span>
+                <span className="text-[10px] text-white/40">{stats.feedback.length} reviews</span>
               </div>
-              {ev.feedback.map((f) => (
+              {stats.feedback.map((f) => (
                 <div key={f.id} className="p-4 rounded-[16px] bg-white/[0.03] border border-white/[0.06]">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-black text-white">{f.author}</span>
@@ -95,7 +115,7 @@ export function CompletedWorkspace({
       {/* ── Media ────────────────────────────────────────────────────────────── */}
       {tab === "Media" && (
         <div className="flex flex-col gap-4">
-          {ev.media.length === 0 ? (
+          {liveState.media.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center p-6 rounded-[20px] bg-white/[0.03] border border-dashed border-white/10">
               <Image className="h-8 w-8 text-white/20 mb-3" />
               <p className="text-xs font-black text-white/40 uppercase tracking-wider">No photos yet</p>
@@ -103,7 +123,7 @@ export function CompletedWorkspace({
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {ev.media.map((url, i) => (
+              {liveState.media.map((url, i) => (
                 <div key={i} className="aspect-square rounded-[14px] overflow-hidden border border-white/10">
                   <img src={url} alt="" className="w-full h-full object-cover" />
                 </div>
