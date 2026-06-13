@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import { EventBuilder } from "../_components/wizard/EventBuilder";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
-export default function CreateEventPage() {
+function CreateEventContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -70,5 +70,19 @@ export default function CreateEventPage() {
         onPublish={() => router.push("/my-events")}
       />
     </div>
+  );
+}
+
+export default function CreateEventPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 text-[var(--brand-1)] animate-spin" />
+        </div>
+      }
+    >
+      <CreateEventContent />
+    </Suspense>
   );
 }

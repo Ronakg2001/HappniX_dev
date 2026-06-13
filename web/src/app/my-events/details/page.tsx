@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import { EventWorkspace } from "../_components/EventWorkspace";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
-export default function EventDetailsPage() {
+function EventDetailsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -42,5 +42,19 @@ export default function EventDetailsPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function EventDetailsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 text-[var(--brand-1)] animate-spin" />
+        </div>
+      }
+    >
+      <EventDetailsContent />
+    </Suspense>
   );
 }
