@@ -1,11 +1,11 @@
 "use client";
 import React from "react";
 import { CreatedEventType } from "@/types/event";
-import { Step1Errors } from "./Step1BasicDetails";
-import { Step2Errors } from "./Step2EventDetails";
+import { Step1Errors } from "./validation";
+import { Step2Errors } from "./validation";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { TagInput } from "./TagInput";
+import { TagInput } from "@/components/ui/tag-input";
 import { ImageIcon, Plus } from "lucide-react";
 
 interface FormPerksLineupProps {

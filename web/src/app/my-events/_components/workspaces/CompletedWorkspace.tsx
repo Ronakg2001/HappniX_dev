@@ -7,7 +7,7 @@ import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { StarRating } from "@/components/ui/star-rating";
 import { COMPLETED_TABS, CompletedTab, fmt, fmtRev } from "../constants";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../../layout";
 
 export function CompletedWorkspace({
   ev,
@@ -16,7 +16,7 @@ export function CompletedWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
-  const { eventLiveStates, eventStats } = useLayout();
+  const { eventLiveStates, eventStats } = useMyEvents();
   const [tab, setTab] = useState<CompletedTab>("Analytics");
 
   const liveState = eventLiveStates[ev.id] || {

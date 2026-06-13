@@ -54,8 +54,8 @@ export function TagInput({
         </label>
       )}
       <div
-        className={`flex flex-wrap gap-1.5 min-h-[46px] px-3 py-2 rounded-2xl bg-white/5 border transition-all ${
-          error ? "border-red-500/60" : "border-white/10 focus-within:border-[var(--brand-1)]"
+        className={`w-full flex flex-wrap gap-1.5 min-h-[46px] px-4 py-3 rounded-[14px] liquid-glass liquid-edge transition-all duration-200 ${
+          error ? "border-red-500/50" : "focus-within:border-[#FF4FD8]/50 focus-within:shadow-glow"
         }`}
       >
         {value.map((tag) => (
@@ -81,7 +81,7 @@ export function TagInput({
           onBlur={add}
           placeholder={value.length < max ? placeholder : ""}
           disabled={value.length >= max}
-          className="flex-1 min-w-[120px] bg-transparent text-xs text-white placeholder-white/20 outline-none py-0.5"
+          className="flex-1 min-w-[120px] bg-transparent text-[15px] text-white placeholder:text-white/25 outline-none py-0.5"
         />
       </div>
       {(hint || error) && (

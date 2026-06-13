@@ -10,7 +10,7 @@ export const STATUS_CONFIG = {
 };
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
-export const FILTERS = ["All", "Draft", "Upcoming", "Live", "Completed", "Archived"] as const;
+export const FILTERS = ["Live", "Upcoming", "Completed", "Draft", "Archived", "All"] as const;
 export type FilterType = typeof FILTERS[number];
 
 // ─── Workspace Tabs ───────────────────────────────────────────────────────────

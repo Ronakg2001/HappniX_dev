@@ -1,9 +1,8 @@
 "use client";
 import React from "react";
-import { MapPin, Calendar, Clock, Users, Shirt, Music, Sparkles, ShieldCheck, Info, Compass } from "lucide-react";
+import { MapPin, Calendar, Shirt, Music, Sparkles, ShieldCheck, Info, Compass } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
-import { validateStep2 } from "./Step2EventDetails";
-import { validateStep3 } from "./Step3Ticketing";
+import { validateStep1, validateStep2, validateStep3 } from "./validation";
 import { Button } from "@/components/ui/button";
 
 interface EventPreviewProps {
@@ -14,24 +13,22 @@ interface EventPreviewProps {
 }
 
 function getStep1MissingText(data: Partial<CreatedEventType>): string[] {
+  const errors = validateStep1(data);
   const missing: string[] = [];
-  const schedule = data.schedule || { startDate: "", endDate: "", startTime: "", endTime: "" };
-  const location = data.location || { venue: "", address: "", lat: null, lng: null };
-
-  if (!data.title?.trim()) missing.push("Name");
-  if (!data.bannerUrl?.trim()) missing.push("Cover Image");
-  if (!schedule.startDate) missing.push("Start Date");
-  if (!schedule.startTime) missing.push("Start Time");
-  if (!location.address?.trim()) missing.push("Address");
-  if (!data.description?.trim()) missing.push("Description");
-  if (!data.highlights?.some(Boolean)) missing.push("Highlights");
+  if (errors.title) missing.push("Name");
+  if (errors.banner) missing.push("Cover Image");
+  if (errors.startDate) missing.push("Start Date");
+  if (errors.startTime) missing.push("Start Time");
+  if (errors.address) missing.push("Address");
+  if (errors.description) missing.push("Description");
+  if (errors.highlights) missing.push("Highlights");
   return missing;
 }
 
 function getStep2MissingText(data: Partial<CreatedEventType>): string[] {
   const missing: string[] = [];
-  if ((data.tags ?? []).length < 2) missing.push("2+ Tags");
   const step2Errs = validateStep2(data);
+  if (step2Errs.tags) missing.push("2+ Tags");
   if (step2Errs.faqs) missing.push("FAQ format");
   if (step2Errs.promoCodes) missing.push("Promo Codes");
   return missing;
@@ -39,13 +36,15 @@ function getStep2MissingText(data: Partial<CreatedEventType>): string[] {
 
 function getStep3MissingText(data: Partial<CreatedEventType>): string[] {
   const missing: string[] = [];
-  const ticketing = data.ticketing || { mode: "free" as const, capacity: 100, capacityFlex: false, tiers: [], promoCodes: [], price: "" };
-  if (ticketing.mode === "paid" && (ticketing.tiers ?? []).length === 0) {
-    missing.push("Ticket Tier");
-  }
   const step3Errs = validateStep3(data);
   if (step3Errs.capacity) missing.push("Capacity value");
-  if (step3Errs.tiers) missing.push("Tier values");
+  if (step3Errs.tiers) {
+    if ((data.ticketing?.tiers ?? []).length === 0) {
+      missing.push("Ticket Tier");
+    } else {
+      missing.push("Tier values");
+    }
+  }
   return missing;
 }
 
@@ -58,9 +57,9 @@ export function EventPreview({ data, publishErrors, onEditStep, hideChecklist = 
 
   const [activeTab, setActiveTab] = React.useState<"about" | "lineup" | "faq">("about");
 
-  const step1Missing = getStep1MissingText(data);
-  const step2Missing = getStep2MissingText(data);
-  const step3Missing = getStep3MissingText(data);
+  const step1Missing = React.useMemo(() => getStep1MissingText(data), [data]);
+  const step2Missing = React.useMemo(() => getStep2MissingText(data), [data]);
+  const step3Missing = React.useMemo(() => getStep3MissingText(data), [data]);
 
   const isStep1Valid = step1Missing.length === 0;
   const isStep2Valid = step2Missing.length === 0;
@@ -193,7 +192,7 @@ export function EventPreview({ data, publishErrors, onEditStep, hideChecklist = 
       )}
 
       {/* Main Glassmorphic Wrapper */}
-      <div className="liquid-glass liquid-edge rounded-[24px] overflow-hidden flex flex-col shadow-glow border border-border">
+      <div className="liquid-glass liquid-edge rounded-[24px] overflow-hidden flex flex-col border border-border">
         
         {/* Banner Hero Image */}
         <div 
@@ -352,7 +351,7 @@ export function EventPreview({ data, publishErrors, onEditStep, hideChecklist = 
                       >
                         <img 
                           src={imgUrl} 
-                          alt=""
+                          alt={`Event highlight ${i + 1}`}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -473,20 +472,13 @@ export function EventPreview({ data, publishErrors, onEditStep, hideChecklist = 
 /** Returns a list of publish-blocking error messages */
 export function getPublishErrors(data: Partial<CreatedEventType>): string[] {
   const errs: string[] = [];
-  const schedule = data.schedule || { startDate: "", endDate: "", startTime: "", endTime: "" };
-  const location = data.location || { venue: "", address: "", lat: null, lng: null };
-  const ticketing = data.ticketing || { mode: "free", capacity: 100, capacityFlex: false, tiers: [], promoCodes: [], price: "" };
+  const s1 = validateStep1(data);
+  const s2 = validateStep2(data);
+  const s3 = validateStep3(data);
 
-  if (!data.title?.trim()) errs.push("Event name is required");
-  if (!data.bannerUrl?.trim()) errs.push("Cover image is required");
-  if (!schedule.startDate) errs.push("Start date is required");
-  if (!schedule.startTime) errs.push("Start time is required");
-  if (!location.address?.trim()) errs.push("Full address is required");
-  if (!data.description?.trim()) errs.push("Event description is required");
-  if (!data.highlights?.some(Boolean)) errs.push("At least one highlight image is required");
-  if ((data.tags ?? []).length < 2) errs.push("At least 2 event tags are required");
-  if (ticketing.mode === "paid" && (ticketing.tiers ?? []).length === 0) {
-    errs.push("At least one ticket tier is required for paid events");
-  }
+  Object.values(s1).forEach((val) => val && errs.push(val));
+  Object.values(s2).forEach((val) => val && errs.push(val));
+  Object.values(s3).forEach((val) => val && errs.push(val));
+
   return errs;
 }

@@ -5,7 +5,7 @@ import { Archive, Copy, RotateCcw } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { StatCard } from "@/components/ui/stat-card";
 import { fmt, fmtRev } from "../constants";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../../layout";
 
 export function ArchivedWorkspace({
   ev,
@@ -16,7 +16,7 @@ export function ArchivedWorkspace({
   onUpdate: (p: Partial<CreatedEventType>) => void;
   onDuplicate: () => void;
 }) {
-  const { eventStats } = useLayout();
+  const { eventStats } = useMyEvents();
   const stats = eventStats[ev.id] || {
     eventId: ev.id,
     revenue: 0,

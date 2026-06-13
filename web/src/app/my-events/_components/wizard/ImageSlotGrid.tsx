@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
 import { Plus, X, ImageIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface ImageSlotGridProps {
   images: string[];
@@ -41,8 +43,8 @@ export function ImageSlotGrid({ images, onChange, max = 9, error, label }: Image
         {images.map((url, idx) => (
           <div key={idx} className="relative group">
             <div
-              className={`aspect-square rounded-xl overflow-hidden border transition-all ${
-                error && idx === 0 ? "border-red-500/60" : "border-white/10"
+              className={`aspect-square rounded-lg overflow-hidden border transition-all ${
+                error && idx === 0 ? "border-red-500/50" : "border-white/15"
               } bg-white/5`}
             >
               {url ? (
@@ -71,13 +73,14 @@ export function ImageSlotGrid({ images, onChange, max = 9, error, label }: Image
               style={{ fontSize: 0 }}
             />
             {/* Remove button */}
-            <button
+            <Button
               type="button"
               onClick={() => removeSlot(idx)}
-              className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              variant="ghost"
+              className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 p-0 border-0 hover:bg-red-600 hover:text-white"
             >
               <X className="h-2.5 w-2.5" />
-            </button>
+            </Button>
             {/* Badge */}
             <div className="absolute bottom-1 left-1 bg-black/60 rounded-md px-1.5 py-0.5 text-[9px] text-white/60">
               #{idx + 1}
@@ -87,14 +90,15 @@ export function ImageSlotGrid({ images, onChange, max = 9, error, label }: Image
 
         {/* URL input card */}
         {images.length < max && (
-          <button
+          <Button
             type="button"
             onClick={addSlot}
-            className="aspect-square rounded-xl border-2 border-dashed border-white/10 hover:border-[var(--brand-1)]/50 flex flex-col items-center justify-center gap-1.5 text-white/30 hover:text-[var(--brand-1)] transition-all cursor-pointer"
+            variant="outline"
+            className="aspect-square rounded-lg border-2 border-dashed border-white/15 hover:border-[var(--brand-1)]/50 flex flex-col items-center justify-center gap-1.5 text-white/30 hover:text-[var(--brand-1)] transition-all cursor-pointer h-auto w-auto bg-transparent"
           >
             <Plus className="h-5 w-5" />
             <span className="text-[9px] font-bold">Add Image</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -105,35 +109,39 @@ export function ImageSlotGrid({ images, onChange, max = 9, error, label }: Image
         </p>
         {images.map((url, idx) => (
           <div key={idx} className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10px] text-white/30 w-4 shrink-0">#{idx + 1}</span>
-            <input
+            <span className="text-[10px] text-white/30 w-4 shrink-0 font-bold">#{idx + 1}</span>
+            <Input
               type="url"
               value={url}
               onChange={(e) => handleUrlChange(idx, e.target.value)}
               placeholder="https://..."
-              className="flex-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-white focus:outline-none focus:border-[var(--brand-1)] placeholder-white/20 transition-all"
+              className="flex-1 text-[11px] h-7 px-2.5 py-1 rounded-lg bg-[#12121a] border border-white/15 text-white"
             />
-            <button
+            <Button
               type="button"
               onClick={() => removeSlot(idx)}
-              className="p-1 text-white/30 hover:text-red-400 transition-colors"
+              variant="ghost"
+              size="icon-xs"
+              className="text-white/30 hover:text-red-400 transition-colors h-7 w-7"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         ))}
         {images.length < max && (
-          <button
+          <Button
             type="button"
             onClick={addSlot}
-            className="flex items-center gap-1.5 text-[11px] text-[var(--brand-1)] hover:opacity-80 transition-opacity mt-1"
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-1.5 text-[11px] text-[var(--brand-1)] hover:opacity-80 transition-opacity mt-1 px-1 h-auto py-1"
           >
             <Plus className="h-3 w-3" /> Add image slot
-          </button>
+          </Button>
         )}
       </div>
 
-      {error && <p className="text-[10px] text-red-400">{error}</p>}
+      {error && <p className="text-[10px] text-red-400 font-bold">{error}</p>}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
 import { CreatedEventType } from "@/types/event";
-import { Step2Errors } from "./Step2EventDetails";
-import { Step3Errors } from "./Step3Ticketing";
+import { Step2Errors } from "./validation";
+import { Step3Errors } from "./validation";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
