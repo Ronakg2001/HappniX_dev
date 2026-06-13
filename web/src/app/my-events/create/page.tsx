@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect,useState,  Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMyEvents } from "../layout";
 import { EventBuilder } from "../_components/wizard/EventBuilder";
@@ -9,7 +9,7 @@ import { CreatedEventType } from "@/types/event";
 import { EventLiveState, EventStats } from "@/types/booking";
 import { Button } from "@/components/ui/button";
 
-export default function CreateEventPage() {
+function CreateEventContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -133,5 +133,19 @@ export default function CreateEventPage() {
         onPublish={() => router.push("/my-events")}
       />
     </div>
+  );
+}
+
+export default function CreateEventPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 text-[var(--brand-1)] animate-spin" />
+        </div>
+      }
+    >
+      <CreateEventContent />
+    </Suspense>
   );
 }
