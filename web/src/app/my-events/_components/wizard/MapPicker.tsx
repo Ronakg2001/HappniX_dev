@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 // Fix Leaflet default marker assets in Webpack/Next.js
 // @ts-ignore
@@ -23,6 +25,9 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   // Jaipur coordinates as fallback default
   const defaultLat = 26.9124;
@@ -84,13 +89,71 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
     };
   }, []);
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchError("");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`
+      );
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const item = data[0];
+        const newLat = parseFloat(item.lat);
+        const newLng = parseFloat(item.lon);
+        const address = item.display_name;
+
+        if (mapRef.current) {
+          mapRef.current.setView([newLat, newLng], 14);
+        }
+        if (markerRef.current) {
+          markerRef.current.setLatLng([newLat, newLng]);
+        }
+        onChange(newLat, newLng, address);
+      } else {
+        setSearchError("Location not found. Try a different search query.");
+      }
+    } catch (err) {
+      console.error("Search error:", err);
+      setSearchError("Failed to search location.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Search Input Box */}
+      <form onSubmit={handleSearch} className="flex gap-2 w-full">
+        <Input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search for a city, landmark, or street..."
+          className="flex-1 bg-white/5 border border-white/10 px-3.5 py-2.5 rounded-xl text-xs text-white"
+        />
+        <Button
+          type="submit"
+          disabled={searching}
+          variant="brand"
+          className="px-5 h-auto rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 shrink-0 cursor-pointer"
+        >
+          {searching ? "Searching..." : "Search"}
+        </Button>
+      </form>
+      
+      {searchError && (
+        <p className="text-[10px] text-red-400 font-bold mt-0.5">{searchError}</p>
+      )}
+
       <div 
         ref={mapContainerRef} 
-        className="h-64 w-full rounded-2xl border border-white/10 overflow-hidden z-10"
+        className="h-64 w-full rounded-lg border border-white/10 overflow-hidden z-10"
         style={{ minHeight: "260px" }}
       />
+      
       <div className="flex justify-between items-center text-[10px] text-white/40">
         <span>Click on the map or drag the pin to set venue coordinates & address</span>
         {loading && <span className="text-[var(--brand-1)] font-bold animate-pulse">Reverse geocoding address...</span>}

@@ -4,7 +4,8 @@ import React from "react";
 import { Calendar, MapPin, Clock, Copy, ChevronRight } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { STATUS_CONFIG, fmtRev } from "./constants";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../layout";
+import { Button } from "@/components/ui/button";
 
 export function EventCard({
   ev,
@@ -15,14 +16,14 @@ export function EventCard({
   onView: () => void;
   onDuplicate: () => void;
 }) {
-  const { eventStats } = useLayout();
+  const { eventStats } = useMyEvents();
   const cfg = STATUS_CONFIG[ev.status];
   const StatusIcon = cfg.icon;
   const totalSold = ev.ticketing.tiers.reduce((s, t) => s + t.sold, 0);
   const revenue = eventStats[ev.id]?.revenue ?? 0;
 
   return (
-    <div className="group relative flex flex-col rounded-[20px] overflow-hidden border border-white/10 bg-gradient-to-b from-[#14141d] to-[#08080c] hover:border-white/20 hover:shadow-[0_0_30px_rgba(201,108,255,0.12)] transition-all duration-300">
+    <div className="group relative flex flex-col rounded-[16px]  transition-all duration-300">
       {/* Banner */}
       <div className="relative w-full h-36 bg-black/40 overflow-hidden shrink-0">
         <img
@@ -82,19 +83,14 @@ export function EventCard({
             )}
           </div>
           <div className="flex gap-1.5">
-            <button
-              onClick={onDuplicate}
-              title="Duplicate"
-              className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-            >
-              <Copy className="h-3 w-3" />
-            </button>
-            <button
+            <Button
               onClick={onView}
-              className="px-3 h-7 rounded-lg bg-white/10 hover:bg-white/15 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer"
+              variant="outline"
+              size="sm"
+              className="border border-white/10 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer"
             >
               Manage <ChevronRight className="h-3 w-3" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

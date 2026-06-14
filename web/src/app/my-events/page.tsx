@@ -1,24 +1,19 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "./layout";
 import { Plus, Search, Calendar } from "lucide-react";
 import { FILTERS, FilterType } from "./_components/constants";
 import { EventCard } from "./_components/EventCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function MyEventsPage() {
   const router = useRouter();
-  const { createdEvents, duplicateCreatedEvent, pendingActiveEventId, clearPendingActiveEventId } = useLayout();
-  const [filter, setFilter]           = useState<FilterType>("All");
+  const { createdEvents, duplicateCreatedEvent } = useMyEvents();
+  const [filter, setFilter]           = useState<FilterType>("Live");
   const [search, setSearch]           = useState("");
-  // Auto-open the newly created Draft after redirect from CreateEventModal
-  useEffect(() => {
-    if (pendingActiveEventId) {
-      router.push(`/my-events/create?id=${pendingActiveEventId}`);
-      clearPendingActiveEventId();
-    }
-  }, [pendingActiveEventId, clearPendingActiveEventId, router]);
 
   const filtered = useMemo(() =>
     createdEvents.filter((ev) => {
@@ -48,7 +43,6 @@ export default function MyEventsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <span className="text-[9px] font-black tracking-widest text-[var(--brand-1)] uppercase">Organizer Dashboard</span>
           <h1 className="text-xl sm:text-2xl font-black text-white mt-1">My Events</h1>
           {liveCount > 0 && (
             <div className="flex items-center gap-1.5 mt-1.5">
@@ -59,40 +53,41 @@ export default function MyEventsPage() {
             </div>
           )}
         </div>
-        <button
+        <Button
+          variant={"brand"}
+          size={"lg"}
           onClick={() => router.push("/my-events/create")}
-          className="px-5 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] cursor-pointer transition-all uppercase tracking-wider flex items-center gap-2 self-start sm:self-auto"
         >
           <Plus className="h-4 w-4" /> Create Event
-        </button>
+        </Button>
       </div>
 
       {/* Search + Filter */}
       <div className="flex flex-col gap-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-          <input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search events by name or venue..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:outline-none focus:border-[var(--brand-1)] placeholder-white/20 transition-all"
+            className="w-full pl-9 rounded-xl"
           />
         </div>
-        <div className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 overflow-x-auto scrollbar-none">
+        <div className="flex gap-1 p-1 rounded-xl bg-white/10 border border-white/20 overflow-x-auto scrollbar-none">
           {FILTERS.map((f) => {
             const cnt = counts[f];
             const isLive = f === "Live" && cnt > 0;
             return (
-              <button
+              <Button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                  filter === f ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
+                className={`shrink-0 flex gap-1 px-3 text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${
+                  filter === f ? "text-white" : "bg-white/10 text-white hover:text-white/70"
                 }`}
               >
                 {isLive && <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />}
                 {f} {cnt > 0 && <span className="opacity-60">({cnt})</span>}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -109,12 +104,12 @@ export default function MyEventsPage() {
             {search ? `No events matching "${search}"` : "No events in this category yet. Create your first event!"}
           </p>
           {!search && (
-            <button
+            <Button
               onClick={() => router.push("/my-events/create")}
               className="mt-5 px-5 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-102 cursor-pointer transition-all uppercase tracking-wider flex items-center gap-1.5"
             >
-              <Plus className="h-4 w-4" /> Create Your First Event
-            </button>
+              <Plus className="h-4 w-4" /> Create Event
+            </Button>
           )}
         </div>
       ) : (

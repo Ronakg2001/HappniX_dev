@@ -4,7 +4,8 @@ import React from "react";
 import { ArrowLeft, MapPin, Calendar, Clock } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { STATUS_CONFIG } from "./constants";
-import { DraftWorkspace } from "./workspaces/DraftWorkspace";
+import { Button } from "@/components/ui/button";
+
 import { UpcomingWorkspace } from "./workspaces/UpcomingWorkspace";
 import { LiveWorkspace } from "./workspaces/LiveWorkspace";
 import { CompletedWorkspace } from "./workspaces/CompletedWorkspace";
@@ -28,12 +29,14 @@ export function EventWorkspace({
     <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* Header */}
       <div className="flex flex-col gap-3">
-        <button
+        <Button
           onClick={onBack}
-          className="flex items-center gap-2 text-white/40 hover:text-white text-xs font-bold cursor-pointer w-fit transition-colors group"
+          variant="ghost"
+          size="sm"
+          className="flex items-center gap-2 text-white/40 hover:text-white text-xs font-bold cursor-pointer w-fit transition-colors group px-0 hover:bg-transparent"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" /> Back to All Events
-        </button>
+        </Button>
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -58,7 +61,6 @@ export function EventWorkspace({
       </div>
 
       {/* Stage-specific workspace */}
-      {ev.status === "Draft"     && <DraftWorkspace     ev={ev} onUpdate={onUpdate} onPublished={onBack} />}
 
       {ev.status === "Upcoming"  && <UpcomingWorkspace  ev={ev} onUpdate={onUpdate} />}
       {ev.status === "Live"      && <LiveWorkspace      ev={ev} onUpdate={onUpdate} />}

@@ -6,7 +6,7 @@ import { CreatedEventType } from "@/types/event";
 import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { LIVE_TABS, LiveTab, fmtRev } from "../constants";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../../layout";
 
 export function LiveWorkspace({
   ev,
@@ -15,7 +15,7 @@ export function LiveWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
-  const { eventLiveStates, eventStats, updateEventLiveState } = useLayout();
+  const { eventLiveStates, eventStats, updateEventLiveState } = useMyEvents();
   const [tab, setTab] = useState<LiveTab>("Check-In");
   const [search, setSearch] = useState("");
   const [announcement, setAnnouncement] = useState("");

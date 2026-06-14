@@ -2,8 +2,9 @@
 
 import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../layout";
 import { EventWorkspace } from "../_components/EventWorkspace";
+import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 function EventDetailsContent() {
@@ -11,7 +12,7 @@ function EventDetailsContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
 
-  const { createdEvents, updateCreatedEvent, duplicateCreatedEvent } = useLayout();
+  const { createdEvents, updateCreatedEvent, duplicateCreatedEvent } = useMyEvents();
 
   const event = id ? createdEvents.find((e) => e.id === id) : null;
 
@@ -20,12 +21,13 @@ function EventDetailsContent() {
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[60vh]">
         <h3 className="text-sm font-black text-white uppercase tracking-wider">Event Not Found</h3>
         <p className="text-xs text-white/40 mt-2">The event may have been deleted or archived.</p>
-        <button
+        <Button
           onClick={() => router.push("/my-events")}
-          className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white hover:bg-white/10 transition-all cursor-pointer"
+          variant="outline"
+          className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-white hover:bg-white/10 transition-all cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-        </button>
+        </Button>
       </div>
     );
   }

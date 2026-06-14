@@ -7,7 +7,7 @@ import { AttendeeType } from "@/types/booking";
 import { TabBar } from "@/components/ui/tab-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { UPCOMING_TABS, UpcomingTab, fmt, fmtRev } from "../constants";
-import { useLayout } from "@/components/layout/AppLayout";
+import { useMyEvents } from "../../layout";
 
 export function UpcomingWorkspace({
   ev,
@@ -16,7 +16,7 @@ export function UpcomingWorkspace({
   ev: CreatedEventType;
   onUpdate: (p: Partial<CreatedEventType>) => void;
 }) {
-  const { eventLiveStates, eventStats, updateEventLiveState } = useLayout();
+  const { eventLiveStates, eventStats, updateEventLiveState } = useMyEvents();
   const [tab, setTab] = useState<UpcomingTab>("Overview");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");

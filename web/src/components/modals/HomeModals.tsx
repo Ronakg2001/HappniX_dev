@@ -1,13 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Bell, UserPlus, Heart, Sparkles, MapPin, Calendar, Clock, Ticket, Check, ShieldCheck } from "lucide-react";
+import { X, Bell, Ticket, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Field } from "@/components/ui/field";
-import { PrimaryBtn } from "@/components/ui/button";
 
 // --- QUICK NOTIFICATIONS MODAL ---
 export function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -383,98 +379,6 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
           </div>
         )}
 
-      </div>
-    </div>
-  );
-}
-
-// --- CREATE EVENT MODAL ---
-export function CreateEventModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const { addCreatedEvent } = useLayout();
-  const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Party");
-  const [price, setPrice] = useState("");
-  const [created, setCreated] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    addCreatedEvent(title, category, price); // sets pendingActiveEventId internally
-    setCreated(true);
-    setTimeout(() => {
-      setCreated(false);
-      setTitle("");
-      setPrice("");
-      setCategory("Party");
-      onClose();
-      router.push("/my-events");
-    }, 1200);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-lg liquid-glass liquid-edge border border-border p-5 sm:p-6 shadow-card animate-in zoom-in-95 duration-200">
-        {created ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="h-14 w-14 rounded-full bg-brand-gradient flex items-center justify-center text-white mb-4 shadow-glow animate-pulse">
-              <ShieldCheck className="h-7 w-7" />
-            </div>
-            <h3 className="text-lg font-black text-foreground mb-1">Event Created!</h3>
-            <p className="text-xs text-foreground/60">Your event will show up on nearby feed searches shortly.</p>
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-                <Sparkles className="h-4.5 w-4.5 text-[var(--brand-1)]" />
-                Host a New Event
-              </h3>
-              <button onClick={onClose} className="p-1 rounded-full hover:bg-foreground/10 text-foreground/50 hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <Field label="Event Name">
-                <Input
-                  type="text"
-                  required
-                  placeholder="e.g. Secret Rooftop Techno Set"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Category">
-                  <Select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    <option value="Party" className="bg-[#09090b] text-white">Party</option>
-                    <option value="Gig" className="bg-[#09090b] text-white">Gig</option>
-                    <option value="Clubbing" className="bg-[#09090b] text-white">Clubbing</option>
-                    <option value="Social" className="bg-[#09090b] text-white">Social</option>
-                  </Select>
-                </Field>
-                <Field label="Price (₹)">
-                  <Input
-                    type="number"
-                    placeholder="999"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              <PrimaryBtn type="submit" className="py-3">
-                Launch Event 🚀
-              </PrimaryBtn>
-            </form>
-          </>
-        )}
       </div>
     </div>
   );

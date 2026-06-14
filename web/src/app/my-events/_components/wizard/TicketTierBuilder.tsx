@@ -2,6 +2,7 @@
 import React from "react";
 import { Plus, X } from "lucide-react";
 import { TicketTierType } from "@/types/event";
+import { Input } from "@/components/ui/input";
 
 const ENTRY_TYPES: TicketTierType["entryType"][] = ["Regular", "VIP", "Early Bird", "Custom"];
 
@@ -38,7 +39,7 @@ export function TicketTierBuilder({ value, onChange, error }: TicketTierBuilderP
       {value.map((tier, idx) => (
         <div
           key={tier.id}
-          className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3"
+          className="rounded-lg bg-white/5 border border-white/10 p-4 space-y-3"
         >
           {/* Header row */}
           <div className="flex items-center gap-2">
@@ -85,22 +86,22 @@ export function TicketTierBuilder({ value, onChange, error }: TicketTierBuilderP
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[9px] font-bold text-white/30 uppercase tracking-wider block mb-1">Price (₹)</label>
-              <input
+              <Input
                 type="number"
                 min={0}
                 value={tier.price}
                 onChange={(e) => update(tier.id, "price", Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white outline-none focus:border-[var(--brand-1)] transition-all"
+                className="w-full px-4 py-2.5 rounded-[12px] bg-[#12121a] text-xs text-white"
               />
             </div>
             <div>
               <label className="text-[9px] font-bold text-white/30 uppercase tracking-wider block mb-1">Seats Available</label>
-              <input
+              <Input
                 type="number"
                 min={1}
                 value={tier.inventory}
                 onChange={(e) => update(tier.id, "inventory", Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white outline-none focus:border-[var(--brand-1)] transition-all"
+                className="w-full px-4 py-2.5 rounded-[12px] bg-[#12121a] text-xs text-white"
               />
             </div>
           </div>
@@ -108,12 +109,12 @@ export function TicketTierBuilder({ value, onChange, error }: TicketTierBuilderP
           {/* Promo text */}
           <div>
             <label className="text-[9px] font-bold text-white/30 uppercase tracking-wider block mb-1">Promo Text</label>
-            <input
+            <Input
               type="text"
               value={tier.promoText}
               onChange={(e) => update(tier.id, "promoText", e.target.value)}
               placeholder="e.g. Earlybird deal — only 20 left!"
-              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/20 outline-none focus:border-[var(--brand-1)] transition-all"
+              className="w-full px-4 py-2.5 rounded-[12px] bg-[#12121a] text-xs text-white"
             />
           </div>
 

@@ -26,17 +26,6 @@ interface LayoutContextType {
   radius: number;
   bookedTickets: TicketType[];
   addTicket: (title: string, price: string) => void;
-  createdEvents: CreatedEventType[];
-  eventLiveStates: Record<string, EventLiveState>;
-  eventStats: Record<string, EventStats>;
-  addCreatedEvent: (title: string, category: string, price: string) => string;
-  updateCreatedEvent: (id: string, patch: Partial<CreatedEventType>) => void;
-  updateEventLiveState: (id: string, patch: Partial<EventLiveState>) => void;
-  updateEventStats: (id: string, patch: Partial<EventStats>) => void;
-  duplicateCreatedEvent: (id: string) => void;
-  // For post-create redirect
-  pendingActiveEventId: string | null;
-  clearPendingActiveEventId: () => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
@@ -67,15 +56,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Tickets State
   const [bookedTickets, setBookedTickets] = useState<TicketType[]>([]);
 
-  // Created Events State
-  const [createdEvents, setCreatedEvents] = useState<CreatedEventType[]>([]);
 
-  // Live States & Stats States
-  const [eventLiveStates, setEventLiveStates] = useState<Record<string, EventLiveState>>({});
-  const [eventStats, setEventStats] = useState<Record<string, EventStats>>({});
 
-  // Post-create redirect state
-  const [pendingActiveEventId, setPendingActiveEventId] = useState<string | null>(null);
+
+
+
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -101,38 +86,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
 
       const savedCreated = localStorage.getItem("happnix_created_events_v4");
-      if (savedCreated) {
-        const parsed = JSON.parse(savedCreated) as CreatedEventType[];
-        let hasSeenUntitledDraft = false;
-        const cleaned = parsed.filter((ev) => {
-          if (ev.status === "Draft" && ev.title === "Untitled Event" && !ev.description?.trim() && !ev.location.address?.trim()) {
-            if (hasSeenUntitledDraft) return false;
-            hasSeenUntitledDraft = true;
-          }
-          return true;
-        });
-        setCreatedEvents(cleaned);
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem("happnix_created_events_v4", JSON.stringify(cleaned));
-        }
-      } else {
-        setCreatedEvents(MOCK_EVENTS);
+      if (!savedCreated) {
         localStorage.setItem("happnix_created_events_v4", JSON.stringify(MOCK_EVENTS));
       }
 
       const savedLive = localStorage.getItem("happnix_event_live_states_v4");
-      if (savedLive) {
-        setEventLiveStates(JSON.parse(savedLive));
-      } else {
-        setEventLiveStates(MOCK_LIVE_STATES);
+      if (!savedLive) {
         localStorage.setItem("happnix_event_live_states_v4", JSON.stringify(MOCK_LIVE_STATES));
       }
 
       const savedStats = localStorage.getItem("happnix_event_stats_v4");
-      if (savedStats) {
-        setEventStats(JSON.parse(savedStats));
-      } else {
-        setEventStats(MOCK_STATS);
+      if (!savedStats) {
         localStorage.setItem("happnix_event_stats_v4", JSON.stringify(MOCK_STATS));
       }
     }
@@ -161,183 +125,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("happnix_booked_tickets", JSON.stringify(updated));
   };
 
-  const addCreatedEvent = (title: string, category: string, price: string): string => {
-    const newId = `c_${Date.now()}`;
-    const numPrice = price ? parseInt(price) : 0;
-    const newEvent: CreatedEventType = {
-      id: newId,
-      status: "Draft",
-      title,
-      category,
-      description: "",
-      bannerUrl: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=800&q=80",
-      ageGroup: "18+",
-      tags: [],
-      highlights: [],
-      highlightText: "",
-      services: [],
-      dresscode: {
-        enabled: false,
-        style: "",
-      },
-      artists: [],
-      schedule: {
-        startDate: "",
-        endDate: "",
-        startTime: "20:00",
-        endTime: "23:00",
-      },
-      location: {
-        venue: "Venue TBD",
-        address: "",
-        lat: null,
-        lng: null,
-      },
-      ticketing: {
-        mode: numPrice > 0 ? "paid" : "free",
-        capacity: 100,
-        capacityFlex: false,
-        tiers: [
-          withTierDefaults({ id: "t1", name: "General Entry", price: numPrice, inventory: 100, sold: 0, paused: false }),
-        ],
-        promoCodes: [],
-        price: price ? `₹${price}` : "Free Entry",
-      },
-      policies: {
-        termsAndConditions: "",
-        privacyPolicy: "",
-        faqs: [],
-      },
-    };
 
-    const newLive: EventLiveState = {
-      eventId: newId,
-      registrationOpen: false,
-      isPublic: false,
-      attendees: [],
-      sessions: [],
-      speakers: [],
-      announcements: [],
-      media: [],
-    };
-
-    const newStats: EventStats = {
-      eventId: newId,
-      revenue: 0,
-      views: 0,
-      hype: "0 Hype",
-      feedback: [],
-    };
-
-    const updatedEvents = [newEvent, ...createdEvents];
-    setCreatedEvents(updatedEvents);
-    localStorage.setItem("happnix_created_events_v4", JSON.stringify(updatedEvents));
-
-    const updatedLive = { ...eventLiveStates, [newId]: newLive };
-    setEventLiveStates(updatedLive);
-    localStorage.setItem("happnix_event_live_states_v4", JSON.stringify(updatedLive));
-
-    const updatedStats = { ...eventStats, [newId]: newStats };
-    setEventStats(updatedStats);
-    localStorage.setItem("happnix_event_stats_v4", JSON.stringify(updatedStats));
-
-    setPendingActiveEventId(newId);
-    return newId;
-  };
-
-  const updateCreatedEvent = (id: string, patch: Partial<CreatedEventType>) => {
-    const updated = createdEvents.map((ev) =>
-      ev.id === id ? { ...ev, ...patch } : ev
-    );
-    setCreatedEvents(updated);
-    localStorage.setItem("happnix_created_events_v4", JSON.stringify(updated));
-  };
-
-  const updateEventLiveState = (id: string, patch: Partial<EventLiveState>) => {
-    const current = eventLiveStates[id] || {
-      eventId: id,
-      registrationOpen: false,
-      isPublic: false,
-      attendees: [],
-      sessions: [],
-      speakers: [],
-      announcements: [],
-      media: [],
-    };
-    const updated = { ...eventLiveStates, [id]: { ...current, ...patch } };
-    setEventLiveStates(updated);
-    localStorage.setItem("happnix_event_live_states_v4", JSON.stringify(updated));
-  };
-
-  const updateEventStats = (id: string, patch: Partial<EventStats>) => {
-    const current = eventStats[id] || {
-      eventId: id,
-      revenue: 0,
-      views: 0,
-      hype: "0 Hype",
-      feedback: [],
-    };
-    const updated = { ...eventStats, [id]: { ...current, ...patch } };
-    setEventStats(updated);
-    localStorage.setItem("happnix_event_stats_v4", JSON.stringify(updated));
-  };
-
-  const duplicateCreatedEvent = (id: string) => {
-    const original = createdEvents.find((ev) => ev.id === id);
-    if (!original) return;
-    const newId = `c_${Date.now()}`;
-    const clone: CreatedEventType = {
-      ...original,
-      id: newId,
-      title: `${original.title} (Copy)`,
-      status: "Draft",
-    };
-
-    const origLive = eventLiveStates[id] || {
-      eventId: id,
-      registrationOpen: false,
-      isPublic: false,
-      attendees: [],
-      sessions: [],
-      speakers: [],
-      announcements: [],
-      media: [],
-    };
-    const cloneLive: EventLiveState = {
-      ...origLive,
-      eventId: newId,
-      attendees: [],
-      announcements: [],
-    };
-
-    const origStats = eventStats[id] || {
-      eventId: id,
-      revenue: 0,
-      views: 0,
-      hype: "0 Hype",
-      feedback: [],
-    };
-    const cloneStats: EventStats = {
-      ...origStats,
-      eventId: newId,
-      revenue: 0,
-      views: 0,
-      hype: "0 Hype",
-      feedback: [],
-    };
-
-    const updatedEvents = [clone, ...createdEvents];
-    setCreatedEvents(updatedEvents);
-    localStorage.setItem("happnix_created_events_v4", JSON.stringify(updatedEvents));
-
-    const updatedLive = { ...eventLiveStates, [newId]: cloneLive };
-    setEventLiveStates(updatedLive);
-    localStorage.setItem("happnix_event_live_states_v4", JSON.stringify(updatedLive));
-
-    const updatedStats = { ...eventStats, [newId]: cloneStats };
-    setEventStats(updatedStats);
-    localStorage.setItem("happnix_event_stats_v4", JSON.stringify(updatedStats));
-  };
 
   // Modal States
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -363,7 +151,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     router.push("/my-events/create");
   };
 
-  const clearPendingActiveEventId = () => setPendingActiveEventId(null);
+
 
   if (!isAppRoute) {
     return <>{children}</>;
@@ -372,9 +160,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <LayoutContext.Provider value={{
       openBooking, openCreateEvent, currentLocation, radius, bookedTickets, addTicket,
-      createdEvents, eventLiveStates, eventStats, addCreatedEvent, updateCreatedEvent,
-      updateEventLiveState, updateEventStats, duplicateCreatedEvent,
-      pendingActiveEventId, clearPendingActiveEventId,
     }}>
       <div className="min-h-screen flex flex-col relative bg-background text-foreground home-feed">
         {/* Background gradients/glow effects */}

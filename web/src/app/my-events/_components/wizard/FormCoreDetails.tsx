@@ -2,7 +2,7 @@
 import React from "react";
 import { MapPin } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
-import { Step1Errors } from "./Step1BasicDetails";
+import { Step1Errors } from "./validation";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
