@@ -115,7 +115,7 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
       
       // Fetch fresh events from backend via GET request
       apiClient.get("/api/events")
-        .then((res) => {
+        .then((res: any) => {
           if (res.success && res.events && res.events.length > 0) {
             setCreatedEvents(res.events);
             localStorage.setItem("happnix_created_events_v4", JSON.stringify(res.events));
