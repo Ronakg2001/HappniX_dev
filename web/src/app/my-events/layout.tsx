@@ -127,14 +127,14 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
 
   const updateCreatedEvent = (id: string, patch: Partial<CreatedEventType>) => {
     setCreatedEvents((prev) => {
-      let savedEvent: CreatedEventType | null = null;
       const updated = prev.map((ev) => {
         if (ev.id === id) {
-          savedEvent = { ...ev, ...patch };
-          return savedEvent;
+          return { ...ev, ...patch };
         }
         return ev;
       });
+      
+      const savedEvent = updated.find((ev) => ev.id === id);
       
       if (savedEvent) {
         localStorage.setItem("happnix_created_events_v4", JSON.stringify(updated));
