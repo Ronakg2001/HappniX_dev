@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { CreatedEventType, TicketTierType } from "@/types/event";
 import { EventLiveState, EventStats } from "@/types/booking";
 import { MOCK_EVENTS, MOCK_LIVE_STATES, MOCK_STATS } from "@/constants/mockData";
+import { apiClient, processEventMedia } from "@/lib/api";
 
 interface MyEventsContextType {
   createdEvents: CreatedEventType[];
@@ -111,13 +112,46 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
         setEventStats(MOCK_STATS);
         localStorage.setItem("happnix_event_stats_v4", JSON.stringify(MOCK_STATS));
       }
+      
+      // Fetch fresh events from backend via GET request
+      apiClient.get("/api/events")
+        .then((res) => {
+          if (res.success && res.events && res.events.length > 0) {
+            setCreatedEvents(res.events);
+            localStorage.setItem("happnix_created_events_v4", JSON.stringify(res.events));
+          }
+        })
+        .catch(err => console.error("Error fetching my events:", err));
     }
   }, []);
 
   const updateCreatedEvent = (id: string, patch: Partial<CreatedEventType>) => {
     setCreatedEvents((prev) => {
-      const updated = prev.map((ev) => (ev.id === id ? { ...ev, ...patch } : ev));
-      localStorage.setItem("happnix_created_events_v4", JSON.stringify(updated));
+      let savedEvent: CreatedEventType | null = null;
+      const updated = prev.map((ev) => {
+        if (ev.id === id) {
+          savedEvent = { ...ev, ...patch };
+          return savedEvent;
+        }
+        return ev;
+      });
+      
+      if (savedEvent) {
+        localStorage.setItem("happnix_created_events_v4", JSON.stringify(updated));
+        
+        // Background sync to backend
+        const actionItem = (savedEvent.status === "Upcoming" || savedEvent.status === "Live") 
+          ? "PublishEvent" 
+          : "CreateEventDraft";
+          
+        processEventMedia(savedEvent).then((processedEvent) => {
+          apiClient.post("/api/events", {
+            actionItem,
+            eventData: processedEvent
+          }).catch(err => console.error("Event Sync Error:", err));
+        });
+      }
+      
       return updated;
     });
   };

@@ -140,10 +140,20 @@ CREATE TABLE IF NOT EXISTS events (
     -- Media
     "coverImageUrl"     VARCHAR(500),                    -- Primary cover image (R2 URL)
 
+    -- Additional Details (From latest frontend)
+    "ageGroup"          VARCHAR(50),                     -- e.g., '18+', 'Family Friendly'
+    "highlights"        TEXT[],                          -- Event highlights/features
+    "services"          TEXT[],                          -- Included services
+    "artists"           TEXT[],                          -- Performers/Speakers
+    
+    -- Extensibility & Policies
+    "metadata"          JSONB DEFAULT '{}'::jsonb,       -- DYNAMIC FIELDS: store dresscode, flexible capacity, etc. here
+    "policies"          JSONB DEFAULT '{}'::jsonb,       -- T&C, Privacy Policy, FAQs
+    "promoCodes"        JSONB DEFAULT '[]'::jsonb,       -- List of promo codes
+    
     -- Settings
     "requireApproval"   BOOLEAN NOT NULL DEFAULT FALSE,  -- Host must approve each booking
     "allowGuestInvite"  BOOLEAN NOT NULL DEFAULT TRUE,   -- Ticket holders can invite guests
-    "ageRestriction"    INTEGER,                         -- Minimum age (NULL = no restriction)
 
     -- Timestamps
     "createdAt"         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -315,6 +325,7 @@ This is the denormalized "card" that the home feed, search, and discovery pages 
 | `description` | String | Truncated (first 200 chars) |
 | `eventCategory` | String | Category |
 | `tags` | List | Tags |
+| `artists` | List | Performers/Speakers |
 | `startAt` | String | ISO 8601 |
 | `endAt` | String | ISO 8601 |
 | `locationName` | String | Venue name |
@@ -410,7 +421,9 @@ Allows querying all events by a specific host, sorted by date. Lightweight — j
           "isOnline", "onlineLink", "ticketType", "basePrice", "currency",
           "ticketTiers", "maxAttendees", "ticketsSold", "serviceFeePercent",
           "visibility", "status", "isActive", "coverImageUrl",
-          "requireApproval", "allowGuestInvite", "ageRestriction",
+          "ageGroup", "highlights", "services", "artists",
+          "metadata", "policies", "promoCodes",
+          "requireApproval", "allowGuestInvite",
           "publishedAt", "cancelledAt"
         ],
         "default_status": "Draft"
@@ -573,6 +586,36 @@ erDiagram
         invite_status_enum inviteStatus
     }
 ```
+
+---
+
+## Part 7: Handling Dynamic Fields (The JSONB Pattern)
+
+Based on your recent frontend updates (`dresscode`, `highlights`, `artists`), it's clear the event creation flow will evolve, and you may want to add new fields later without running complex RDS database migrations every time. 
+
+**How to proceed dynamically:**
+Use the **`metadata` JSONB column** in PostgreSQL. JSONB allows you to store arbitrary nested JSON objects with strict schema-less flexibility, but it can still be indexed and queried efficiently by PostgreSQL!
+
+For example, your `dresscode` and `capacityFlex` fields can be stored inside `metadata`:
+```json
+{
+  "dresscode": {
+    "enabled": true,
+    "style": "Smart Casual"
+  },
+  "capacityFlex": true,
+  "theme": "Neon"
+}
+```
+
+If you ever need to add a new field like `"parkingAvailable": true` or `"foodMenu": [...]` tomorrow, you just add it to the `metadata` JSON object on the frontend and send it to the backend. The backend just dumps the whole object into the `metadata` JSONB column. No DB migration required!
+
+### What else should you add? (Suggestions based on your frontend)
+
+1. **Promo Codes Table/JSONB**: The frontend `CreatedEventType` has `promoCodes: PromoCodeType[]`. We've added this as a JSONB column (`promoCodes`), but if promo codes are reused across events or need heavy tracking (e.g., "max uses reached"), it might be better to split them into a dedicated `event_promo_codes` table in RDS.
+2. **Event Sessions/Agenda**: The `booking.ts` type has a `SessionType` array. If an event has multiple sessions (like a multi-day festival), consider an `event_sessions` table in RDS instead of a single event row.
+3. **Announcements Channel**: `booking.ts` has `AnnouncementType`. You should add an `event_announcements` table in RDS to track broadcast messages sent to attendees via email/push.
+4. **Analytics/Stats**: The frontend uses `EventStats` (revenue, views, hype). We will need to track these metrics either via aggregation queries or storing them in DynamoDB for real-time counters.
 
 ---
 

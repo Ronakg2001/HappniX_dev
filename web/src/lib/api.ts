@@ -1,4 +1,5 @@
 import axios from "axios";
+import { CreatedEventType } from "@/types/event";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
 
@@ -123,3 +124,99 @@ apiClient.interceptors.response.use(
     return Promise.reject(new Error(message));
   }
 );
+
+export const uploadMediaToR2 = async (file: File, eventId: string): Promise<string | null> => {
+  try {
+    const res = await apiClient.post("/api/events", {
+      actionItem: "GetMediaUploadUrl",
+      fileName: file.name.replace(/[^a-zA-Z0-9.-]/g, "_"), // Sanitize filename
+      contentType: file.type,
+      eventId: eventId
+    });
+    
+    if (!res.success) return null;
+    
+    const { uploadUrl, objectKey } = res;
+    
+    // Upload directly to R2
+    const uploadRes = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "Content-Type": file.type
+      }
+    });
+    
+    if (uploadRes.ok) {
+      const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
+      return `${publicBase}/${objectKey}`;
+    }
+    return null;
+  } catch (err) {
+    console.error("Upload failed", err);
+    return null;
+  }
+};
+
+export const deleteMediaFromR2 = async (url: string): Promise<boolean> => {
+  try {
+    const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
+    if (!url.startsWith(publicBase)) return false;
+    
+    const objectKey = url.replace(`${publicBase}/`, "");
+    const res = await apiClient.post("/api/events", {
+      actionItem: "DeleteMedia",
+      objectKey
+    });
+    return !!res.success;
+  } catch (err) {
+    console.error("Delete media failed", err);
+    return false;
+  }
+};
+
+export const processEventMedia = async (eventData: CreatedEventType): Promise<CreatedEventType> => {
+  const processed = { ...eventData };
+  
+  const base64ToFile = (base64: string, filename: string): File | null => {
+    try {
+      const arr = base64.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1];
+      if (!mime) return null;
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, { type: mime });
+    } catch (e) {
+      return null;
+    }
+  };
+
+  if (processed.bannerUrl?.startsWith("data:image")) {
+    const file = base64ToFile(processed.bannerUrl, `banner_${Date.now()}.jpg`);
+    if (file) {
+      const url = await uploadMediaToR2(file, processed.id);
+      if (url) processed.bannerUrl = url;
+    }
+  }
+
+  if (processed.highlights && processed.highlights.length > 0) {
+    const newHighlights = [...processed.highlights];
+    for (let i = 0; i < newHighlights.length; i++) {
+      if (newHighlights[i].startsWith("data:image")) {
+        const file = base64ToFile(newHighlights[i], `highlight_${Date.now()}_${i}.jpg`);
+        if (file) {
+          const url = await uploadMediaToR2(file, processed.id);
+          if (url) newHighlights[i] = url;
+        }
+      }
+    }
+    processed.highlights = newHighlights;
+  }
+
+  return processed;
+};
+

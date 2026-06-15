@@ -45,10 +45,14 @@ def get_r2_client():
 
     return _r2_client, _bucket_name
 
-def create_folder(folder_key: str) -> dict:
+def create_folder(**kwargs) -> dict:
     """
     Creates an empty object with a trailing slash to simulate a folder.
     """
+    folder_key = kwargs.get("folder_key")
+    if not folder_key:
+        return {"success": False, "error": "Missing folder_key"}
+        
     client, bucket = get_r2_client()
     if not client:
         return {"success": False, "error": "R2 Client not initialized"}
@@ -64,11 +68,19 @@ def create_folder(folder_key: str) -> dict:
         util.log("error", "r2_bucket.create_folder", f"Failed to create folder {folder_key}: {exc}")
         return {"success": False, "error": str(exc)}
 
-def generate_presigned_url(object_key: str, method: str = 'put_object', expires_in: int = 3600, content_type: str = None) -> dict:
+def generate_presigned_url(**kwargs) -> dict:
     """
     Generates a presigned URL for uploading or viewing files.
-    method: 'put_object' for upload, 'get_object' for download/viewing private files.
+    Requires 'object_key'. Optional: 'method', 'expires_in', 'content_type'.
     """
+    object_key = kwargs.get("object_key")
+    method = kwargs.get("method", "put_object")
+    expires_in = kwargs.get("expires_in", 3600)
+    content_type = kwargs.get("content_type")
+    
+    if not object_key:
+        return {"success": False, "error": "Missing object_key"}
+
     client, bucket = get_r2_client()
     if not client:
         return {"success": False, "error": "R2 Client not initialized"}
@@ -88,10 +100,14 @@ def generate_presigned_url(object_key: str, method: str = 'put_object', expires_
         util.log("error", "r2_bucket.generate_presigned_url", f"Failed to generate presigned URL for {object_key}: {exc}")
         return {"success": False, "error": str(exc)}
 
-def delete_folder_contents(prefix: str) -> dict:
+def delete_folder_contents(**kwargs) -> dict:
     """
     Deletes all objects under a specific prefix (folder).
     """
+    prefix = kwargs.get("prefix")
+    if not prefix:
+        return {"success": False, "error": "Missing prefix"}
+        
     client, bucket = get_r2_client()
     if not client:
         return {"success": False, "error": "R2 Client not initialized"}
@@ -132,4 +148,24 @@ def delete_folder_contents(prefix: str) -> dict:
 
     except ClientError as exc:
         util.log("error", "r2_bucket.delete_folder_contents", f"Failed to delete folder {prefix}: {exc}")
+        return {"success": False, "error": str(exc)}
+
+def delete_object(**kwargs) -> dict:
+    """
+    Deletes a single object from R2.
+    """
+    object_key = kwargs.get("object_key")
+    if not object_key:
+        return {"success": False, "error": "Missing object_key"}
+        
+    client, bucket = get_r2_client()
+    if not client:
+        return {"success": False, "error": "R2 Client not initialized"}
+        
+    try:
+        client.delete_object(Bucket=bucket, Key=object_key)
+        util.log("info", "r2_bucket.delete_object", f"Deleted object {object_key}")
+        return {"success": True}
+    except ClientError as exc:
+        util.log("error", "r2_bucket.delete_object", f"Failed to delete {object_key}: {exc}")
         return {"success": False, "error": str(exc)}

@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { EventLiveState, EventStats } from "@/types/booking";
 import { Button } from "@/components/ui/button";
+import { apiClient, processEventMedia } from "@/lib/api";
 
 function CreateEventContent() {
   const router = useRouter();
@@ -82,6 +83,14 @@ function CreateEventContent() {
       const updatedStats = { ...prev, [newEvent.id]: newStats };
       localStorage.setItem("happnix_event_stats_v4", JSON.stringify(updatedStats));
       return updatedStats;
+    });
+
+    // Initial background sync to backend
+    processEventMedia(newEvent).then((processedEvent) => {
+      apiClient.post("/api/events", {
+        actionItem: "CreateEventDraft",
+        eventData: processedEvent
+      }).catch(err => console.error("Initial Draft Sync Error:", err));
     });
   };
 
