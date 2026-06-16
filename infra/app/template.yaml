@@ -639,7 +639,7 @@ Resources:
     Properties:
       CodeUri: ../../backend/
       Handler: handlers.events.lambda_handler
-      Description: Events CRUD — create, list, discover, delete.
+      Description: Events API v2 - handles all /api/events routing
       Policies:
         - AWSLambdaBasicExecutionRole
         - AWSLambdaVPCAccessExecutionRole
@@ -662,7 +662,7 @@ Resources:
                 - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
               Resource: "*"
       Events:
-        EventsBaseAny:
+        CatchAllEvents:
           Type: Api
           Properties:
             RestApiId:
