@@ -1,7 +1,8 @@
 import axios from "axios";
 import { CreatedEventType } from "@/types/event";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
+const API_BASE = RAW_API_BASE.endsWith("/") ? RAW_API_BASE : `${RAW_API_BASE}/`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
@@ -82,7 +83,7 @@ apiClient.interceptors.response.use(
         const refreshToken = localStorage.getItem("happnix_refresh_token");
         if (refreshToken) {
           try {
-            const response = await axios.post(API_BASE + "/api/auth", {
+            const response = await axios.post(API_BASE + "api/auth", {
               actionItem: "RefreshToken",
               refreshToken: refreshToken
             });
