@@ -121,6 +121,12 @@ ACTION_HANDLERS = {
 
 def lambda_handler(event, context):
     try:
+        http_method = event.get("httpMethod", "")
+        
+        # Browsers send OPTIONS requests without Authorization headers during preflight
+        if http_method == "OPTIONS":
+            return success_response({"success": True, "message": "CORS preflight successful"})
+            
         headers = event.get("headers", {})
         auth_header = headers.get("Authorization") or headers.get("authorization")
         
@@ -136,8 +142,6 @@ def lambda_handler(event, context):
         if not username:
             return error_response("Unauthorized. Invalid Cognito user.", 401)
             
-        http_method = event.get("httpMethod", "")
-        
         if http_method == "GET":
             action_item = "GetMyEvents"
             qs = event.get("queryStringParameters") or {}
