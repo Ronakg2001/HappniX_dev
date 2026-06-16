@@ -662,27 +662,13 @@ Resources:
                 - cognito-idp:GetUser # verify_cognito_token (Bearer token validation)
               Resource: "*"
       Events:
-        EventsBaseOptions:
+        EventsBaseAny:
           Type: Api
           Properties:
             RestApiId:
               Ref: HappnixDevApi
             Path: /api/events
-            Method: OPTIONS
-        EventsBasePost:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/events
-            Method: POST
-        EventsBaseGet:
-          Type: Api
-          Properties:
-            RestApiId:
-              Ref: HappnixDevApi
-            Path: /api/events
-            Method: GET
+            Method: ANY
         CreateEvent:
           Type: Api
           Properties:
