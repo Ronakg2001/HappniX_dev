@@ -114,7 +114,7 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
       }
       
       // Fetch fresh events from backend via GET request
-      apiClient.get("/api/events")
+      apiClient.get("api/events")
         .then((res: any) => {
           if (res.success && res.events && res.events.length > 0) {
             setCreatedEvents(res.events);

@@ -87,7 +87,7 @@ function CreateEventContent() {
 
     // Initial background sync to backend
     processEventMedia(newEvent).then((processedEvent) => {
-      apiClient.post("/api/events", {
+      apiClient.post("api/events", {
         actionItem: "CreateEventDraft",
         eventData: processedEvent
       }).catch(err => console.error("Initial Draft Sync Error:", err));

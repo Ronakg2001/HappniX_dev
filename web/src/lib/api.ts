@@ -127,7 +127,7 @@ apiClient.interceptors.response.use(
 
 export const uploadMediaToR2 = async (file: File, eventId: string): Promise<string | null> => {
   try {
-    const res = (await apiClient.post("/api/events", {
+    const res = (await apiClient.post("api/events", {
       actionItem: "GetMediaUploadUrl",
       fileName: file.name.replace(/[^a-zA-Z0-9.-]/g, "_"), // Sanitize filename
       contentType: file.type,
@@ -164,7 +164,7 @@ export const deleteMediaFromR2 = async (url: string): Promise<boolean> => {
     if (!url.startsWith(publicBase)) return false;
     
     const objectKey = url.replace(`${publicBase}/`, "");
-    const res = (await apiClient.post("/api/events", {
+    const res = (await apiClient.post("api/events", {
       actionItem: "DeleteMedia",
       objectKey
     })) as any;
