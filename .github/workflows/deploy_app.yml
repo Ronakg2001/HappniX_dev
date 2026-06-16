@@ -53,6 +53,7 @@ jobs:
           --capabilities CAPABILITY_IAM
           --parameter-overrides
           ParameterKey=EnvironmentName,ParameterValue=dev
+          ParameterKey=EnableEventsApi,ParameterValue=true
           ParameterKey=VpcId,ParameterValue='${{ vars.NETWORK_VPC_ID }}'
           ParameterKey=PrivateSubnetAId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_A_ID }}'
           ParameterKey=PrivateSubnetBId,ParameterValue='${{ vars.NETWORK_PRIVATE_SUBNET_B_ID }}'
