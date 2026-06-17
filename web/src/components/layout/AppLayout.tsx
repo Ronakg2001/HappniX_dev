@@ -6,18 +6,8 @@ import Header from "./Header";
 import LocationBar from "@/components/location/LocationBar";
 import LeftSidebar from "./LeftSidebar";
 import BottomNav from "./BottomNav";
-import {
-  BookingModal,
-  NotificationsModal
-} from "@/components/modals/HomeModals";
-
-import { TicketType, AttendeeType, EventLiveState, EventStats } from "@/types/booking";
-import {
-  CreatedEventType,
-  TicketTierType,
-  PromoCodeType,
-  FAQType,
-} from "@/types/event";
+import { BookingModal, NotificationsModal } from "@/components/modals/HomeModals";
+import { TicketType } from "@/types/booking";
 
 interface LayoutContextType {
   openBooking: (title: string, price: string) => void;
@@ -38,10 +28,6 @@ export function useLayout() {
   return context;
 }
 
-function withTierDefaults(t: Omit<TicketTierType, "entryType"|"flexibleSeats"|"promoText"> & Partial<Pick<TicketTierType,"entryType"|"flexibleSeats"|"promoText">>): TicketTierType {
-  return { entryType: "Regular", flexibleSeats: false, promoText: "", ...t };
-}
-
 import { MOCK_EVENTS, MOCK_LIVE_STATES, MOCK_STATS, MOCK_BOOKED_TICKETS } from "@/constants/mockData";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -55,12 +41,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Tickets State
   const [bookedTickets, setBookedTickets] = useState<TicketType[]>([]);
-
-
-
-
-
-
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -125,8 +105,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     localStorage.setItem("happnix_booked_tickets", JSON.stringify(updated));
   };
 
-
-
   // Modal States
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<{ title: string; price: string } | null>(null);
@@ -150,8 +128,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const openCreateEvent = () => {
     router.push("/my-events/create");
   };
-
-
 
   if (!isAppRoute) {
     return <>{children}</>;

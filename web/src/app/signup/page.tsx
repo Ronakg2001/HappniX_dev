@@ -318,13 +318,14 @@ const SignUpCard = () => {
                 onChange={(e) => set("password", e.target.value)}
                 className="pr-14"
               />
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-white/40 hover:text-white/80 transition"
+                variant="link"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-white/40 hover:text-white/80 transition p-0 h-auto font-normal"
               >
                 {showPw ? "Hide" : "Show"}
-              </button>
+              </Button>
             </div>
           </Field>
 

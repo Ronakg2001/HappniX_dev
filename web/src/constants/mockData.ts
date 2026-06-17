@@ -1,5 +1,7 @@
-import { CreatedEventType, TicketTierType } from "@/types/event";
+import { CreatedEventType, TicketTierType, EventDetail, DiscoverItem, EventMetaType, CountryInfo } from "@/types/event";
+import { User } from "@/types/user";
 import { EventLiveState, EventStats, TicketType } from "@/types/booking";
+import { MediaItem } from "@/components/ui/media-grid-item";
 
 function withTierDefaults(t: Omit<TicketTierType, "entryType"|"flexibleSeats"|"promoText"> & Partial<Pick<TicketTierType,"entryType"|"flexibleSeats"|"promoText">>): TicketTierType {
   return { entryType: "Regular", flexibleSeats: false, promoText: "", ...t };
@@ -404,4 +406,526 @@ export const MOCK_BOOKED_TICKETS: TicketType[] = [
   { id: "t1", eventTitle: "Neon Nights Party", date: "May 28", time: "9:00 PM", seat: "VIP Entry" },
   { id: "t2", eventTitle: "Rooftop Unplugged Gig", date: "May 30", time: "7:00 PM", seat: "General Entry" },
   { id: "t3", eventTitle: "Forbidden Forest Warehouse Party", date: "Jun 06", time: "10:00 PM", seat: "VIP Access Pass" }
+];
+
+export const MOCK_EVENTS_DETAILS: Record<string, EventDetail> = {
+  e1: {
+    id: "e1",
+    organizer: "Utopia Entertainment",
+    verifiedOrganizer: true,
+    title: "Club Utopia DJ Set",
+    category: "Clubbing",
+    musicGenre: "Techno & House",
+    ageRestricted: true,
+    date: "Friday, May 29",
+    time: "9:00 PM - 3:00 AM",
+    venue: "Utopia Club, C-Scheme, Jaipur",
+    distance: "2.4 km away",
+    ticketsLeft: 14,
+    trending: true,
+    price: "₹999",
+    about: "Jaipur's premier underground techno night is back. Join us at Utopia for an unparalleled sensory trip featuring state-of-the-art visual mapping, absolute acoustic bliss, and a headline set by national mixmasters.",
+    lineup: [
+      { name: "DJ Shadow", role: "Headliner (Tech-House)", avatarBg: "from-[#FF4FD8] to-[#C96CFF]" },
+      { name: "Neon Ghost", role: "Supporting Act (Melodic)", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
+      { name: "Aarav Mehta", role: "Local Opener (Minimal)", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
+    ],
+    friendsAttending: [
+      { name: "Aria", avatarLetter: "A", color: "bg-pink-500" },
+      { name: "Rohan", avatarLetter: "R", color: "bg-blue-500" },
+      { name: "Sneha", avatarLetter: "S", color: "bg-purple-500" },
+      { name: "Kabir", avatarLetter: "K", color: "bg-amber-500" }
+    ],
+    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80",
+    lat: 26.9124,
+    lng: 75.8087,
+    gallery: [
+      "https://images.unsplash.com/photo-1545128485-c400e7702796?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1486591978090-58e619d37fe7?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?auto=format&fit=crop&w=600&q=80"
+    ]
+  },
+  e2: {
+    id: "e2",
+    organizer: "Unplugged Nights",
+    verifiedOrganizer: false,
+    title: "Rooftop Unplugged Gig",
+    category: "Acoustic Gig",
+    musicGenre: "Indie / Folk",
+    ageRestricted: false,
+    date: "Saturday, May 30",
+    time: "7:00 PM - 10:00 PM",
+    venue: "Cafe Sky, Malviya Nagar, Jaipur",
+    distance: "5.1 km away",
+    ticketsLeft: 35,
+    trending: false,
+    price: "₹499",
+    about: "An intimate evening under the stars featuring acoustic covers, soulful original sets, and cozy ambient dining. Unplug from the rush of the city and immerse in cozy vibes.",
+    lineup: [
+      { name: "Sneha Sen", role: "Acoustic Soloist", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
+      { name: "Kabir & The Strings", role: "Indie Duo Band", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
+    ],
+    friendsAttending: [
+      { name: "Sarah", avatarLetter: "S", color: "bg-emerald-500" },
+      { name: "Vikram", avatarLetter: "V", color: "bg-sky-500" }
+    ],
+    banner: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
+    lat: 26.8529,
+    lng: 75.8052,
+    gallery: [
+      "https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1493676304818-94cf0cb5ef1e?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1485872299829-967f05efe90a?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=600&q=80"
+    ]
+  },
+  sp1: {
+    id: "sp1",
+    organizer: "Happnix VIP Labs",
+    verifiedOrganizer: true,
+    title: "Forbidden Forest Warehouse Party",
+    category: "Private Party",
+    musicGenre: "Industrial Techno",
+    ageRestricted: true,
+    date: "Saturday, June 6",
+    time: "10:00 PM onwards",
+    venue: "Warehouse 12, Industrial Area, Jaipur",
+    distance: "9.2 km away",
+    ticketsLeft: 5,
+    trending: true,
+    price: "₹1,999",
+    about: "A warehouse rave in the outskirts of the pink city. Industrial vibes, heavy bass lines, and laser sweeps that go on until sunrise. Access code required for gate entry.",
+    lineup: [
+      { name: "DJ Phantom", role: "Special Guest (Berlin)", avatarBg: "from-[#FF4FD8] to-[#C96CFF]" },
+      { name: "Acid Eclipse", role: "Hardware Live Set", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
+      { name: "Circuit Breaker", role: "Dark Techno Opener", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
+    ],
+    friendsAttending: [
+      { name: "DJ Shadow", avatarLetter: "D", color: "bg-red-500" },
+      { name: "Aria", avatarLetter: "A", color: "bg-pink-500" },
+      { name: "Sarah", avatarLetter: "S", color: "bg-emerald-500" }
+    ],
+    banner: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1200&q=80",
+    lat: 26.8289,
+    lng: 75.8021,
+    gallery: [
+      "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1574096079513-d8259312b785?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1578946956088-940c3b502864?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80"
+    ]
+  }
+};
+
+export const DISCOVER_ITEMS: DiscoverItem[] = [
+  {
+    id: "e1",
+    type: "event",
+    title: "Club Utopia DJ Set",
+    category: "Clubbing",
+    genre: "Techno & House",
+    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=400&q=80",
+    hype: "2.8M Hype",
+    attending: "6 friends",
+    host: "Utopia Entertainment",
+    verified: true,
+    price: "₹999",
+    venue: "C-Scheme, Jaipur"
+  },
+  {
+    id: "e2",
+    type: "event",
+    title: "Rooftop Unplugged Gig",
+    category: "Acoustic Gig",
+    genre: "Indie / Folk",
+    image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=400&q=80",
+    hype: "4.2M Hype",
+    attending: "2 friends",
+    host: "Unplugged Nights",
+    verified: false,
+    price: "₹499",
+    venue: "Malviya Nagar, Jaipur"
+  },
+  {
+    id: "sp1",
+    type: "event",
+    title: "Forbidden Forest Warehouse Rave",
+    category: "Private Party",
+    genre: "Industrial Techno",
+    image: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=400&q=80",
+    hype: "5.1M Hype",
+    attending: "3 friends",
+    host: "Happnix VIP Labs",
+    verified: true,
+    price: "₹1,999",
+    venue: "Industrial Area, Jaipur"
+  },
+  {
+    id: "m4",
+    type: "social",
+    title: "Late Night Boiler Room Session Jaipur edit",
+    category: "Rave",
+    genre: "Acid Techno",
+    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80",
+    hype: "2.5M Hype",
+    attending: "18 attending",
+    host: "Circuit Breaker",
+    verified: false,
+    price: "Free Entry",
+    venue: "Sector 5, Jaipur"
+  },
+  {
+    id: "m5",
+    type: "social",
+    title: "Soundcheck with Sneha unplugged folk cover",
+    category: "Acoustic",
+    genre: "Folk / Indie",
+    image: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=400&q=80",
+    hype: "16M Views",
+    attending: "Local Session",
+    host: "Sneha Sen",
+    verified: true,
+    price: "Invite Only",
+    venue: "C-Scheme, Jaipur"
+  },
+  {
+    id: "m6",
+    type: "event",
+    title: "Eclipse Deep House pool gig",
+    category: "Pool Party",
+    genre: "Deep House",
+    image: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=400&q=80",
+    hype: "2.8M Hype",
+    attending: "5 friends",
+    host: "Shadowmix Lab",
+    verified: true,
+    price: "₹799",
+    venue: "Amer Road, Jaipur"
+  }
+];
+
+export const CATEGORY_PILLS = [
+  "All", 
+  "Techno & House", 
+  "Acoustic Gigs", 
+  "Warehouse Raves", 
+  "Pool Parties", 
+  "Deep House", 
+  "Indie / Folk"
+];
+
+export const TRENDING_SEARCHES = [
+  "Forbidden Forest Warehouse Party",
+  "Utopia Techno DJ set",
+  "Rooftop Acoustic Sneha Sen",
+  "Pool gig Amer Road",
+  "Industrial Beats Jaipur",
+  "Squad chat invites"
+];
+
+export const INDIA_DEFAULT: CountryInfo = {
+  name: "India",
+  region_code: "IN",
+  dial_code: "+91",
+  mobile_number_pattern: "^[6-9]\\d{9}$",
+  region_flag: "🇮🇳",
+};
+
+export const EVENT_META: Record<string, EventMetaType> = {
+  "club utopia dj set": {
+    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80",
+    venue: "Utopia Club, C-Scheme, Jaipur",
+    locationLink: "https://maps.google.com/?q=Utopia+Club+C-Scheme+Jaipur",
+    instructions: ["Age limit: 18+ only. Valid ID required at entrance.", "Smart Casual attire. Club rules apply.", "Pass code is unique and active for 1 scan."]
+  },
+  "neon nights party": {
+    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80",
+    venue: "Utopia Club, C-Scheme, Jaipur",
+    locationLink: "https://maps.google.com/?q=Utopia+Club+C-Scheme+Jaipur",
+    instructions: ["Age limit: 18+ only. Valid ID required at entrance.", "Smart Casual attire. Club rules apply.", "Pass code is unique and active for 1 scan."]
+  },
+  "rooftop unplugged gig": {
+    banner: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80",
+    venue: "Cafe Sky, Malviya Nagar, Jaipur",
+    locationLink: "https://maps.google.com/?q=Cafe+Sky+Malviya+Nagar+Jaipur",
+    instructions: ["All ages welcome. Under 16 must be accompanied.", "Gate opens at 6:45 PM.", "Food and drinks menu available at venue."]
+  },
+  "forbidden forest warehouse party": {
+    banner: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
+    venue: "Warehouse 12, Industrial Area, Jaipur",
+    locationLink: "https://maps.google.com/?q=Warehouse+12+Industrial+Area+Jaipur",
+    instructions: ["Strictly 21+ event. Zero tolerance policy.", "Warehouses can get chilly - dress accordingly.", "Access code active until 1:00 AM."]
+  }
+};
+
+export const MOCK_FOLLOWERS = [
+  { id: "f1", name: "Sarah Connor", username: "sarahc", avatar: null, mutuals: 4 },
+  { id: "f2", name: "Aria Roy", username: "ariar", avatar: null, mutuals: 7 },
+  { id: "f3", name: "DJ Shadow", username: "shadowmix", avatar: null, mutuals: 12 },
+  { id: "f4", name: "Neha Kapoor", username: "nehak", avatar: null, mutuals: 2 },
+  { id: "f5", name: "Vikram Singh", username: "vikrams", avatar: null, mutuals: 9 },
+];
+
+export const MOCK_FOLLOWING = [
+  { id: "g1", name: "Utopia Entertainment", username: "utopiaent", avatar: null, mutuals: 0 },
+  { id: "g2", name: "Rohan Gupta", username: "rohang", avatar: null, mutuals: 12 },
+  { id: "g3", name: "Ananya Sharma", username: "ananyas", avatar: null, mutuals: 5 },
+];
+
+export const MOCK_MEDIA: MediaItem[] = [
+  { id: "m1", type: "photo" as const, gradient: "from-[var(--brand-1)]/40 to-[var(--brand-2)]/30", caption: "Chasing sunsets 🌅", likes: 42, comments: 8 },
+  { id: "m2", type: "video" as const, gradient: "from-[var(--brand-3)]/40 to-[var(--brand-2)]/30", caption: "Club Utopia was 🔥", likes: 87, comments: 23 },
+  { id: "m3", type: "event" as const, gradient: "from-[var(--brand-4)]/40 to-[var(--brand-1)]/20", caption: "VIP Pass — Neon Nights", likes: 31, comments: 5 },
+  { id: "m4", type: "photo" as const, gradient: "from-[var(--brand-2)]/40 to-[var(--brand-3)]/20", caption: "Rooftop vibes ✨", likes: 56, comments: 14 },
+  { id: "m5", type: "photo" as const, gradient: "from-[var(--brand-3)]/30 to-[var(--brand-4)]/30", caption: "Night out 🎵", likes: 29, comments: 6 },
+  { id: "m6", type: "video" as const, gradient: "from-[var(--brand-4)]/30 to-[var(--brand-1)]/30", caption: "Acoustic session", likes: 74, comments: 18 },
+  { id: "m7", type: "photo" as const, gradient: "from-[var(--brand-1)]/30 to-[var(--brand-4)]/20", caption: "Festival mode 🎪", likes: 61, comments: 11 },
+  { id: "m8", type: "event" as const, gradient: "from-[var(--brand-2)]/30 to-[var(--brand-3)]/30", caption: "Techno set ticket", likes: 19, comments: 3 },
+  { id: "m9", type: "photo" as const, gradient: "from-[var(--brand-3)]/40 to-[var(--brand-1)]/20", caption: "Sound & light 💫", likes: 94, comments: 31 },
+];
+
+export const MOCK_POSTS = [
+  {
+    id: "p1",
+    user: { name: "Aarav Mehta", username: "aaravm", avatar: "", verified: true },
+    timestamp: "2 hours ago",
+    privacy: "public" as const,
+    content: "Just booked tickets for the Utopia DJ Set! Who else is going this Friday? The line-up looks insane! 🔥🎧",
+    hashtags: ["UtopiaMusic", "JaipurGigs", "WeekendVibes"],
+    mentions: ["sarahc", "shadowmix"],
+    musicTag: "Utopia Underground - Techno Mix",
+    moodTag: "Hyped Up",
+    likes: 42,
+    comments: 18,
+    location: "Utopia Club, Jaipur",
+    liked: true,
+    saved: false
+  },
+  {
+    id: "p2",
+    user: { name: "Sneha Sen", username: "snehasen", avatar: "", verified: false },
+    timestamp: "5 hours ago",
+    privacy: "public" as const,
+    content: "Chasing sunsets and acoustic vibes in Jaipur. If you love unplugged music, there's a cozy gathering happening tomorrow at C-Scheme.",
+    hashtags: ["AcousticSession", "Unplugged", "JaipurDiaries"],
+    mentions: [],
+    musicTag: "Cozy Acoustic - Indie Cover",
+    moodTag: "Chill & Relaxed",
+    likes: 29,
+    comments: 7,
+    location: "Cafe Noir, C-Scheme",
+    liked: false,
+    saved: true
+  }
+];
+
+export const MOCK_FEED_EVENTS = [
+  {
+    id: "e1",
+    organizer: "Utopia Entertainment",
+    verifiedOrganizer: true,
+    banner: "",
+    title: "Club Utopia DJ Set",
+    category: "Clubbing",
+    musicGenre: "Techno / House",
+    ageRestricted: true,
+    date: "Friday, May 29",
+    time: "9:00 PM - 3:00 AM",
+    venue: "Utopia Club, C-Scheme, Jaipur",
+    distance: "2.4 km away",
+    ticketsLeft: 14,
+    trending: true,
+    friendsAttending: 6,
+    price: "₹999"
+  },
+  {
+    id: "e2",
+    organizer: "Unplugged Nights",
+    verifiedOrganizer: false,
+    banner: "",
+    title: "Rooftop Unplugged Gig",
+    category: "Gig",
+    musicGenre: "Acoustic / Indie",
+    ageRestricted: false,
+    date: "Saturday, May 30",
+    time: "7:00 PM - 10:00 PM",
+    venue: "Cafe Sky, Malviya Nagar, Jaipur",
+    distance: "5.1 km away",
+    ticketsLeft: 35,
+    trending: false,
+    friendsAttending: 2,
+    price: "₹499"
+  }
+];
+
+export const MOCK_SPONSORED_EVENT = {
+  id: "sp1",
+  organizer: "Happnix VIP Labs",
+  verifiedOrganizer: true,
+  banner: "",
+  title: "Forbidden Forest Warehouse Party",
+  category: "Party",
+  musicGenre: "Industrial Techno",
+  ageRestricted: true,
+  date: "Saturday, June 6",
+  time: "10:00 PM onwards",
+  venue: "Warehouse 12, Industrial Area, Jaipur",
+  distance: "9.2 km away",
+  ticketsLeft: 5,
+  trending: true,
+  price: "₹1,999"
+};
+
+export const MOCK_USERS: User[] = [
+  {
+    id: "u1",
+    name: "Aria Roy",
+    username: "ariaroy",
+    avatar: null,
+    bio: "DJ & music producer based in Jaipur. Techno purist. 🎧",
+    verified: true,
+    followers: 12400,
+    mutuals: 7,
+    isFollowing: false,
+    tags: ["techno", "dj", "music"],
+  },
+  {
+    id: "u2",
+    name: "Sneha Sen",
+    username: "snehasen",
+    avatar: null,
+    bio: "Acoustic singer-songwriter. Coffee & chords. ☕🎸",
+    verified: false,
+    followers: 3200,
+    mutuals: 2,
+    isFollowing: true,
+    tags: ["acoustic", "folk", "indie"],
+  },
+  {
+    id: "u3",
+    name: "Kabir Malhotra",
+    username: "kabirm",
+    avatar: null,
+    bio: "Event promoter · Warehouse raves · Collective curator",
+    verified: true,
+    followers: 8900,
+    mutuals: 12,
+    isFollowing: false,
+    tags: ["events", "rave", "promoter"],
+  },
+  {
+    id: "u4",
+    name: "Zara Khan",
+    username: "zarakhan",
+    avatar: null,
+    bio: "House music lover & night owl 🌙 Jaipur → Mumbai",
+    verified: false,
+    followers: 1540,
+    mutuals: 4,
+    isFollowing: false,
+    tags: ["house", "party", "music"],
+  },
+  {
+    id: "u5",
+    name: "Rohan Gupta",
+    username: "rohang",
+    avatar: null,
+    bio: "Festival head. Photographer. Always on the guest list. 📸",
+    verified: false,
+    followers: 5600,
+    mutuals: 12,
+    isFollowing: true,
+    tags: ["festival", "photography"],
+  },
+  {
+    id: "u6",
+    name: "DJ Shadow",
+    username: "shadowmix",
+    avatar: null,
+    bio: "Tech-House. Melodic. Minimal. Headliner — Utopia Club.",
+    verified: true,
+    followers: 48000,
+    mutuals: 3,
+    isFollowing: false,
+    tags: ["dj", "techno", "house"],
+  },
+  {
+    id: "u7",
+    name: "Neha Kapoor",
+    username: "nehak",
+    avatar: null,
+    bio: "Vibes only ✨ | Music therapy student | Indie soul",
+    verified: false,
+    followers: 890,
+    mutuals: 2,
+    isFollowing: false,
+    tags: ["indie", "music", "therapy"],
+  },
+  {
+    id: "u8",
+    name: "Aarav Mehta",
+    username: "aaravm",
+    avatar: null,
+    bio: "Local DJ · Minimal · Jaipur underground scene founder",
+    verified: true,
+    followers: 9200,
+    mutuals: 9,
+    isFollowing: false,
+    tags: ["dj", "minimal", "underground"],
+  },
+  {
+    id: "u9",
+    name: "Priya Sharma",
+    username: "priyasharma",
+    avatar: null,
+    bio: "Party planner & social butterfly 🦋 Jaipur events insider",
+    verified: false,
+    followers: 2100,
+    mutuals: 5,
+    isFollowing: true,
+    tags: ["events", "party"],
+  },
+  {
+    id: "u10",
+    name: "Vikram Singh",
+    username: "vikrams",
+    avatar: null,
+    bio: "Bass head. Industrial techno enthusiast. Late night only.",
+    verified: false,
+    followers: 660,
+    mutuals: 9,
+    isFollowing: false,
+    tags: ["bass", "techno", "industrial"],
+  },
+  {
+    id: "u11",
+    name: "Ananya Sharma",
+    username: "ananyas",
+    avatar: null,
+    bio: "Singer | Songwriter | BTS of the Jaipur acoustic scene 🎼",
+    verified: false,
+    followers: 4300,
+    mutuals: 5,
+    isFollowing: true,
+    tags: ["singer", "acoustic", "songwriter"],
+  },
+  {
+    id: "u12",
+    name: "Utopia Entertainment",
+    username: "utopiaent",
+    avatar: null,
+    bio: "Jaipur's premier event collective. Club. Warehouse. Pool.",
+    verified: true,
+    followers: 91000,
+    mutuals: 0,
+    isFollowing: false,
+    tags: ["events", "club", "collective"],
+  },
 ];
