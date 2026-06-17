@@ -122,6 +122,7 @@ def insert_record(table_name: str, **kwargs) -> dict:
     """
     Dynamically insert a record into the table.
     Uses manifest.json to pull allowed columns and default statuses.
+    Handles PostgreSQL TEXT[] and JSONB types automatically.
     """
     conn = get_connection()
     if not conn:
@@ -135,19 +136,24 @@ def insert_record(table_name: str, **kwargs) -> dict:
         
     insert_data = {}
     for col in columns:
-        if col in kwargs:
-            insert_data[col] = kwargs[col]
+        if col in kwargs and kwargs[col] is not None:
+            val = kwargs[col]
+            # Convert Python dicts to JSON strings for JSONB columns
+            if isinstance(val, dict):
+                insert_data[col] = json.dumps(val)
+            else:
+                insert_data[col] = val
         elif col == "status":
             insert_data[col] = table_config.get("default_status", "Active")
-        else:
-            insert_data[col] = None
+        # Skip None values — let the database use its own DEFAULT
+    
+    if not insert_data:
+        return {"success": False, "error": "No data to insert."}
             
     cols_str = ", ".join([f'"{k}"' for k in insert_data.keys()])
     placeholders = ", ".join(["%s"] * len(insert_data))
     values = tuple(insert_data.values())
     
-    # We assume 'userID' is primary key based on prior implementation. 
-    # For full genericness, could put pk in manifest, but DO NOTHING on conflict is standard for users.
     pk = table_config.get("pk", "userID")
     sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) ON CONFLICT ("{pk}") DO NOTHING;'
     

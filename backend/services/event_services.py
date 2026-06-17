@@ -47,48 +47,55 @@ def _build_event_card(event_data: dict) -> dict:
     }
 
 
-def _format_event_payload(payload: dict) -> dict:
-    """Map the frontend JSON payload to the backend RDS schema fields."""
+def _format_event_payload(raw_payload: dict) -> dict:
+    """
+    Map the frontend JSON payload to the backend RDS schema fields.
+    The frontend sends: { actionItem, eventData: { title, schedule, location, ... } }
+    After the handler strips actionItem, we receive: { eventData: { ... }, username, user_id }
+    """
+    # Unwrap: frontend nests everything inside eventData
+    payload = raw_payload.get("eventData", raw_payload)
+
     schedule = payload.get("schedule", {})
     location = payload.get("location", {})
     ticketing = payload.get("ticketing", {})
     policies = payload.get("policies", {})
-    
+
     # Parse dates to ISO 8601 (or fallback to current time if missing)
     start_at = None
     if schedule.get("startDate") and schedule.get("startTime"):
-        start_at = f"{schedule.get('startDate')}T{schedule.get('startTime')}:00+00:00"
+        start_at = f"{schedule['startDate']}T{schedule['startTime']}:00+05:30"
     else:
         start_at = util.now_iso()
-            
+
     end_at = None
     if schedule.get("endDate") and schedule.get("endTime"):
-        end_at = f"{schedule.get('endDate')}T{schedule.get('endTime')}:00+00:00"
-            
-    # Parse ticket type
+        end_at = f"{schedule['endDate']}T{schedule['endTime']}:00+05:30"
+
+    # Parse ticket type from mode
     t_mode = str(ticketing.get("mode", "free")).lower()
     ticket_type = "Paid" if t_mode == "paid" else "Free"
-    
+
     return {
-        "title": payload.get("title") or payload.get("eventData", {}).get("title", "Untitled Event"),
+        "title": payload.get("title", "Untitled Event"),
         "description": payload.get("description", ""),
-        "eventCategory": payload.get("category") or payload.get("eventData", {}).get("category", "General"),
+        "eventCategory": payload.get("category", "General"),
         "tags": payload.get("tags", []),
-        
+
         "startAt": start_at,
         "endAt": end_at,
         "timezone": "Asia/Kolkata",
-        
+
         "locationName": location.get("venue", "Venue TBD"),
         "locationAddress": location.get("address", ""),
         "isOnline": location.get("isOnline", False),
-        
+
         "ticketType": ticket_type,
         "basePrice": 0.00,
-        "maxAttendees": ticketing.get("capacity", 0),
-        
+        "maxAttendees": ticketing.get("capacity"),
+
         "coverImageUrl": payload.get("bannerUrl", ""),
-        
+
         "policies": policies,
         "metadata": {
             "ageGroup": payload.get("ageGroup"),
@@ -148,9 +155,10 @@ def create_event(host_user_id: str, raw_payload: dict, status: str = "Draft") ->
 
     rds_result = rds.insert_record("events", **rds_payload)
     if not rds_result.get("success"):
+        error_msg = rds_result.get('error', 'Unknown RDS error')
         util.log("error", "event_services.create_event",
-                 f"RDS insert failed: {rds_result.get('error')}")
-        return {"success": False, "error": "Failed to create event."}
+                 f"RDS insert failed: {error_msg}")
+        return {"success": False, "error": f"Failed to create event: {error_msg}"}
 
     # ── Step 2: Insert ticket tiers (if provided) ──
     tiers = event_data.get("ticketTiers", [])

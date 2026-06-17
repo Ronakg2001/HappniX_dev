@@ -6,11 +6,15 @@ import {
   ShieldAlert,
   ArrowLeft,
   PenTool,
-  Eye
+  Eye,
+  Loader2,
+  AlertTriangle,
+  X
 } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { validateStep1, validateStep2, validateStep3 } from "./validation";
 import { EventPreview, getPublishErrors } from "./EventPreview";
+import { apiClient, processEventMedia } from "@/lib/api";
 
 import { FormCoreDetails } from "./FormCoreDetails";
 import { FormPerksLineup } from "./FormPerksLineup";
@@ -39,7 +43,11 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
   // Form State
   const [form, setForm] = useState<Partial<CreatedEventType>>({ ...ev });
   const [hasTriedPublish, setHasTriedPublish] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  
+  // Publishing state
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -55,21 +63,33 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
   const publishErrors = useMemo(() => getPublishErrors(form), [form]);
   const isPublishable = publishErrors.length === 0;
 
-  // Save draft locally
-  const handleSaveDraft = () => {
+  // Save draft — persists locally and syncs to backend
+  const handleSaveDraft = async () => {
     setSaveStatus("saving");
+    setApiError(null);
     onUpdate(form);
-    setTimeout(() => {
+    
+    try {
+      const processedEvent = await processEventMedia({ ...ev, ...form } as CreatedEventType);
+      await apiClient.post("api/events", {
+        actionItem: "CreateEventDraft",
+        eventData: processedEvent
+      });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
-    }, 600);
+    } catch (err: any) {
+      console.error("Draft save API error:", err);
+      setSaveStatus("error");
+      setApiError(err?.message || "Failed to sync draft. Your data is saved locally.");
+      setTimeout(() => setSaveStatus("idle"), 4000);
+    }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     setHasTriedPublish(true);
+    setApiError(null);
     if (!isPublishable) {
       setViewMode("edit");
-      // Find the first tab with error and switch to it
       if (Object.keys(step1Errs).length > 0) {
         setActiveSubTab("event");
       } else if (Object.keys(step2Errs).length > 0) {
@@ -80,9 +100,28 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
       return;
     }
 
-    updateEventLiveState(ev.id, { registrationOpen: true, isPublic: true });
+    setIsPublishing(true);
+    
+    // Save locally first (data is always safe)
     onUpdate({ ...form, status: "Upcoming" });
-    onPublish();
+    
+    try {
+      const processedEvent = await processEventMedia({ ...ev, ...form, status: "Upcoming" } as CreatedEventType);
+      await apiClient.post("api/events", {
+        actionItem: "PublishEvent",
+        eventData: processedEvent
+      });
+      
+      // Success — navigate away
+      updateEventLiveState(ev.id, { registrationOpen: true, isPublic: true });
+      setIsPublishing(false);
+      onPublish();
+    } catch (err: any) {
+      console.error("Publish API error:", err);
+      setIsPublishing(false);
+      setApiError(err?.message || "Failed to publish event. Your data is saved locally — please try again.");
+      // Stay on the form — data is intact
+    }
   };
 
   const handleBack = () => {
@@ -108,6 +147,29 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
   return (
     <div className="flex flex-col gap-6 min-w-0 w-full animate-in fade-in duration-300">
 
+      {/* API Error Banner */}
+      {apiError && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-950/50 border border-red-900/50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+          <p className="text-xs text-red-300 flex-1">{apiError}</p>
+          <button
+            onClick={() => setApiError(null)}
+            className="text-red-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Publishing Overlay */}
+      {isPublishing && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 animate-in fade-in duration-200">
+          <Loader2 className="h-10 w-10 text-[var(--brand-1)] animate-spin" />
+          <p className="text-sm font-bold text-white">Publishing your event...</p>
+          <p className="text-xs text-white/50">This may take a moment</p>
+        </div>
+      )}
+
       {/* Top Action Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10 w-full">
         {/* Left Side: Back & Title */}
@@ -115,6 +177,7 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
           <Button
             variant="ghost"
             onClick={handleBack}
+            disabled={isPublishing || saveStatus === "saving"}
             className="flex items-center gap-1 text-white/60 hover:text-white text-xs font-bold cursor-pointer transition-colors group px-2 py-1 h-auto shrink-0"
           >
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" /> Back
@@ -133,21 +196,30 @@ export function EventBuilder({ ev, onUpdate, onPublish }: EventBuilderProps) {
               type="button"
               variant="outline"
               onClick={handleSaveDraft}
-              className="flex-1 md:flex-none px-4 h-9 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={saveStatus === "saving" || isPublishing}
+              className={`flex-1 md:flex-none px-4 h-9 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                saveStatus === "error" ? "border-red-500/50 text-red-400" : ""
+              }`}
             >
               {saveStatus === "saving" && <span className="h-3 w-3 rounded-full border-2 border-white/20 border-t-white animate-spin" />}
               {saveStatus === "saved" && <Check className="h-3.5 w-3.5 text-green-400" />}
-              {saveStatus === "saved" ? "Draft Saved!" : saveStatus === "saving" ? "Saving..." : "Save Draft"}
+              {saveStatus === "error" && <AlertTriangle className="h-3.5 w-3.5 text-red-400" />}
+              {saveStatus === "saved" ? "Draft Saved!" : saveStatus === "saving" ? "Syncing..." : saveStatus === "error" ? "Sync Failed" : "Save Draft"}
             </Button>
 
             <div className="relative group flex-1 md:flex-none">
               <Button
                 variant="brand"
                 onClick={handlePublish}
+                disabled={isPublishing}
                 className={`w-full md:w-auto px-5 h-9 rounded-xl text-white text-xs font-black shadow-glow transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer ${!isPublishable && "opacity-50 hover:opacity-60"
                   }`}
               >
-                Publish Event
+                {isPublishing ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing...</>
+                ) : (
+                  "Publish Event"
+                )}
               </Button>
               {hasTriedPublish && !isPublishable && (
                 <div ref={popupRef} className="absolute right-0 top-full mt-2 w-64 p-3.5 rounded-md bg-[#1c0a0a] border border-red-900/50 text-[10px] text-red-300 shadow-2xl z-50 pointer-events-auto animate-in fade-in slide-in-from-top-1 select-text">
