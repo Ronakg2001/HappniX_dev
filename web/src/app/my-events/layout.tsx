@@ -81,6 +81,93 @@ export const initialBlankEvent = (id: string): CreatedEventType => ({
   },
 });
 
+/**
+ * Transform a flat backend RDS event row into the nested CreatedEventType
+ * shape that the frontend components expect.
+ */
+function transformBackendEvent(ev: any): CreatedEventType {
+  // If it already has the frontend shape (e.g. from localStorage), return as-is
+  if (ev.schedule && ev.location && ev.ticketing) {
+    return ev as CreatedEventType;
+  }
+
+  const metadata = typeof ev.metadata === "string" ? JSON.parse(ev.metadata || "{}") : (ev.metadata || {});
+  const policies = typeof ev.policies === "string" ? JSON.parse(ev.policies || "{}") : (ev.policies || {});
+
+  // Parse ISO datetime into date and time parts
+  const parseDateTime = (iso: string | null) => {
+    if (!iso) return { date: "", time: "" };
+    try {
+      const d = new Date(iso);
+      const date = d.toISOString().split("T")[0]; // YYYY-MM-DD
+      const time = d.toTimeString().slice(0, 5);   // HH:MM
+      return { date, time };
+    } catch {
+      return { date: "", time: "" };
+    }
+  };
+
+  const start = parseDateTime(ev.startAt);
+  const end = parseDateTime(ev.endAt);
+
+  // Map backend status to frontend status
+  const statusMap: Record<string, CreatedEventType["status"]> = {
+    "Draft": "Draft",
+    "Published": "Upcoming",
+    "SoldOut": "Live",
+    "Cancelled": "Archived",
+    "Completed": "Completed",
+    "Suspended": "Archived",
+  };
+
+  const tags = Array.isArray(ev.tags)
+    ? ev.tags
+    : (typeof ev.tags === "string" ? ev.tags.replace(/[{}]/g, "").split(",").filter(Boolean) : []);
+
+  return {
+    id: ev.eventID || ev.id,
+    status: statusMap[ev.status] || "Draft",
+    title: ev.title || "",
+    category: ev.eventCategory || ev.category || "General",
+    description: ev.description || "",
+    bannerUrl: ev.coverImageUrl || "",
+    ageGroup: metadata.ageGroup || "18+",
+    tags,
+    highlights: metadata.highlights || [],
+    highlightText: metadata.highlightText || "",
+    services: metadata.services || [],
+    dresscode: metadata.dresscode || { enabled: false, style: "" },
+    artists: metadata.artists || [],
+    schedule: {
+      startDate: start.date,
+      endDate: end.date,
+      startTime: start.time || "20:00",
+      endTime: end.time || "23:00",
+    },
+    location: {
+      venue: ev.locationName || "Venue TBD",
+      address: ev.locationAddress || "",
+      lat: ev.latitude ? parseFloat(ev.latitude) : null,
+      lng: ev.longitude ? parseFloat(ev.longitude) : null,
+    },
+    ticketing: {
+      mode: (ev.ticketType === "Paid" ? "paid" : "free") as "free" | "paid" | "guestlist",
+      capacity: ev.maxAttendees ? parseInt(ev.maxAttendees) : 100,
+      capacityFlex: false,
+      tiers: [
+        withTierDefaults({ id: "t1", name: "General Entry", price: parseFloat(ev.basePrice || "0"), inventory: ev.maxAttendees ? parseInt(ev.maxAttendees) : 100, sold: 0, paused: false }),
+      ],
+      promoCodes: [],
+      price: ev.ticketType === "Paid" ? `₹${ev.basePrice || "0"}` : "Free Entry",
+    },
+    policies: {
+      termsAndConditions: policies.termsAndConditions || "",
+      privacyPolicy: policies.privacyPolicy || "",
+      faqs: policies.faqs || [],
+    },
+  };
+}
+
 export default function MyEventsLayout({ children }: { children: React.ReactNode }) {
   const [createdEvents, setCreatedEvents] = useState<CreatedEventType[]>([]);
   const [eventLiveStates, setEventLiveStates] = useState<Record<string, EventLiveState>>({});
@@ -117,8 +204,17 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
       apiClient.get("api/events")
         .then((res: any) => {
           if (res.success && res.events && res.events.length > 0) {
-            setCreatedEvents(res.events);
-            localStorage.setItem("happnix_created_events_v4", JSON.stringify(res.events));
+            // Transform backend flat RDS rows into frontend CreatedEventType shape
+            const transformed = res.events.map((ev: any) => transformBackendEvent(ev));
+            
+            // Merge: backend events take priority, keep any local-only drafts
+            setCreatedEvents((prev) => {
+              const backendIds = new Set(transformed.map((e: CreatedEventType) => e.id));
+              const localOnly = prev.filter((e) => !backendIds.has(e.id) && e.id.startsWith("c_"));
+              const merged = [...transformed, ...localOnly];
+              localStorage.setItem("happnix_created_events_v4", JSON.stringify(merged));
+              return merged;
+            });
           }
         })
         .catch(err => console.error("Error fetching my events:", err));
