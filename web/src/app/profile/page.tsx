@@ -32,33 +32,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileStat } from "@/components/ui/profile-stat";
 import { MediaGridItem, type MediaItem } from "@/components/ui/media-grid-item";
 
-// ─── MOCK DATA ─────────────────────────────────────────────────
-
-const MOCK_FOLLOWERS = [
-  { id: "f1", name: "Sarah Connor", username: "sarahc", avatar: null, mutuals: 4 },
-  { id: "f2", name: "Aria Roy", username: "ariar", avatar: null, mutuals: 7 },
-  { id: "f3", name: "DJ Shadow", username: "shadowmix", avatar: null, mutuals: 12 },
-  { id: "f4", name: "Neha Kapoor", username: "nehak", avatar: null, mutuals: 2 },
-  { id: "f5", name: "Vikram Singh", username: "vikrams", avatar: null, mutuals: 9 },
-];
-
-const MOCK_FOLLOWING = [
-  { id: "g1", name: "Utopia Entertainment", username: "utopiaent", avatar: null, mutuals: 0 },
-  { id: "g2", name: "Rohan Gupta", username: "rohang", avatar: null, mutuals: 12 },
-  { id: "g3", name: "Ananya Sharma", username: "ananyas", avatar: null, mutuals: 5 },
-];
-
-const MOCK_MEDIA = [
-  { id: "m1", type: "photo" as const, gradient: "from-[var(--brand-1)]/40 to-[var(--brand-2)]/30", caption: "Chasing sunsets 🌅", likes: 42, comments: 8 },
-  { id: "m2", type: "video" as const, gradient: "from-[var(--brand-3)]/40 to-[var(--brand-2)]/30", caption: "Club Utopia was 🔥", likes: 87, comments: 23 },
-  { id: "m3", type: "event" as const, gradient: "from-[var(--brand-4)]/40 to-[var(--brand-1)]/20", caption: "VIP Pass — Neon Nights", likes: 31, comments: 5 },
-  { id: "m4", type: "photo" as const, gradient: "from-[var(--brand-2)]/40 to-[var(--brand-3)]/20", caption: "Rooftop vibes ✨", likes: 56, comments: 14 },
-  { id: "m5", type: "photo" as const, gradient: "from-[var(--brand-3)]/30 to-[var(--brand-4)]/30", caption: "Night out 🎵", likes: 29, comments: 6 },
-  { id: "m6", type: "video" as const, gradient: "from-[var(--brand-4)]/30 to-[var(--brand-1)]/30", caption: "Acoustic session", likes: 74, comments: 18 },
-  { id: "m7", type: "photo" as const, gradient: "from-[var(--brand-1)]/30 to-[var(--brand-4)]/20", caption: "Festival mode 🎪", likes: 61, comments: 11 },
-  { id: "m8", type: "event" as const, gradient: "from-[var(--brand-2)]/30 to-[var(--brand-3)]/30", caption: "Techno set ticket", likes: 19, comments: 3 },
-  { id: "m9", type: "photo" as const, gradient: "from-[var(--brand-3)]/40 to-[var(--brand-1)]/20", caption: "Sound & light 💫", likes: 94, comments: 31 },
-];
+import { MOCK_FOLLOWERS, MOCK_FOLLOWING, MOCK_MEDIA } from "@/constants/mockData";
 
 // ─── MAIN PROFILE PAGE ─────────────────────────────────────────
 export default function ProfilePage() {
@@ -154,12 +128,14 @@ export default function ProfilePage() {
                   2
                 </span>
               </Button>
-              <Link
-                href="/settings"
-                className="p-2 rounded-lg bg-black/40 backdrop-blur-md text-white hover:bg-black/60 transition-all"
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/settings")}
+                className="p-2 h-8 w-8 rounded-lg bg-black/40 backdrop-blur-md text-white hover:bg-black/60 transition-all"
               >
                 <Settings className="h-4 w-4" />
-              </Link>
+              </Button>
             </div>
           </div>
 

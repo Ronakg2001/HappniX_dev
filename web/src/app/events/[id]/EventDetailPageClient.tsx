@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
+import { Button } from "@/components/ui/button";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -28,145 +29,8 @@ import {
   X
 } from "lucide-react";
 
-interface EventDetail {
-  id: string;
-  organizer: string;
-  verifiedOrganizer: boolean;
-  title: string;
-  category: string;
-  musicGenre: string;
-  ageRestricted: boolean;
-  date: string;
-  time: string;
-  venue: string;
-  distance: string;
-  ticketsLeft: number;
-  trending: boolean;
-  price: string;
-  about: string;
-  lineup: { name: string; role: string; avatarBg: string }[];
-  friendsAttending: { name: string; avatarLetter: string; color: string }[];
-  banner: string;
-  lat: number;
-  lng: number;
-  gallery: string[];
-}
-
-const MOCK_EVENTS_DETAILS: Record<string, EventDetail> = {
-  e1: {
-    id: "e1",
-    organizer: "Utopia Entertainment",
-    verifiedOrganizer: true,
-    title: "Club Utopia DJ Set",
-    category: "Clubbing",
-    musicGenre: "Techno & House",
-    ageRestricted: true,
-    date: "Friday, May 29",
-    time: "9:00 PM - 3:00 AM",
-    venue: "Utopia Club, C-Scheme, Jaipur",
-    distance: "2.4 km away",
-    ticketsLeft: 14,
-    trending: true,
-    price: "₹999",
-    about: "Jaipur's premier underground techno night is back. Join us at Utopia for an unparalleled sensory trip featuring state-of-the-art visual mapping, absolute acoustic bliss, and a headline set by national mixmasters.",
-    lineup: [
-      { name: "DJ Shadow", role: "Headliner (Tech-House)", avatarBg: "from-[#FF4FD8] to-[#C96CFF]" },
-      { name: "Neon Ghost", role: "Supporting Act (Melodic)", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
-      { name: "Aarav Mehta", role: "Local Opener (Minimal)", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
-    ],
-    friendsAttending: [
-      { name: "Aria", avatarLetter: "A", color: "bg-pink-500" },
-      { name: "Rohan", avatarLetter: "R", color: "bg-blue-500" },
-      { name: "Sneha", avatarLetter: "S", color: "bg-purple-500" },
-      { name: "Kabir", avatarLetter: "K", color: "bg-amber-500" }
-    ],
-    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80",
-    lat: 26.9124,
-    lng: 75.8087,
-    gallery: [
-      "https://images.unsplash.com/photo-1545128485-c400e7702796?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1486591978090-58e619d37fe7?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?auto=format&fit=crop&w=600&q=80"
-    ]
-  },
-  e2: {
-    id: "e2",
-    organizer: "Unplugged Nights",
-    verifiedOrganizer: false,
-    title: "Rooftop Unplugged Gig",
-    category: "Acoustic Gig",
-    musicGenre: "Indie / Folk",
-    ageRestricted: false,
-    date: "Saturday, May 30",
-    time: "7:00 PM - 10:00 PM",
-    venue: "Cafe Sky, Malviya Nagar, Jaipur",
-    distance: "5.1 km away",
-    ticketsLeft: 35,
-    trending: false,
-    price: "₹499",
-    about: "An intimate evening under the stars featuring acoustic covers, soulful original sets, and cozy ambient dining. Unplug from the rush of the city and immerse in cozy vibes.",
-    lineup: [
-      { name: "Sneha Sen", role: "Acoustic Soloist", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
-      { name: "Kabir & The Strings", role: "Indie Duo Band", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
-    ],
-    friendsAttending: [
-      { name: "Sarah", avatarLetter: "S", color: "bg-emerald-500" },
-      { name: "Vikram", avatarLetter: "V", color: "bg-sky-500" }
-    ],
-    banner: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
-    lat: 26.8529,
-    lng: 75.8052,
-    gallery: [
-      "https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1493676304818-94cf0cb5ef1e?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1485872299829-967f05efe90a?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=600&q=80"
-    ]
-  },
-  sp1: {
-    id: "sp1",
-    organizer: "Happnix VIP Labs",
-    verifiedOrganizer: true,
-    title: "Forbidden Forest Warehouse Party",
-    category: "Private Party",
-    musicGenre: "Industrial Techno",
-    ageRestricted: true,
-    date: "Saturday, June 6",
-    time: "10:00 PM onwards",
-    venue: "Warehouse 12, Industrial Area, Jaipur",
-    distance: "9.2 km away",
-    ticketsLeft: 5,
-    trending: true,
-    price: "₹1,999",
-    about: "A warehouse rave in the outskirts of the pink city. Industrial vibes, heavy bass lines, and laser sweeps that go on until sunrise. Access code required for gate entry.",
-    lineup: [
-      { name: "DJ Phantom", role: "Special Guest (Berlin)", avatarBg: "from-[#FF4FD8] to-[#C96CFF]" },
-      { name: "Acid Eclipse", role: "Hardware Live Set", avatarBg: "from-[#72B7FF] to-[#C96CFF]" },
-      { name: "Circuit Breaker", role: "Dark Techno Opener", avatarBg: "from-[#FFB347] to-[#FF4FD8]" }
-    ],
-    friendsAttending: [
-      { name: "DJ Shadow", avatarLetter: "D", color: "bg-red-500" },
-      { name: "Aria", avatarLetter: "A", color: "bg-pink-500" },
-      { name: "Sarah", avatarLetter: "S", color: "bg-emerald-500" }
-    ],
-    banner: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1200&q=80",
-    lat: 26.8289,
-    lng: 75.8021,
-    gallery: [
-      "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1574096079513-d8259312b785?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1578946956088-940c3b502864?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80"
-    ]
-  }
-};
+import { EventDetail } from "@/types/event";
+import { MOCK_EVENTS_DETAILS } from "@/constants/mockData";
 
 export default function EventDetailPageClient({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -200,43 +64,48 @@ export default function EventDetailPageClient({ params }: { params: { id: string
 
       {/* Floating Action Header Bar */}
       <div className="flex items-center justify-between shrink-0">
-        <button
+        <Button
           onClick={() => router.back()}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white hover:scale-102 active:scale-98 transition-all duration-200 cursor-pointer"
+          variant="outline"
+          className="rounded-xl px-3.5 h-9 text-xs font-bold text-white/80 hover:scale-102 transition-all duration-200"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Feed
-        </button>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Feed
+        </Button>
 
         <div className="flex items-center gap-2">
-          <button 
+          <Button 
             onClick={() => setLiked(!liked)} 
-            className={`p-2.5 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer active:scale-95 ${
-              liked 
-                ? 'bg-red-500/20 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.25)]' 
-                : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+            variant={liked ? "destructive" : "outline"}
+            size="icon"
+            className={`rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 ${
+              liked ? 'shadow-[0_0_15px_rgba(239,68,68,0.25)]' : ''
             }`}
             title="Like event"
           >
-            <Heart className={`h-4 w-4 ${liked ? 'fill-red-500 animate-pulse' : ''}`} />
-          </button>
-          <button 
+            <Heart className={`h-4 w-4 ${liked ? 'fill-current animate-pulse' : 'text-white/60'}`} />
+          </Button>
+          <Button 
             onClick={() => setSaved(!saved)} 
-            className={`p-2.5 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer active:scale-95 ${
+            variant="outline"
+            size="icon"
+            className={`rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 ${
               saved 
                 ? 'bg-[var(--brand-2)]/20 border-[var(--brand-2)] text-[var(--brand-2)] shadow-glow' 
-                : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                : 'text-white/60'
             }`}
             title="Bookmark event"
           >
             <Bookmark className={`h-4 w-4 ${saved ? 'fill-[var(--brand-2)]' : ''}`} />
-          </button>
-          <button 
+          </Button>
+          <Button 
             onClick={handleShare}
-            className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:scale-105 cursor-pointer active:scale-95 transition-all duration-200"
+            variant="outline"
+            size="icon"
+            className="rounded-xl text-white/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
             title="Copy link to share"
           >
             <Share2 className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -281,16 +150,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
                     <ShieldCheck className="h-4 w-4 text-[var(--brand-3)]" />
                   )}
                 </div>
-                <button 
+                <Button 
                   onClick={() => setFollowed(!followed)}
-                  className={`ml-3 px-2 py-0.5 rounded-md text-[9px] font-bold border transition-all duration-200 cursor-pointer ${
-                    followed 
-                      ? "bg-white/10 border-white/20 text-white/60" 
-                      : "bg-brand-gradient text-white border-transparent shadow-glow hover:scale-102"
-                  }`}
+                  variant={followed ? "outline" : "brand"}
+                  size="xs"
+                  className="ml-3 px-2 text-[9px] font-bold"
                 >
                   {followed ? "Following" : "Follow"}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -300,12 +167,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
                 <span className="text-[8px] text-white/40 uppercase font-black tracking-widest leading-none">Starting from</span>
                 <span className="text-sm font-black text-white leading-tight mt-0.5">{event.price}</span>
               </div>
-              <button
+              <Button
                 onClick={() => openBooking(event.title, event.price)}
-                className="px-4 py-2 rounded-lg bg-brand-gradient text-white text-[11px] font-black shadow-glow hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
+                variant="brand"
+                size="sm"
+                className="px-4 rounded-lg text-[11px] font-black uppercase tracking-wider hover:scale-105 active:scale-95 transition-all duration-200"
               >
-                <Ticket className="h-3.5 w-3.5" /> Book Now
-              </button>
+                <Ticket className="h-3.5 w-3.5 mr-1" /> Book Now
+              </Button>
             </div>
           </div>
         </div>
@@ -500,12 +369,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
                     <h4 className="text-xs font-black text-white truncate">{event.venue}</h4>
                     <p className="text-[10px] text-white/40 truncate mt-0.5">{event.distance}</p>
                   </div>
-                  <button 
+                  <Button 
                     onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(event.venue)}`)}
-                    className="px-3 py-1.5 rounded-lg bg-brand-gradient text-white text-[10px] font-black uppercase tracking-wider shadow-glow hover:scale-102 cursor-pointer transition-all shrink-0"
+                    variant="brand"
+                    size="sm"
+                    className="px-3 text-[10px] font-black uppercase tracking-wider shrink-0"
                   >
                     Open maps
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -520,12 +391,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
           className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 cursor-zoom-out"
         >
           {/* Close button */}
-          <button 
+          <Button 
             onClick={() => setActivePhotoIndex(null)}
-            className="absolute top-6 right-6 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white cursor-pointer active:scale-95 transition-all"
+            variant="ghost"
+            size="icon"
+            className="absolute top-6 right-6 rounded-xl text-white/60 hover:text-white"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
 
           {/* Main Carousel Wrapper */}
           <div 
@@ -533,12 +406,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
             className="relative max-w-4xl w-full flex items-center justify-center gap-4 select-none cursor-default"
           >
             {/* Left Nav Arrow */}
-            <button 
+            <Button 
               onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : (event.gallery?.length || 1) - 1))}
-              className="p-3 rounded-full bg-white/5 hover:bg-white/10 text-white/80 hover:text-white cursor-pointer active:scale-95 transition-all shrink-0"
+              variant="outline"
+              size="icon"
+              className="rounded-full bg-white/5 border-white/10 text-white/80 hover:text-white shrink-0"
             >
               <ChevronLeft className="h-6 w-6" />
-            </button>
+            </Button>
 
             {/* Photo Container */}
             <div className="relative aspect-square sm:aspect-video w-full max-h-[70vh] rounded-2xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center">
@@ -551,12 +426,14 @@ export default function EventDetailPageClient({ params }: { params: { id: string
             </div>
 
             {/* Right Nav Arrow */}
-            <button 
+            <Button 
               onClick={() => setActivePhotoIndex((prev) => (prev !== null && prev < (event.gallery?.length || 1) - 1 ? prev + 1 : 0))}
-              className="p-3 rounded-full bg-white/5 hover:bg-white/10 text-white/80 hover:text-white cursor-pointer active:scale-95 transition-all shrink-0"
+              variant="outline"
+              size="icon"
+              className="rounded-full bg-white/5 border-white/10 text-white/80 hover:text-white shrink-0"
             >
               <ChevronRight className="h-6 w-6" />
-            </button>
+            </Button>
           </div>
 
           {/* Carousel footer stats indicator */}

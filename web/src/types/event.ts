@@ -74,3 +74,54 @@ export interface CreatedEventType {
     faqs: FAQType[];
   };
 }
+
+export interface EventDetail {
+  id: string;
+  organizer: string;
+  verifiedOrganizer: boolean;
+  title: string;
+  category: string;
+  musicGenre: string;
+  ageRestricted: boolean;
+  date: string;
+  time: string;
+  venue: string;
+  distance: string;
+  ticketsLeft: number;
+  trending: boolean;
+  price: string;
+  about: string;
+  lineup: { name: string; role: string; avatarBg: string }[];
+  friendsAttending: { name: string; avatarLetter: string; color: string }[];
+  banner: string;
+  lat: number;
+  lng: number;
+  gallery: string[];
+}
+export interface DiscoverItem {
+  id: string;
+  type: string;
+  title: string;
+  category: string;
+  genre: string;
+  image: string;
+  hype: string;
+  attending: string;
+  host: string;
+  verified: boolean;
+  price: string;
+  venue: string;
+}export interface CountryInfo {
+  name: string;
+  region_code: string;
+  dial_code: string;
+  mobile_number_pattern: string;
+  region_flag: string;
+}
+
+export interface EventMetaType {
+  banner: string;
+  venue: string;
+  locationLink: string;
+  instructions: string[];
+}

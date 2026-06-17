@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiClient } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { PrimaryBtn, GhostBtn } from "@/components/ui/button";
+import { PrimaryBtn, GhostBtn, Button } from "@/components/ui/button";
 
 export default function PasswordStep({ onSuccess, onBack }: { onSuccess: (result: Record<string, unknown>) => void; onBack: () => void }) {
   const [identifier, setIdentifier] = useState("");
@@ -44,9 +44,14 @@ export default function PasswordStep({ onSuccess, onBack }: { onSuccess: (result
       </Field>
       <a href="/forgot-password" className="text-[13px] text-[#72B7FF] hover:text-white transition -mt-2 self-start">Forgot password?</a>
       {showNewUser && (
-        <button type="button" onClick={onBack} className="text-[13px] text-[#FF4FD8] hover:underline -mt-2 self-start">
+        <Button
+          type="button"
+          onClick={onBack}
+          variant="link"
+          className="text-[13px] text-[#FF4FD8] hover:underline -mt-2 self-start p-0 h-auto font-normal"
+        >
           New here? Sign in with mobile number instead →
-        </button>
+        </Button>
       )}
       <PrimaryBtn type="submit" loading={loading}>Sign In →</PrimaryBtn>
       <GhostBtn type="button" onClick={onBack}>← Sign in with Mobile</GhostBtn>

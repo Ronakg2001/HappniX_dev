@@ -18,33 +18,8 @@ import {
   Share2
 } from "lucide-react";
 
-// Static mapping of known mock events to banners and locations to enrich visual design
-const EVENT_META: Record<string, { banner: string; venue: string; locationLink: string; instructions: string[] }> = {
-  "club utopia dj set": {
-    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80",
-    venue: "Utopia Club, C-Scheme, Jaipur",
-    locationLink: "https://maps.google.com/?q=Utopia+Club+C-Scheme+Jaipur",
-    instructions: ["Age limit: 18+ only. Valid ID required at entrance.", "Smart Casual attire. Club rules apply.", "Pass code is unique and active for 1 scan."]
-  },
-  "neon nights party": {
-    banner: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80",
-    venue: "Utopia Club, C-Scheme, Jaipur",
-    locationLink: "https://maps.google.com/?q=Utopia+Club+C-Scheme+Jaipur",
-    instructions: ["Age limit: 18+ only. Valid ID required at entrance.", "Smart Casual attire. Club rules apply.", "Pass code is unique and active for 1 scan."]
-  },
-  "rooftop unplugged gig": {
-    banner: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=600&q=80",
-    venue: "Cafe Sky, Malviya Nagar, Jaipur",
-    locationLink: "https://maps.google.com/?q=Cafe+Sky+Malviya+Nagar+Jaipur",
-    instructions: ["All ages welcome. Under 16 must be accompanied.", "Gate opens at 6:45 PM.", "Food and drinks menu available at venue."]
-  },
-  "forbidden forest warehouse party": {
-    banner: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
-    venue: "Warehouse 12, Industrial Area, Jaipur",
-    locationLink: "https://maps.google.com/?q=Warehouse+12+Industrial+Area+Jaipur",
-    instructions: ["Strictly 21+ event. Zero tolerance policy.", "Warehouses can get chilly - dress accordingly.", "Access code active until 1:00 AM."]
-  }
-};
+import { Button } from "@/components/ui/button";
+import { EVENT_META } from "@/constants/mockData";
 
 export default function MyBookingsPage() {
   const router = useRouter();
@@ -80,26 +55,28 @@ export default function MyBookingsPage() {
 
         {/* Tab Switcher */}
         <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 w-full sm:w-fit self-start sm:self-auto">
-          <button 
+          <Button 
             onClick={() => setActiveTab("upcoming")}
-            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
+            variant="ghost"
+            className={`flex-1 sm:flex-none px-4 py-1.5 h-auto rounded-lg text-xs font-black uppercase tracking-wider transition-all text-center ${
               activeTab === "upcoming" 
-                ? "bg-white/10 text-white text-shadow-glow" 
+                ? "bg-white/10 text-white text-shadow-glow hover:bg-white/10 hover:text-white" 
                 : "text-white/40 hover:text-white/70"
             }`}
           >
             Active Passes ({bookedTickets.length})
-          </button>
-          <button 
+          </Button>
+          <Button 
             onClick={() => setActiveTab("past")}
-            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
+            variant="ghost"
+            className={`flex-1 sm:flex-none px-4 py-1.5 h-auto rounded-lg text-xs font-black uppercase tracking-wider transition-all text-center ${
               activeTab === "past" 
-                ? "bg-white/10 text-white text-shadow-glow" 
+                ? "bg-white/10 text-white text-shadow-glow hover:bg-white/10 hover:text-white" 
                 : "text-white/40 hover:text-white/70"
             }`}
           >
             History (0)
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -118,12 +95,14 @@ export default function MyBookingsPage() {
               : "You haven't secured any gig or rave entries yet. Browse the home feed to find your next night-out experience."}
           </p>
           {activeTab === "upcoming" && (
-            <button 
+            <Button 
               onClick={() => router.push("/home")}
-              className="mt-5 px-5 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-102 cursor-pointer transition-all uppercase tracking-wider flex items-center gap-1.5"
+              variant="brand"
+              size="lg"
+              className="mt-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
             >
               <Compass className="h-4 w-4" /> Explore Events
-            </button>
+            </Button>
           )}
         </div>
       ) : (
@@ -227,12 +206,14 @@ export default function MyBookingsPage() {
               className="relative w-full max-w-[580px] rounded-[28px] border border-white/10 bg-gradient-to-b from-[#14141d] to-[#08080c] flex flex-col md:flex-row shadow-[0_0_60px_rgba(201,108,255,0.25)] overflow-hidden animate-in zoom-in-95 duration-300 cursor-default"
             >
               {/* Sleek Floating Close Button */}
-              <button 
+              <Button 
                 onClick={() => setSelectedTicket(null)}
-                className="absolute top-3.5 right-3.5 z-20 p-2 rounded-full bg-black/50 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 active:scale-90 transition-all cursor-pointer"
+                variant="ghost"
+                size="icon"
+                className="absolute top-3.5 right-3.5 z-20 h-8 w-8 rounded-full bg-black/50 hover:bg-white/10 text-white/60 hover:text-white border border-white/10"
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </Button>
 
               {/* Left Column: QR Code Stub */}
               <div className="w-full md:w-[220px] bg-white/[0.01] p-6 flex flex-col items-center justify-center border-b md:border-b-0 border-white/10 shrink-0 text-center relative">
@@ -334,15 +315,15 @@ export default function MyBookingsPage() {
                         </span>
                         <span className="font-bold text-white block mt-0.5 text-xs truncate max-w-[200px] md:max-w-[240px]">{meta.venue}</span>
                       </div>
-                      <a 
-                        href={meta.locationLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-black text-white uppercase tracking-wider flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                      <Button 
+                        onClick={() => window.open(meta.locationLink, "_blank")}
+                        variant="outline"
+                        size="sm"
+                        className="px-3 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0"
                       >
                         <span>Maps</span>
                         <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
+                      </Button>
                     </div>
                   </div>
 

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { STATIC_MEDIA_URL } from "@/lib/utils";
 import AuroraBackground from "@/components/landing/AuroraBackground";
+import { Button } from "@/components/ui/button";
 import MobileStep from "./components/MobileView";
 import OtpStep from "./components/OTPView";
 import PasswordStep from "./components/PasswordView";
@@ -101,10 +102,13 @@ export default function SignInPage() {
 
             {view === "mobile" && (
               <div className="mt-6 pt-5 border-t border-white/[0.06] text-center">
-                <button onClick={() => setView("password")}
-                  className="text-[13px] text-white/45 hover:text-[#72B7FF] transition duration-200">
+                <Button
+                  onClick={() => setView("password")}
+                  variant="link"
+                  className="text-[13px] text-white/45 hover:text-[#72B7FF] transition duration-200 p-0 h-auto font-normal"
+                >
                   Sign in with Username / Email instead →
-                </button>
+                </Button>
               </div>
             )}
           </div>
