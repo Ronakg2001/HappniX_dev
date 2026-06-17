@@ -369,7 +369,7 @@ Resources:
             Fn::Sub: HappniX-social-${EnvironmentName}
 
   # ─── Events (Single-Table: EVENT_CARD, FEED_POST, FEED_EVENT, CELEB, PREF_CLUSTER) ──
-  HappnixEventsTable:
+  HappnixEventsTableV2:
     Type: AWS::DynamoDB::Table
     Condition: HasEventsTable
     Properties:
@@ -542,7 +542,7 @@ Outputs:
     Condition: HasEventsTable
     Description: DynamoDB events table name.
     Value:
-      Ref: HappnixEventsTable
+      Ref: HappnixEventsTableV2
   SettingsTableName:
     Condition: HasSettingsTable
     Description: DynamoDB settings table name.
