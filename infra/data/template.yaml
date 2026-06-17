@@ -368,7 +368,7 @@ Resources:
           Value:
             Fn::Sub: HappniX-social-${EnvironmentName}
 
-  # ─── Events (live, upcoming, geo) ──────────────────────────────────
+  # ─── Events (Single-Table: EVENT_CARD, FEED_POST, FEED_EVENT, CELEB, PREF_CLUSTER) ──
   HappnixEventsTable:
     Type: AWS::DynamoDB::Table
     Condition: HasEventsTable
@@ -377,30 +377,40 @@ Resources:
         Fn::Sub: HappniX-events-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: cognitoSub
+        - AttributeName: PK
           AttributeType: S
-        - AttributeName: itemId
+        - AttributeName: SK
           AttributeType: S
-        - AttributeName: statusStartAt
+        - AttributeName: discoverShard
           AttributeType: S
-        - AttributeName: geohash
+        - AttributeName: engagementSortKey
+          AttributeType: S
+        - AttributeName: eventCategory
+          AttributeType: S
+        - AttributeName: startAt
           AttributeType: S
       KeySchema:
-        - AttributeName: cognitoSub
+        - AttributeName: PK
           KeyType: HASH
-        - AttributeName: itemId
+        - AttributeName: SK
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: status-startAt-index
+        # Sharded global algorithm feed (PK = DISCOVER#SHARD_0..9)
+        - IndexName: GSI-Discover
           KeySchema:
-            - AttributeName: statusStartAt
+            - AttributeName: discoverShard
               KeyType: HASH
+            - AttributeName: engagementSortKey
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
-        - IndexName: geohash-index
+        # Browse events by category, sorted by start date
+        - IndexName: GSI-Category
           KeySchema:
-            - AttributeName: geohash
+            - AttributeName: eventCategory
               KeyType: HASH
+            - AttributeName: startAt
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
       Tags:

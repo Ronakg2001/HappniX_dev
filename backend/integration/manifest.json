@@ -37,6 +37,32 @@
             }
           }
         }
+      },
+      "events": {
+        "env_var": "EVENTS_TABLE_NAME",
+        "keys": {
+          "pk": "PK",
+          "sk": "SK"
+        },
+        "entities": {
+          "EVENT_CARD": { "entityType": "EVENT_CARD" },
+          "FEED_POST": { "entityType": "FEED_POST" },
+          "FEED_EVENT": { "entityType": "FEED_EVENT" },
+          "CELEB": { "entityType": "CELEB" },
+          "PREFERENCE_CLUSTER": { "entityType": "PREFERENCE_CLUSTER" }
+        },
+        "gsis": {
+          "GSI-Discover": {
+            "pk": "discoverShard",
+            "sk": "engagementSortKey",
+            "shard_count": 10,
+            "shard_prefix": "DISCOVER#SHARD_"
+          },
+          "GSI-Category": {
+            "pk": "eventCategory",
+            "sk": "startAt"
+          }
+        }
       }
     }
   },
@@ -48,6 +74,74 @@
           "phoneNumber", "dateOfBirth", "gender", "region", "emailVerified", "status"
         ],
         "default_status": "Active"
+      },
+      "events": {
+        "pk": "eventID",
+        "columns": [
+          "eventID", "hostUserID", "eventUID", "title", "description",
+          "eventCategory", "tags", "startAt", "endAt", "startLabel", "timezone",
+          "locationName", "locationAddress", "latitude", "longitude",
+          "isOnline", "onlineLink", "ticketType", "basePrice", "currency",
+          "maxAttendees", "visibility", "status",
+          "coverImageUrl", "engagementScore", "metadata", "policies",
+          "createdAt", "updatedAt"
+        ],
+        "default_status": "Draft"
+      },
+      "follows": {
+        "pk": ["followerUserID", "followingUserID"],
+        "columns": ["followerUserID", "followingUserID", "createdAt"]
+      },
+      "posts": {
+        "pk": "postID",
+        "columns": [
+          "postID", "userID", "eventID", "postType", "mediaItems",
+          "caption", "likesCount", "commentsCount", "engagementScore",
+          "createdAt", "updatedAt"
+        ]
+      },
+      "user_interactions": {
+        "pk": "interactionID",
+        "columns": [
+          "interactionID", "userID", "entityID", "entityType",
+          "interactionType", "weight", "createdAt"
+        ]
+      },
+      "event_ticket_tiers": {
+        "pk": "tierID",
+        "columns": [
+          "tierID", "eventID", "name", "description", "price",
+          "capacity", "ticketsSold", "isActive", "createdAt", "updatedAt"
+        ]
+      },
+      "event_orders": {
+        "pk": "orderID",
+        "columns": [
+          "orderID", "orderNumber", "eventID", "buyerUserID",
+          "subtotal", "platformFee", "totalAmount",
+          "paymentStatus", "paymentTransactionID", "paymentMethod",
+          "createdAt", "updatedAt", "completedAt"
+        ],
+        "default_status": "Pending",
+        "on_delete_event": "RESTRICT"
+      },
+      "event_tickets": {
+        "pk": "ticketID",
+        "columns": [
+          "ticketID", "orderID", "eventID", "tierID", "attendeeUserID",
+          "attendeeName", "attendeeEmail", "claimToken", "claimedAt",
+          "status", "ticketQrPayload", "checkedInAt", "createdAt", "updatedAt"
+        ],
+        "default_status": "Pending",
+        "on_delete_event": "RESTRICT"
+      },
+      "event_collaborators": {
+        "pk": "collaboratorID",
+        "columns": ["collaboratorID", "eventID", "userID", "role", "addedAt"]
+      },
+      "event_waitlist": {
+        "pk": "waitlistID",
+        "columns": ["waitlistID", "eventID", "userID", "tierID", "status", "joinedAt"]
       }
     }
   },

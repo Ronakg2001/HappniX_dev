@@ -6,14 +6,22 @@ from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import r2_bucket
+from services import event_services
 
 def get_my_events(**kwargs):
     """Fetches all events for a user."""
     try:
         username = kwargs.get("username")
+        user_id = kwargs.get("user_id")
         util.log("info", "get_my_events", f"Fetching events for {username}")
-        # Phase 1: Return empty list until DB is implemented
-        return success_response({"success": True, "events": []})
+
+        if not user_id:
+            return success_response({"success": True, "events": []})
+
+        result = event_services.get_my_events(host_user_id=user_id)
+        if result.get("success"):
+            return success_response({"success": True, "events": result.get("data", [])})
+        return error_response(result.get("error", "Failed to fetch events."), 500)
     except Exception as exc:
         util.log("error", "get_my_events", f"Error fetching events: {str(exc)}")
         return error_response(str(exc), 500)
@@ -22,16 +30,23 @@ def create_draft(**kwargs):
     """Handles saving an event draft."""
     try:
         username = kwargs.get("username")
-        
+        user_id = kwargs.get("user_id")
+
         event_data = kwargs.get("eventData", {})
         if not event_data:
             return error_response("Missing event data", 400)
-        
-        event_id = event_data.get("id")
-        title = event_data.get("title")
-        util.log("info", "create_draft", f"Draft saved for {event_id}", username=username, title=title)
-        
-        return success_response({"success": True, "message": "Draft saved successfully."})
+
+        event_data["status"] = "Draft"
+        result = event_services.create_event(host_user_id=user_id, event_data=event_data)
+
+        if result.get("success"):
+            return success_response({
+                "success": True,
+                "message": "Draft saved successfully.",
+                "eventID": result.get("eventID"),
+                "eventUID": result.get("eventUID"),
+            })
+        return error_response(result.get("error", "Failed to save draft."), 500)
     except Exception as exc:
         util.log("error", "create_draft", f"Error saving draft: {str(exc)}")
         return error_response(str(exc), 500)
@@ -40,15 +55,23 @@ def publish_event(**kwargs):
     """Handles publishing an event."""
     try:
         username = kwargs.get("username")
-        
+        user_id = kwargs.get("user_id")
+
         event_data = kwargs.get("eventData", {})
         if not event_data:
             return error_response("Missing event data", 400)
-            
-        event_id = event_data.get("id")
-        util.log("info", "publish_event", f"Event published {event_id}", username=username)
-        
-        return success_response({"success": True, "message": "Event published successfully."})
+
+        event_data["status"] = "Published"
+        result = event_services.create_event(host_user_id=user_id, event_data=event_data)
+
+        if result.get("success"):
+            return success_response({
+                "success": True,
+                "message": "Event published successfully.",
+                "eventID": result.get("eventID"),
+                "eventUID": result.get("eventUID"),
+            })
+        return error_response(result.get("error", "Failed to publish event."), 500)
     except Exception as exc:
         util.log("error", "publish_event", f"Error publishing event: {str(exc)}")
         return error_response(str(exc), 500)
@@ -161,8 +184,17 @@ def lambda_handler(event, context):
         if not handler:
             return error_response(f"Action '{action_item}' not implemented.", 501)
             
+        # Extract user_id from Cognito attributes for service calls
+        user_attrs = cognito_user.get("UserAttributes", [])
+        user_id = None
+        for attr in user_attrs:
+            if attr.get("Name") == "custom:userId":
+                user_id = attr.get("Value")
+                break
+
         payload["event"] = event
         payload["username"] = username
+        payload["user_id"] = user_id
         
         return handler(**payload)
         
