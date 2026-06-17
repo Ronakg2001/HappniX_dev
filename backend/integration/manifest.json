@@ -1,4 +1,10 @@
 {
+  "enums": {
+    "EventStatus": ["Draft", "Published", "SoldOut", "Cancelled", "Completed", "Suspended"],
+    "TicketType": ["Free", "Paid", "Donation", "Invite"],
+    "EventVisibility": ["Public", "Private", "Unlisted"],
+    "TicketStatus": ["Confirmed", "Pending", "Cancelled", "Refunded", "CheckedIn", "Expired"]
+  },
   "dynamodb": {
     "tables": {
       "users": {

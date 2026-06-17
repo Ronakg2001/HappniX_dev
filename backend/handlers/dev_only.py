@@ -290,6 +290,29 @@ def get_active_resources(**kwargs):
         "resources": resources
     })
 
+def init_database(**kwargs):
+    """DEV ONLY: Read and execute the event_schema.sql file on RDS."""
+    import os
+    schema_path = os.path.join(os.environ.get("LAMBDA_TASK_ROOT", ""), "schemas", "event_schema.sql")
+    
+    # Fallback for local execution
+    if not os.path.exists(schema_path):
+        schema_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas", "event_schema.sql")
+        
+    if not os.path.exists(schema_path):
+        return error_response(f"Schema file not found at {schema_path}", 404)
+        
+    try:
+        with open(schema_path, 'r') as f:
+            sql = f.read()
+            
+        result = rds.execute_raw_sql(sql)
+        if not result.get("success"):
+            return error_response(f"Failed to execute schema: {result.get('error')}", 500)
+            
+        return success_response({"success": True, "message": "Database schema successfully initialized!"})
+    except Exception as exc:
+        return error_response(f"Error initializing DB: {exc}", 500)
 
 def get_dev_rds_user(**kwargs):
     """Retrieve a selective user from RDS by username."""
@@ -402,6 +425,7 @@ ACTION_HANDLERS = {
     "GetDevRDSTable":    get_dev_rds_table,
     "GetDevDynamoTable": get_dev_dynamo_table,
     "GetActiveResources": get_active_resources,
+    "InitDatabase":      init_database,
 }
 
 

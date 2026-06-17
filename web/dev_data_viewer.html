@@ -71,6 +71,7 @@
             <h2>Infrastructure & Resources</h2>
             <p>Get a complete list of all provisioned RDS tables, DynamoDB tables, Cognito settings, and Storage buckets.</p>
             <button onclick="fetchResources()" style="background: #28a745;">Get Active Resources</button>
+            <button onclick="initDatabase()" style="background: #17a2b8; margin-left: 10px;">Init Database (Run event_schema.sql)</button>
         </div>
 
         <h2 style="margin-top: 30px;">Results</h2>
@@ -115,6 +116,12 @@
 
         function fetchResources() {
             fetchAPI('GetActiveResources', {});
+        }
+
+        function initDatabase() {
+            if (confirm("Are you sure you want to run event_schema.sql on the RDS database? This will create all the missing tables.")) {
+                fetchAPI('InitDatabase', {});
+            }
         }
 
         function wipeData() {

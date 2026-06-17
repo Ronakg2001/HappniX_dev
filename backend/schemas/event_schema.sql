@@ -4,36 +4,9 @@
 -- Prerequisites: The `users` table must already exist.
 -- ============================================================================
 
--- ─── Step 1: Enums ──────────────────────────────────────────────────────────
+-- ─── Step 1: Core Tables ──────────────────────────────────────────────────────
 
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'event_status_enum') THEN
-        CREATE TYPE event_status_enum AS ENUM ('Draft', 'Published', 'SoldOut', 'Cancelled', 'Completed', 'Suspended');
-    END IF;
-END $$;
-
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_type_enum') THEN
-        CREATE TYPE ticket_type_enum AS ENUM ('Free', 'Paid', 'Donation', 'Invite');
-    END IF;
-END $$;
-
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'event_visibility_enum') THEN
-        CREATE TYPE event_visibility_enum AS ENUM ('Public', 'Private', 'Unlisted');
-    END IF;
-END $$;
-
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_status_enum') THEN
-        CREATE TYPE ticket_status_enum AS ENUM ('Confirmed', 'Pending', 'Cancelled', 'Refunded', 'CheckedIn', 'Expired');
-    END IF;
-END $$;
-
-
--- ─── Step 2: Core Tables ────────────────────────────────────────────────────
-
--- 2a. Events
+-- 1a. Events
 CREATE TABLE IF NOT EXISTS events (
     "eventID"           UUID PRIMARY KEY,
     "hostUserID"        UUID NOT NULL REFERENCES users("userID") ON DELETE CASCADE,
@@ -56,13 +29,13 @@ CREATE TABLE IF NOT EXISTS events (
     "isOnline"          BOOLEAN NOT NULL DEFAULT FALSE,
     "onlineLink"        VARCHAR(500),
 
-    "ticketType"        ticket_type_enum NOT NULL DEFAULT 'Free',
+    "ticketType"        VARCHAR(50) NOT NULL DEFAULT 'Free',
     "basePrice"         DECIMAL(10, 2) DEFAULT 0.00,
     "currency"          VARCHAR(3) NOT NULL DEFAULT 'INR',
     "maxAttendees"      INTEGER,
 
-    "visibility"        event_visibility_enum NOT NULL DEFAULT 'Public',
-    "status"            event_status_enum NOT NULL DEFAULT 'Draft',
+    "visibility"        VARCHAR(50) NOT NULL DEFAULT 'Public',
+    "status"            VARCHAR(50) NOT NULL DEFAULT 'Draft',
     "coverImageUrl"     VARCHAR(500),
 
     "engagementScore"   DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
@@ -198,7 +171,7 @@ CREATE TABLE IF NOT EXISTS event_tickets (
     "claimToken"            VARCHAR(255) UNIQUE,
     "claimedAt"             TIMESTAMPTZ,
 
-    "status"                ticket_status_enum NOT NULL DEFAULT 'Pending',
+    "status"                VARCHAR(50) NOT NULL DEFAULT 'Pending',
     "ticketQrPayload"       TEXT,
     "checkedInAt"           TIMESTAMPTZ,
 

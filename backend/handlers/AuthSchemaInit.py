@@ -16,10 +16,10 @@ from integration import rds
 from utils import utilities as util
 
 
-_SCHEMA_SQL_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "..", "schemas", "happnix_auth_schema.sql"
-)
+_SCHEMAS = [
+    "happnix_auth_schema.sql",
+    "event_schema.sql"
+]
 
 
 def send_cfn_response(event, context, response_status, response_data, physical_resource_id=None, no_echo=False):
@@ -67,26 +67,29 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "Resource deletion ignored"}
 
     try:
-        sql_path = os.path.realpath(_SCHEMA_SQL_PATH)
-        with open(sql_path, "r", encoding="utf-8") as f:
-            sql = f.read()
-    except Exception as exc:
-        msg = f"Could not read schema SQL file: {exc}"
-        util.log("error", "AuthSchemaInit", msg)
-        send_cfn_response(event, context, "FAILED", {"Message": msg})
-        return {"statusCode": 500, "body": msg}
-
-    # Execute SQL
-    result = rds.execute_raw_sql(sql)
-
-    if result.get("success"):
-        msg = "Schema applied successfully."
+        schema_dir = os.path.join(os.path.dirname(__file__), "..", "schemas")
+        
+        for schema_file in _SCHEMAS:
+            sql_path = os.path.realpath(os.path.join(schema_dir, schema_file))
+            with open(sql_path, "r", encoding="utf-8") as f:
+                sql = f.read()
+                
+            # Execute SQL
+            result = rds.execute_raw_sql(sql)
+            if not result.get("success"):
+                error = result.get("error", "Unknown RDS error")
+                msg = f"Schema apply failed for {schema_file}: {error}"
+                util.log("error", "AuthSchemaInit", msg)
+                send_cfn_response(event, context, "FAILED", {"Message": msg})
+                return {"statusCode": 500, "body": msg}
+                
+        msg = "All schemas applied successfully."
         util.log("info", "AuthSchemaInit", msg)
         send_cfn_response(event, context, "SUCCESS", {"Message": msg})
         return {"statusCode": 200, "body": msg}
-    else:
-        error = result.get("error", "Unknown RDS error")
-        msg = f"Schema apply failed: {error}"
+        
+    except Exception as exc:
+        msg = f"Could not process schema files: {exc}"
         util.log("error", "AuthSchemaInit", msg)
         send_cfn_response(event, context, "FAILED", {"Message": msg})
         return {"statusCode": 500, "body": msg}
