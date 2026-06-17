@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HappniX Dev Data Viewer</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input, select, button { padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        pre { background: #282c34; color: #abb2bf; padding: 15px; border-radius: 5px; overflow-x: auto; max-height: 600px; }
+        .error { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HappniX Dev Data Viewer</h1>
+        <p>Use this tool to query data from RDS SQL tables and DynamoDB tables in the Dev environment.</p>
+
+        <div class="form-group">
+            <label>API Endpoint</label>
+            <input type="text" id="apiUrl" value="https://api-dev.happnix.com/api/dev_only" style="width: 100%; max-width: 400px;" placeholder="https://api-id.execute-api.region.amazonaws.com/Prod/api/dev_only">
+            <small style="display:block; margin-top:5px; color:#666;">Make sure this points to your deployed API Gateway /api/dev_only endpoint.</small>
+        </div>
+
+        <div class="grid">
+            <!-- RDS Section -->
+            <div>
+                <h2>RDS SQL Tables</h2>
+                <div class="form-group">
+                    <label>Select Table</label>
+                    <select id="rdsTable">
+                        <option value="users">users</option>
+                        <option value="events">events</option>
+                        <option value="event_ticket_tiers">event_ticket_tiers</option>
+                        <option value="event_tickets">event_tickets</option>
+                        <option value="event_orders">event_orders</option>
+                        <option value="posts">posts</option>
+                        <option value="follows">follows</option>
+                        <option value="user_interactions">user_interactions</option>
+                        <option value="all">all (Wipes EVERYTHING)</option>
+                    </select>
+                </div>
+                <button onclick="fetchRDS()">Fetch RDS Table</button>
+                <button onclick="wipeData()" style="background: #dc3545; margin-left: 10px;">Wipe Data</button>
+            </div>
+
+            <!-- DynamoDB Section -->
+            <div>
+                <h2>DynamoDB Tables</h2>
+                <div class="form-group">
+                    <label>Select Table Key (from manifest)</label>
+                    <select id="dynamoTable">
+                        <option value="users">users (Profiles/Settings)</option>
+                        <option value="events">events (Event Cards/Feeds)</option>
+                        <option value="sessions">sessions</option>
+                        <option value="otp">otp</option>
+                    </select>
+                </div>
+                <button onclick="fetchDynamo()">Fetch DynamoDB Table</button>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+            <h2>Infrastructure & Resources</h2>
+            <p>Get a complete list of all provisioned RDS tables, DynamoDB tables, Cognito settings, and Storage buckets.</p>
+            <button onclick="fetchResources()" style="background: #28a745;">Get Active Resources</button>
+        </div>
+
+        <h2 style="margin-top: 30px;">Results</h2>
+        <div id="loading" style="display:none;">Loading data...</div>
+        <pre id="output">Results will appear here...</pre>
+    </div>
+
+    <script>
+        async function fetchAPI(actionItem, payload) {
+            const url = document.getElementById('apiUrl').value;
+            const output = document.getElementById('output');
+            const loading = document.getElementById('loading');
+            
+            output.textContent = '';
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ actionItem, ...payload })
+                });
+                
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                output.innerHTML = `<span class="error">Error: ${err.message}</span>\n\nMake sure the API URL is correct and CORS is enabled if needed.`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function fetchRDS() {
+            const tableName = document.getElementById('rdsTable').value;
+            fetchAPI('GetDevRDSTable', { tableName });
+        }
+
+        function fetchDynamo() {
+            const tableKey = document.getElementById('dynamoTable').value;
+            fetchAPI('GetDevDynamoTable', { tableKey });
+        }
+
+        function fetchResources() {
+            fetchAPI('GetActiveResources', {});
+        }
+
+        function wipeData() {
+            const tableName = document.getElementById('rdsTable').value;
+            if (confirm(`Are you SURE you want to completely wipe all data from '${tableName}'? This cannot be undone.`)) {
+                fetchAPI('WipeAllData', { tableName });
+            }
+        }
+    </script>
+</body>
+</html>

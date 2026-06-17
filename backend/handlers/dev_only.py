@@ -112,48 +112,56 @@ def test_cognito_login(**kwargs):
         return error_response(f"Cognito error: {exc}", 500)
 
 
-def wipe_all_users(**kwargs):
+def wipe_all_data(**kwargs):
     """
-    Wipe all users from Cognito and RDS. DEV/QA only.
+    Wipe all data from a specific RDS table. If tableName is 'users' or 'all',
+    also wipes Cognito users. DEV/QA only.
     """
-    # 1. Wipe Cognito Users
-    cognito_deleted = 0
-    if cognito._client and cognito.POOL_ID:
-        try:
-            paginator = cognito._client.get_paginator('list_users')
-            for page in paginator.paginate(UserPoolId=cognito.POOL_ID):
-                for user in page.get('Users', []):
-                    cognito._client.admin_delete_user(
-                        UserPoolId=cognito.POOL_ID,
-                        Username=user['Username']
-                    )
-                    cognito_deleted += 1
-        except Exception as exc:
-            util.log("error", "dev_only.wipe_all_users", f"Cognito wipe failed: {exc}")
-            return error_response("Failed to wipe Cognito users. Check logs.", 500)
+    table_name = str(kwargs.get("tableName", "")).strip()
+    if not table_name:
+        return error_response("tableName is required.", 400)
+        
+    messages = []
     
-    # 2. Wipe RDS Users
-    rds_result = rds.execute_raw_sql("DELETE FROM users;")
-    if not rds_result.get("success"):
-        util.log("error", "dev_only.wipe_all_users", f"RDS wipe failed: {rds_result.get('error')}")
-        return error_response("Failed to wipe RDS users. Check logs.", 500)
+    if table_name in ["users", "all"]:
+        # 1. Wipe Cognito Users
+        cognito_deleted = 0
+        if cognito._client and cognito.POOL_ID:
+            try:
+                paginator = cognito._client.get_paginator('list_users')
+                for page in paginator.paginate(UserPoolId=cognito.POOL_ID):
+                    for user in page.get('Users', []):
+                        cognito._client.admin_delete_user(
+                            UserPoolId=cognito.POOL_ID,
+                            Username=user['Username']
+                        )
+                        cognito_deleted += 1
+                messages.append(f"Wiped {cognito_deleted} user(s) from Cognito.")
+            except Exception as exc:
+                util.log("error", "dev_only.wipe_all_data", f"Cognito wipe failed: {exc}")
+                return error_response(f"Failed to wipe Cognito users: {exc}", 500)
+
+    # 2. Wipe RDS
+    if table_name == "all":
+        # Truncate all tables in public schema cascading foreign keys
+        sql = "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END $$;"
+        rds_result = rds.execute_raw_sql(sql)
+        if not rds_result.get("success"):
+            util.log("error", "dev_only.wipe_all_data", f"RDS wipe failed: {rds_result.get('error')}")
+            return error_response("Failed to wipe all RDS tables. Check logs.", 500)
+        messages.append("Cleared ALL RDS tables.")
+    else:
+        # Wipe specific table
+        sql = f'TRUNCATE TABLE "{table_name}" CASCADE;'
+        rds_result = rds.execute_raw_sql(sql)
+        if not rds_result.get("success"):
+            util.log("error", "dev_only.wipe_all_data", f"RDS wipe failed: {rds_result.get('error')}")
+            return error_response(f"Failed to wipe RDS table {table_name}. Check logs.", 500)
+        messages.append(f"Cleared RDS table '{table_name}'.")
 
     return success_response({
         "success": True,
-        "message": f"Successfully wiped {cognito_deleted} user(s) from Cognito and cleared RDS user tables."
-    })
-
-
-def wipe_dev_rds_users(**kwargs):
-    """Wipe only the RDS users (leaves Cognito intact)."""
-    rds_result = rds.execute_raw_sql("DELETE FROM users;")
-    if not rds_result.get("success"):
-        util.log("error", "dev_only.wipe_dev_rds_users", f"RDS wipe failed: {rds_result.get('error')}")
-        return error_response("Failed to wipe RDS users. Check logs.", 500)
-    
-    return success_response({
-        "success": True,
-        "message": "Successfully cleared RDS user tables."
+        "message": " ".join(messages)
     })
 
 
@@ -178,6 +186,109 @@ def get_dev_all_users(**kwargs):
         return error_response(f"Failed to fetch users: {exc}", 500)
     finally:
         conn.close()
+
+
+def get_dev_rds_table(**kwargs):
+    """Retrieve all rows from an arbitrary RDS table (dev/qa only)."""
+    table_name = str(kwargs.get("tableName", "")).strip()
+    if not table_name:
+        return error_response("tableName is required.", 400)
+        
+    import psycopg2.extras
+    conn = rds.get_connection()
+    if not conn:
+        return error_response("Database connection failed.", 500)
+        
+    try:
+        # NOTE: This is safe only because this endpoint is hard-blocked in prod
+        # and table_name comes from trusted dev invocation.
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT * FROM {table_name} LIMIT 100;")
+            rows = cur.fetchall()
+            data = [{k: str(v) if v is not None else None for k, v in row.items()} for row in rows]
+            
+        return success_response({
+            "success": True,
+            "tableName": table_name,
+            "data": data
+        })
+    except Exception as exc:
+        return error_response(f"Failed to fetch table {table_name}: {exc}", 500)
+    finally:
+        conn.close()
+
+def get_dev_dynamo_table(**kwargs):
+    """Scan and retrieve items from a DynamoDB table (dev/qa only)."""
+    table_key = str(kwargs.get("tableKey", "")).strip()
+    if not table_key:
+        return error_response("tableKey is required.", 400)
+        
+    table = dynamo_db._get_table(table_key)
+    if not table:
+        return error_response(f"DynamoDB table for key '{table_key}' not found.", 404)
+        
+    try:
+        response = table.scan(Limit=100)
+        items = response.get("Items", [])
+        return success_response({
+            "success": True,
+            "tableKey": table_key,
+            "data": items
+        })
+    except Exception as exc:
+        return error_response(f"Failed to scan DynamoDB table: {exc}", 500)
+
+
+def get_active_resources(**kwargs):
+    """Retrieve a list of all active resources in the current environment."""
+    resources = {
+        "rds_tables": [],
+        "dynamo_tables": [],
+        "cognito": {},
+        "storage": {}
+    }
+
+    # 1. RDS Tables
+    conn = rds.get_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public';")
+                tables = [row[0] for row in cur.fetchall()]
+                resources["rds_tables"] = tables
+        except Exception as exc:
+            resources["rds_tables_error"] = str(exc)
+        finally:
+            conn.close()
+
+    # 2. DynamoDB Tables
+    try:
+        import boto3
+        dynamo_client = boto3.client("dynamodb")
+        response = dynamo_client.list_tables()
+        resources["dynamo_tables"] = response.get("TableNames", [])
+    except Exception as exc:
+        resources["dynamo_tables_error"] = str(exc)
+
+    # 3. Cognito
+    resources["cognito"] = {
+        "pool_id": cognito.POOL_ID,
+        "client_id": cognito.CLIENT_ID,
+        "pool_reachable": cognito.describe_pool() is not None
+    }
+
+    # 4. Storage (R2/S3)
+    import os
+    resources["storage"] = {
+        "bucket_name": os.environ.get("R2_BUCKET_NAME", ""),
+        "public_domain": os.environ.get("R2_PUBLIC_DOMAIN", "")
+    }
+
+    return success_response({
+        "success": True,
+        "environment": util.app_env(),
+        "resources": resources
+    })
 
 
 def get_dev_rds_user(**kwargs):
@@ -283,12 +394,14 @@ def test_db_connection(**kwargs):
 ACTION_HANDLERS = {
     "GetAuthConfig":     get_auth_config,
     "TestCognitoLogin":  test_cognito_login,
-    "WipeAllUsers":      wipe_all_users,
-    "WipeDevRDSUsers":   wipe_dev_rds_users,
+    "WipeAllData":       wipe_all_data,
     "GetDevAllUsers":    get_dev_all_users,
     "GetDevRDSUser":     get_dev_rds_user,
     "TestDBConnection":  test_db_connection,
     "DeleteAccount":     delete_account,
+    "GetDevRDSTable":    get_dev_rds_table,
+    "GetDevDynamoTable": get_dev_dynamo_table,
+    "GetActiveResources": get_active_resources,
 }
 
 
