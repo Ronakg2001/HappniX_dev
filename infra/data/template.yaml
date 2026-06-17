@@ -374,7 +374,7 @@ Resources:
     Condition: HasEventsTable
     Properties:
       TableName:
-        Fn::Sub: HappniX-events-${EnvironmentName}
+        Fn::Sub: HappniX-events-v2-${EnvironmentName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -416,7 +416,7 @@ Resources:
       Tags:
         - Key: Name
           Value:
-            Fn::Sub: HappniX-events-${EnvironmentName}
+            Fn::Sub: HappniX-events-v2-${EnvironmentName}
 
   # ─── Settings (preferences, blocked, muted) ────────────────────────
   HappnixSettingsTable:
