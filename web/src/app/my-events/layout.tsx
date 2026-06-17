@@ -178,7 +178,16 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
     if (typeof window !== "undefined") {
       const savedCreated = localStorage.getItem("happnix_created_events_v4");
       if (savedCreated) {
-        setCreatedEvents(JSON.parse(savedCreated));
+        try {
+          const parsed = JSON.parse(savedCreated);
+          // Always run through transform to handle any stale flat backend data
+          const safe = parsed.map((ev: any) => transformBackendEvent(ev));
+          setCreatedEvents(safe);
+          localStorage.setItem("happnix_created_events_v4", JSON.stringify(safe));
+        } catch {
+          setCreatedEvents(MOCK_EVENTS);
+          localStorage.setItem("happnix_created_events_v4", JSON.stringify(MOCK_EVENTS));
+        }
       } else {
         setCreatedEvents(MOCK_EVENTS);
         localStorage.setItem("happnix_created_events_v4", JSON.stringify(MOCK_EVENTS));
