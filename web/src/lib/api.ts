@@ -19,7 +19,7 @@ apiClient.interceptors.request.use((config) => {
     if (preAuthToken) {
       config.headers["X-HappniX-PreAuth"] = preAuthToken;
     }
-    
+
     // Inject bearer token (JWT flow), except for auth endpoints
     const accessToken = localStorage.getItem("happnix_access_token");
     const isAuthEndpoint = config.url?.includes("/api/auth");
@@ -30,14 +30,14 @@ apiClient.interceptors.request.use((config) => {
         config.headers["Authorization"] = `Bearer ${accessToken}`;
       }
     }
-    
+
     // Clear storage on logout request
     if (config.data?.actionItem === "Logout") {
       localStorage.removeItem("happnix_pre_auth_token");
       localStorage.removeItem("happnix_access_token");
       localStorage.removeItem("happnix_refresh_token");
       localStorage.removeItem("happnix_session_id");
-      
+
       // If a logout call is made to the backend, prevent it from firing since backend auth is removed
       if (isAuthEndpoint || config.url?.includes("/api/home/logout")) {
         return Promise.reject(new axios.Cancel("Logout handled locally."));
@@ -109,7 +109,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem("happnix_pre_auth_token");
         localStorage.removeItem("happnix_refresh_token");
         localStorage.removeItem("happnix_session_id");
-        
+
         // Prevent infinite reload loops if already on auth pages
         if (!window.location.pathname.includes("/signin") && !window.location.pathname.includes("/signup")) {
           window.location.href = "/signin";
@@ -134,11 +134,11 @@ export const uploadMediaToR2 = async (file: File, eventId: string): Promise<stri
       contentType: file.type,
       eventId: eventId
     })) as any;
-    
+
     if (!res.success) return null;
-    
+
     const { uploadUrl, objectKey } = res;
-    
+
     // Upload directly to R2
     const uploadRes = await fetch(uploadUrl, {
       method: "PUT",
@@ -147,7 +147,7 @@ export const uploadMediaToR2 = async (file: File, eventId: string): Promise<stri
         "Content-Type": file.type
       }
     });
-    
+
     if (uploadRes.ok) {
       const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
       return `${publicBase}/${objectKey}`;
@@ -163,7 +163,7 @@ export const deleteMediaFromR2 = async (url: string): Promise<boolean> => {
   try {
     const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
     if (!url.startsWith(publicBase)) return false;
-    
+
     const objectKey = url.replace(`${publicBase}/`, "");
     const res = (await apiClient.post("api/events", {
       actionItem: "DeleteMedia",
@@ -178,7 +178,7 @@ export const deleteMediaFromR2 = async (url: string): Promise<boolean> => {
 
 export const processEventMedia = async (eventData: CreatedEventType): Promise<CreatedEventType> => {
   const processed = { ...eventData };
-  
+
   const base64ToFile = (base64: string, filename: string): File | null => {
     try {
       const arr = base64.split(',');
