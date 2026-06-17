@@ -32,12 +32,7 @@ def create_draft(**kwargs):
         username = kwargs.get("username")
         user_id = kwargs.get("user_id")
 
-        event_data = kwargs.get("eventData", {})
-        if not event_data:
-            return error_response("Missing event data", 400)
-
-        event_data["status"] = "Draft"
-        result = event_services.create_event(host_user_id=user_id, event_data=event_data)
+        result = event_services.create_event(host_user_id=user_id, raw_payload=kwargs, status="Draft")
 
         if result.get("success"):
             return success_response({
@@ -57,12 +52,7 @@ def publish_event(**kwargs):
         username = kwargs.get("username")
         user_id = kwargs.get("user_id")
 
-        event_data = kwargs.get("eventData", {})
-        if not event_data:
-            return error_response("Missing event data", 400)
-
-        event_data["status"] = "Published"
-        result = event_services.create_event(host_user_id=user_id, event_data=event_data)
+        result = event_services.create_event(host_user_id=user_id, raw_payload=kwargs, status="Published")
 
         if result.get("success"):
             return success_response({

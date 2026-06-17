@@ -47,15 +47,74 @@ def _build_event_card(event_data: dict) -> dict:
     }
 
 
-def create_event(host_user_id: str, event_data: dict) -> dict:
+def _format_event_payload(payload: dict) -> dict:
+    """Map the frontend JSON payload to the backend RDS schema fields."""
+    schedule = payload.get("schedule", {})
+    location = payload.get("location", {})
+    ticketing = payload.get("ticketing", {})
+    policies = payload.get("policies", {})
+    
+    # Parse dates to ISO 8601 (or fallback to current time if missing)
+    start_at = None
+    if schedule.get("startDate") and schedule.get("startTime"):
+        start_at = f"{schedule.get('startDate')}T{schedule.get('startTime')}:00+00:00"
+    else:
+        start_at = util.now_iso()
+            
+    end_at = None
+    if schedule.get("endDate") and schedule.get("endTime"):
+        end_at = f"{schedule.get('endDate')}T{schedule.get('endTime')}:00+00:00"
+            
+    # Parse ticket type
+    t_mode = str(ticketing.get("mode", "free")).lower()
+    ticket_type = "Paid" if t_mode == "paid" else "Free"
+    
+    return {
+        "title": payload.get("title") or payload.get("eventData", {}).get("title", "Untitled Event"),
+        "description": payload.get("description", ""),
+        "eventCategory": payload.get("category") or payload.get("eventData", {}).get("category", "General"),
+        "tags": payload.get("tags", []),
+        
+        "startAt": start_at,
+        "endAt": end_at,
+        "timezone": "Asia/Kolkata",
+        
+        "locationName": location.get("venue", "Venue TBD"),
+        "locationAddress": location.get("address", ""),
+        "isOnline": location.get("isOnline", False),
+        
+        "ticketType": ticket_type,
+        "basePrice": 0.00,
+        "maxAttendees": ticketing.get("capacity", 0),
+        
+        "coverImageUrl": payload.get("bannerUrl", ""),
+        
+        "policies": policies,
+        "metadata": {
+            "ageGroup": payload.get("ageGroup"),
+            "artists": payload.get("artists", []),
+            "dresscode": payload.get("dresscode", {}),
+            "highlightText": payload.get("highlightText", ""),
+            "highlights": payload.get("highlights", []),
+            "services": payload.get("services", [])
+        },
+        "ticketTiers": ticketing.get("tiers", [])
+    }
+
+
+def create_event(host_user_id: str, raw_payload: dict, status: str = "Draft") -> dict:
     """
     Create a new event:
-    1. INSERT into RDS `events` table
-    2. INSERT ticket tiers into RDS `event_ticket_tiers`
-    3. PUT EVENT_CARD into DynamoDB
+    1. Parse frontend raw payload into RDS format
+    2. INSERT into RDS `events` table
+    3. INSERT ticket tiers into RDS `event_ticket_tiers`
+    4. PUT EVENT_CARD into DynamoDB
     """
     event_id = str(uuid.uuid4())
     event_uid = _generate_event_uid()
+    
+    event_data = _format_event_payload(raw_payload)
+    event_data["status"] = status
 
     # ── Step 1: Insert into RDS ──
     rds_payload = {
