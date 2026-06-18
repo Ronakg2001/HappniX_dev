@@ -212,9 +212,11 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
       // Fetch fresh events from backend via GET request
       apiClient.get("api/events")
         .then((res: any) => {
-          if (res.success && res.events && res.events.length > 0) {
+          console.log("[HappniX] Backend events response:", res);
+          if (res?.success && Array.isArray(res?.events) && res.events.length > 0) {
             // Transform backend flat RDS rows into frontend CreatedEventType shape
             const transformed = res.events.map((ev: any) => transformBackendEvent(ev));
+            console.log("[HappniX] Transformed events:", transformed);
             
             // Merge: backend events take priority, keep any local-only drafts
             setCreatedEvents((prev) => {
@@ -224,9 +226,11 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
               localStorage.setItem("happnix_created_events_v4", JSON.stringify(merged));
               return merged;
             });
+          } else {
+            console.log("[HappniX] No backend events found. Response:", res);
           }
         })
-        .catch(err => console.error("Error fetching my events:", err));
+        .catch(err => console.error("[HappniX] Error fetching my events:", err));
     }
   }, []);
 
