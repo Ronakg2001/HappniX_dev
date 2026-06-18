@@ -92,8 +92,8 @@ function transformBackendEvent(ev: any): CreatedEventType {
   }
 
   // Safely parse JSON or Python-stringified dictionaries (from corrupted test data)
-  let metadata = {};
-  let policies = {};
+  let metadata: any = {};
+  let policies: any = {};
   try {
     if (typeof ev.metadata === "string") {
       // Very basic cleanup to try and salvage Python strings like "{'artists': []}"
