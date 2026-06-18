@@ -75,11 +75,13 @@ def media_upload_url(**kwargs):
         content_type = kwargs.get("contentType")
         event_id = kwargs.get("eventId")
         
-        if not all([file_name, content_type, event_id]):
-            return error_response("Missing fileName, contentType, or eventId", 400)
+        user_id = kwargs.get("user_id")
+        
+        if not all([file_name, content_type, event_id, user_id]):
+            return error_response("Missing fileName, contentType, eventId, or userId", 400)
             
-        # Robust folder structure: events/{username}/{eventId}/{fileName}
-        object_key = f"events/{username}/{event_id}/{file_name}"
+        # Follow strict manifest folder structure: private/{user_id}/vibe/events/{event_id}/...
+        object_key = f"private/{user_id}/vibe/events/{event_id}/{file_name}"
         
         # Note: calling integration layer using strictly **kwargs per guidelines
         url_res = r2_bucket.generate_presigned_url(**{

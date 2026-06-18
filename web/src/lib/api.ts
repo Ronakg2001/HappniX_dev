@@ -149,7 +149,7 @@ export const uploadMediaToR2 = async (file: File, eventId: string): Promise<stri
     });
 
     if (uploadRes.ok) {
-      const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
+      const publicBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
       return `${publicBase}/${objectKey}`;
     }
     return null;
@@ -161,7 +161,7 @@ export const uploadMediaToR2 = async (file: File, eventId: string): Promise<stri
 
 export const deleteMediaFromR2 = async (url: string): Promise<boolean> => {
   try {
-    const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "https://media.happnix.com";
+    const publicBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
     if (!url.startsWith(publicBase)) return false;
 
     const objectKey = url.replace(`${publicBase}/`, "");
