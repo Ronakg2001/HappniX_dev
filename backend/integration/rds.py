@@ -77,7 +77,7 @@ def get_record(table_name: str, **kwargs) -> dict:
             cur.execute(f'SELECT * FROM {table_name} WHERE {where_str} LIMIT 1;', tuple(values))
             row = cur.fetchone()
             if row:
-                data = {k: str(v) if v is not None else None for k, v in row.items()}
+                data = util.format_rds_row(row)
                 return {"success": True, "data": data}
             else:
                 return {"success": False, "error": "Record not found."}

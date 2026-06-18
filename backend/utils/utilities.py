@@ -157,3 +157,25 @@ def log(level: str, trace_id: str, message: str, **extra):
     if extra:
         payload["extra"] = extra
     print(json.dumps(payload, sort_keys=True))
+
+def format_rds_row(row: dict) -> dict:
+    """
+    Format a database row dictionary so it can be safely serialized to JSON.
+    - Datetimes/Dates are converted to ISO strings
+    - Nested dicts/lists (JSONB/Array columns) are kept as dicts/lists so `json.dumps`
+      in the response handler will serialize them into valid JSON objects, NOT Python strings.
+    - Other types are converted to strings to match legacy behavior.
+    """
+    from datetime import date, datetime
+    
+    formatted = {}
+    for k, v in row.items():
+        if v is None:
+            formatted[k] = None
+        elif isinstance(v, (dict, list)):
+            formatted[k] = v
+        elif isinstance(v, (datetime, date)):
+            formatted[k] = v.isoformat()
+        else:
+            formatted[k] = str(v)
+    return formatted

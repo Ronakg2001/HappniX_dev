@@ -91,8 +91,31 @@ function transformBackendEvent(ev: any): CreatedEventType {
     return ev as CreatedEventType;
   }
 
-  const metadata = typeof ev.metadata === "string" ? JSON.parse(ev.metadata || "{}") : (ev.metadata || {});
-  const policies = typeof ev.policies === "string" ? JSON.parse(ev.policies || "{}") : (ev.policies || {});
+  // Safely parse JSON or Python-stringified dictionaries (from corrupted test data)
+  let metadata = {};
+  let policies = {};
+  try {
+    if (typeof ev.metadata === "string") {
+      // Very basic cleanup to try and salvage Python strings like "{'artists': []}"
+      const cleaned = ev.metadata.replace(/'/g, '"').replace(/False/g, 'false').replace(/True/g, 'true');
+      metadata = JSON.parse(cleaned || "{}");
+    } else {
+      metadata = ev.metadata || {};
+    }
+  } catch (e) {
+    console.warn("[HappniX] Failed to parse metadata:", ev.metadata);
+  }
+
+  try {
+    if (typeof ev.policies === "string") {
+      const cleaned = ev.policies.replace(/'/g, '"').replace(/False/g, 'false').replace(/True/g, 'true');
+      policies = JSON.parse(cleaned || "{}");
+    } else {
+      policies = ev.policies || {};
+    }
+  } catch (e) {
+    console.warn("[HappniX] Failed to parse policies:", ev.policies);
+  }
 
   // Parse ISO datetime into date and time parts
   const parseDateTime = (iso: string | null) => {

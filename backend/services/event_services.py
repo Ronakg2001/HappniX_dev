@@ -227,7 +227,7 @@ def get_my_events(host_user_id: str) -> dict:
                 (host_user_id,)
             )
             rows = cur.fetchall()
-            events = [{k: str(v) if v is not None else None for k, v in row.items()} for row in rows]
+            events = [util.format_rds_row(row) for row in rows]
             return {"success": True, "data": events}
     except Exception as exc:
         util.log("error", "event_services.get_my_events", f"Failed: {exc}")
