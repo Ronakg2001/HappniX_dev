@@ -53,7 +53,7 @@ export default function HomePage() {
 
         {/* Sponsored/Featured Event Card (Render always at the top of feed) */}
         {activeTab !== "posts" && (activeTab !== "nearby" || mockSponsoredEvent.venue.toLowerCase().includes(currentLocation.toLowerCase())) && (
-          <div onClick={() => router.push(`/events/${mockSponsoredEvent.id}`)} className="cursor-pointer">
+          <div onClick={() => router.push(`/event?id=${mockSponsoredEvent.id}`)} className="cursor-pointer">
             <SponsoredEventCard
               event={mockSponsoredEvent}
               onBookNow={(e) => handleBookNow(mockSponsoredEvent.title, mockSponsoredEvent.price, e)}
@@ -79,7 +79,7 @@ export default function HomePage() {
             mockEvents
               .filter(event => activeTab !== "nearby" || event.venue.toLowerCase().includes(currentLocation.toLowerCase()))
               .map((event) => (
-                <div key={event.id} onClick={() => router.push(`/events/${event.id}`)} className="cursor-pointer">
+                <div key={event.id} onClick={() => router.push(`/event?id=${event.id}`)} className="cursor-pointer">
                   <EventCard
                     event={event}
                     onBookNow={(e) => handleBookNow(event.title, event.price, e)}

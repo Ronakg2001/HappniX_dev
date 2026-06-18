@@ -304,7 +304,7 @@ function DiscoverPageInner() {
                         aria-label={item.title}
                         onClick={() =>
                           item.type === "event"
-                            ? router.push(`/events/${item.id}`)
+                            ? router.push(`/event?id=${item.id}`)
                             : alert("Opening highlight clip...")
                         }
                         className="group relative flex flex-col rounded-sm overflow-hidden hover:-translate-y-1 cursor-pointer transition-all duration-300"
