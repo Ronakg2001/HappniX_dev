@@ -210,16 +210,18 @@ export function PostCard({ post }: { post: any }) {
   );
 }
 
-export function PersonCard({ person, actionLabel = 'Follow' }: { person: any; actionLabel?: string }) {
+export function PersonCard({ person, actionLabel = 'Follow', onPress }: { person: any; actionLabel?: string; onPress?: () => void }) {
   return (
-    <Glass style={styles.personCard}>
-      <Avatar name={person.name || person.username || 'User'} uri={person.profile_picture_url} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.postName} numberOfLines={1}>{person.name || person.full_name || person.username}</Text>
-        <Text style={styles.postMeta} numberOfLines={1}>@{person.username} - {person.mutuals ?? 0} mutuals</Text>
-      </View>
-      <GhostButton label={actionLabel} />
-    </Glass>
+    <TouchableOpacity activeOpacity={0.86} onPress={onPress}>
+      <Glass style={styles.personCard}>
+        <Avatar name={person.name || person.username || 'User'} uri={person.profile_picture_url} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.postName} numberOfLines={1}>{person.name || person.full_name || person.username}</Text>
+          <Text style={styles.postMeta} numberOfLines={1}>@{person.username} - {person.mutuals ?? 0} mutuals</Text>
+        </View>
+        <GhostButton label={actionLabel} onPress={onPress} />
+      </Glass>
+    </TouchableOpacity>
   );
 }
 

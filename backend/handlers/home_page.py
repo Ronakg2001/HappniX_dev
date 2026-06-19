@@ -92,12 +92,20 @@ def handle_user_search(event):
         
     users = search_res.get("data", [])
     
-    # We could fetch DynamoDB profiles here to append avatars, but RDS has profilePictureUrl
-    # and basic info. The discover screen just needs PersonCard details.
+    # Map to frontend expected format
+    formatted_users = []
+    for u in users:
+        formatted_users.append({
+            "id": u.get("userID"),
+            "username": u.get("userName"),
+            "name": u.get("fullName"),
+            "profile_picture_url": u.get("profilePictureUrl"),
+            "is_following": False # Can be enhanced later to check true follow status
+        })
     
     return success_response({
         "success": True,
-        "users": users
+        "users": formatted_users
     })
 
 def handle_public_profile(event, target_user_id):

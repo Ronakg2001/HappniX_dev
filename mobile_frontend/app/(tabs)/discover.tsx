@@ -72,7 +72,7 @@ export default function DiscoverScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {query.length >= 2 ? (
             users.length ? (
-              users.map((user) => <PersonCard key={user.id || user.sql_user_id || user.username} person={user} actionLabel={user.is_following ? 'Following' : 'View'} />)
+              users.map((user) => <PersonCard key={user.id || user.sql_user_id || user.username} person={user} actionLabel={user.is_following ? 'Following' : 'View'} onPress={() => router.push({ pathname: '/profile/[id]', params: { id: String(user.id || user.username) } })} />)
             ) : (
               <EmptyState title="No people found" body="Try a username, host name, or DJ alias." />
             )
