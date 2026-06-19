@@ -254,3 +254,57 @@ def update_record(table_name: str, pk_name: str, pk_value: str, updates: dict) -
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()
+
+def get_user_by_username(username: str) -> dict:
+    """Helper for legacy routines."""
+    return get_record("users", userName=username)
+
+def search_users_by_name(query: str, limit: int = 20) -> dict:
+    """
+    Search for users in RDS using an ILIKE query on userName and fullName.
+    Returns a list of dicts with basic user details.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+        
+    search_pattern = f"%{query}%"
+    sql = '''
+        SELECT "userID", "userName", "fullName", "profilePictureUrl", "privacyMode", "status"
+        FROM users
+        WHERE ("userName" ILIKE %s OR "fullName" ILIKE %s)
+          AND "status" = 'Active'
+        LIMIT %s;
+    '''
+    
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (search_pattern, search_pattern, limit))
+            rows = cur.fetchall()
+            data = [util.format_rds_row(r) for r in rows]
+            return {"success": True, "data": data}
+    except Exception as exc:
+        util.log("error", "rds.search_users_by_name", f"Search failed: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
+def check_if_following(follower_id: str, following_id: str) -> bool:
+    """
+    Check if a follower_id is following a following_id.
+    """
+    conn = get_connection()
+    if not conn:
+        return False
+        
+    sql = 'SELECT 1 FROM follows WHERE "followerUserID" = %s AND "followingUserID" = %s LIMIT 1;'
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (follower_id, following_id))
+            return cur.fetchone() is not None
+    except Exception as exc:
+        util.log("error", "rds.check_if_following", f"Failed to check follow status: {exc}")
+        return False
+    finally:
+        conn.close()

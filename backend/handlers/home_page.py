@@ -6,6 +6,7 @@ from utils.Response import success_response, error_response
 from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
+from integration import dynamo_db
 
 def handle_logout(event, body):
     """
@@ -73,6 +74,99 @@ def handle_home_feed(event):
         "feed": []
     })
 
+def handle_user_search(event):
+    """
+    Handle GET /api/users/search
+    Query parameters: q (string), limit (int)
+    """
+    query_params = event.get("queryStringParameters") or {}
+    query = query_params.get("q", "").strip()
+    limit = int(query_params.get("limit", 20))
+    
+    if len(query) < 2:
+        return success_response({"success": True, "users": []})
+        
+    search_res = rds.search_users_by_name(query, limit)
+    if not search_res.get("success"):
+        return error_response("Search failed.", 500)
+        
+    users = search_res.get("data", [])
+    
+    # We could fetch DynamoDB profiles here to append avatars, but RDS has profilePictureUrl
+    # and basic info. The discover screen just needs PersonCard details.
+    
+    return success_response({
+        "success": True,
+        "users": users
+    })
+
+def handle_public_profile(event, target_user_id):
+    """
+    Handle GET /api/users/{id}/profile
+    """
+    headers = event.get("headers", {})
+    auth_header = headers.get("Authorization") or headers.get("authorization", "")
+    current_user_id = None
+    
+    # Authenticate to see if they are logged in (so we can check follow status)
+    if auth_header.startswith("Bearer "):
+        access_token = auth_header.split(" ")[1]
+        cognito_user = cognito.get_user(access_token)
+        if cognito_user:
+            username = cognito_user.get("Username")
+            rds_result = rds.get_user_by_username(username)
+            if rds_result.get("success"):
+                current_user_id = rds_result.get("data", {}).get("userID")
+                
+    # 1. Fetch target user's RDS basic info
+    target_rds = rds.get_record("users", userID=target_user_id)
+    if not target_rds.get("success"):
+        return error_response("User not found.", 404)
+        
+    target_data = target_rds.get("data", {})
+    is_private = target_data.get("privacyMode", "public").lower() == "private"
+    
+    # 2. Check follow status if private
+    is_following = False
+    if current_user_id and current_user_id != target_user_id:
+        is_following = rds.check_if_following(current_user_id, target_user_id)
+        
+    # 3. Fetch full profile from DynamoDB
+    profile_data = {}
+    dynamo_res = dynamo_db.get_item(table_key="users", pk_value=target_user_id, sk_value="PROFILE")
+    if dynamo_res.get("success"):
+        profile_data = dynamo_res.get("data", {})
+        
+    # 4. Build response based on privacy
+    can_view_full = not is_private or is_following or (current_user_id == target_user_id)
+    
+    response_profile = {
+        "id": target_user_id,
+        "username": target_data.get("userName"),
+        "name": target_data.get("fullName"),
+        "avatar": profile_data.get("avatar") or target_data.get("profilePictureUrl"),
+        "isPrivate": is_private,
+        "isFollowing": is_following
+    }
+    
+    if can_view_full:
+        response_profile.update({
+            "bio": profile_data.get("bio"),
+            "followers": profile_data.get("followers", 0),
+            "following": profile_data.get("following", 0),
+            "vibes": profile_data.get("vibes", 0),
+            "verified": profile_data.get("verified", False),
+            "accountType": profile_data.get("accountType", "general")
+        })
+    else:
+        # Restricted view
+        response_profile["restricted"] = True
+        
+    return success_response({
+        "success": True,
+        "profile": response_profile
+    })
+
 def lambda_handler(event, context):
     try:
         http_method = event.get("httpMethod", "")
@@ -87,6 +181,14 @@ def lambda_handler(event, context):
         if http_method == "GET":
             if path.endswith("/feed"):
                 return handle_home_feed(event)
+            elif path.endswith("/search"):
+                return handle_user_search(event)
+            elif "/profile" in path and path.startswith("/api/users/"):
+                # Extract target user ID from /api/users/{id}/profile
+                parts = path.strip("/").split("/")
+                if len(parts) >= 4 and parts[3] == "profile":
+                    target_user_id = parts[2]
+                    return handle_public_profile(event, target_user_id)
             # Add future GET routes here (e.g. /live, /nearby)
             return error_response("GET endpoint not implemented.", 501)
             

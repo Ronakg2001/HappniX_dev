@@ -88,6 +88,17 @@ def _build_entity(table_key: str, entity_type: str, user_id: str, **kwargs) -> d
     
     return item
 
+def _clean_empty_strings(d):
+    """
+    Recursively remove empty strings from dictionaries, 
+    as DynamoDB's put_item rejects empty string values.
+    """
+    if isinstance(d, dict):
+        return {k: _clean_empty_strings(v) for k, v in d.items() if v != ""}
+    elif isinstance(d, list):
+        return [_clean_empty_strings(v) for v in d if v != ""]
+    return d
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # GENERIC DYNAMODB OPERATIONS
@@ -145,7 +156,8 @@ def put_item(table_key: str, pk_value: str, sk_value: str, entity_type: str = No
         item[sk_name] = sk_value
 
     try:
-        table.put_item(Item=item)
+        clean_item = _clean_empty_strings(item)
+        table.put_item(Item=clean_item)
         return {"success": True}
     except ClientError as exc:
         util.log("error", "dynamo_db.put_item",
@@ -174,7 +186,8 @@ def batch_write_items(table_key: str, items_config: list, **kwargs) -> dict:
                 else:
                     item = conf.get("item", {})
                 
-                batch.put_item(Item=item)
+                clean_item = _clean_empty_strings(item)
+                batch.put_item(Item=clean_item)
         return {"success": True}
     except ClientError as exc:
         util.log("error", "dynamo_db.batch_write_items",

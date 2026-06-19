@@ -22,9 +22,13 @@ def _build_event_card(event_data: dict) -> dict:
     Build the denormalized EVENT_CARD for DynamoDB from the full RDS event row.
     This is what appears in feeds and discovery.
     """
+    event_id = event_data.get("eventID", "")
+    score = float(event_data.get("engagementScore") or 0.0)
+    shard_index = int(hashlib.md5(event_id.encode()).hexdigest(), 16) % 10 if event_id else 0
+
     return {
         "entityType": "EVENT_CARD",
-        "eventID": event_data.get("eventID"),
+        "eventID": event_id,
         "eventUID": event_data.get("eventUID"),
         "hostUserID": event_data.get("hostUserID"),
         "title": event_data.get("title"),
@@ -40,7 +44,9 @@ def _build_event_card(event_data: dict) -> dict:
         "coverImageUrl": event_data.get("coverImageUrl"),
         "visibility": event_data.get("visibility", "Public"),
         "status": event_data.get("status", "Draft"),
-        "engagementScore": str(event_data.get("engagementScore", "0.00")),
+        "engagementScore": str(score),
+        "discoverShard": f"DISCOVER#SHARD_{shard_index}",
+        "engagementSortKey": f"{score:012.2f}#{util.now_iso()}",
         "ticketsSold": 0,
         "createdAt": util.now_iso(),
         "updatedAt": util.now_iso(),
