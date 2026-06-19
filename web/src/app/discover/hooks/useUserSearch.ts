@@ -67,7 +67,19 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
       if (controller.signal.aborted) return;
       try {
         const response = await userApi.search(debouncedQuery);
-        setAllResults(response.data?.users || []);
+        const mappedUsers: User[] = (response.data?.users || []).map((u: any) => ({
+          id: String(u.id),
+          name: u.name || "",
+          username: u.username || "",
+          avatar: u.profile_picture_url || null,
+          bio: u.bio || "",
+          verified: !!u.verified,
+          followers: u.follower_count || 0,
+          mutuals: 0,
+          isFollowing: !!u.is_following,
+          tags: []
+        }));
+        setAllResults(mappedUsers);
         setStatus("success");
       } catch {
         setError("Something went wrong. Please try again.");

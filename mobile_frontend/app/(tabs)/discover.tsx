@@ -49,7 +49,7 @@ export default function DiscoverScreen() {
   };
 
   useEffect(() => {
-    const handle = setTimeout(() => executeSearch(query), 2000);
+    const handle = setTimeout(() => executeSearch(query), 350);
     return () => clearTimeout(handle);
   }, [query]);
 

@@ -141,7 +141,7 @@ function DiscoverPageInner() {
         </div>
       </div>
 
-      {searchFocused ? (
+      {searchFocused && !searchQuery.trim() ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
 
           {/* Recent Searches */}
