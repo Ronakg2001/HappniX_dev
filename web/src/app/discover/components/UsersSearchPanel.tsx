@@ -45,8 +45,8 @@ export function UsersSearchPanel({ query }: UsersSearchPanelProps) {
     return () => observer.disconnect();
   }, [hasMore, status, loadMore]);
 
-  const handleNavigate = useCallback((username: string) => {
-      router.push(`/user?username=${username}`);
+  const handleNavigate = useCallback((id: string) => {
+      router.push(`/user?id=${id}`);
     }, [router]
   );
 

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileStat } from "@/components/ui/profile-stat";
 import { MOCK_USERS } from "@/constants/mockData";
 import { type User } from "@/types/user";
+import { userApi } from "@/lib/api";
 
 function ProfileSkeleton() {
   return (
@@ -52,7 +53,7 @@ function ProfileSkeleton() {
   );
 }
 
-function UserNotFound({ username }: { username: string }) {
+function UserNotFound({ id }: { id: string }) {
   const router = useRouter();
   return (
     <main className="flex-1 min-w-0 flex flex-col items-center justify-center text-center p-8 min-h-[60vh]">
@@ -63,7 +64,7 @@ function UserNotFound({ username }: { username: string }) {
         User not found
       </h2>
       <p className="text-[11px] text-white/40 max-w-xs leading-relaxed mb-5">
-        @{username} doesn&apos;t exist or may have changed their username.
+        User {id} doesn&apos;t exist or is unavailable.
       </p>
       <Button
         onClick={() => router.back()}
@@ -78,28 +79,65 @@ function UserNotFound({ username }: { username: string }) {
 }
 
 interface UserProfileClientProps {
-  username: string;
+  id: string;
 }
 
-export default function UserProfileClient({ username }: UserProfileClientProps) {
+export default function UserProfileClient({ id }: UserProfileClientProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
-    if (!username) return;
-    const timer = setTimeout(() => {
-      const found = MOCK_USERS.find((u) => u.username === username) ?? null;
-      setUser(found);
-      setIsFollowing(found?.isFollowing ?? false);
-      setLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [username]);
+    if (!id) return;
+    const fetchProfile = async () => {
+      try {
+        const response: any = await userApi.publicProfile(id);
+        if (response.profile && !response.profile.restricted) {
+          const p = response.profile;
+          setUser({
+            id: String(p.id),
+            name: p.name || "",
+            username: p.username || "",
+            avatar: p.avatar || null,
+            bio: p.bio || "",
+            verified: !!p.verified,
+            followers: p.followers || 0,
+            mutuals: 0,
+            isFollowing: !!p.isFollowing,
+            tags: []
+          });
+          setIsFollowing(!!p.isFollowing);
+        } else if (response.profile && response.profile.restricted) {
+          // If restricted, we might just show basic info
+          const p = response.profile;
+          setUser({
+            id: String(p.id),
+            name: p.name || "",
+            username: p.username || "",
+            avatar: p.avatar || null,
+            bio: "This profile is private.",
+            verified: false,
+            followers: 0,
+            mutuals: 0,
+            isFollowing: !!p.isFollowing,
+            tags: []
+          });
+          setIsFollowing(!!p.isFollowing);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [id]);
 
   if (loading) return <ProfileSkeleton />;
-  if (!user) return <UserNotFound username={username} />;
+  if (!user) return <UserNotFound id={id} />;
 
   return (
     <>

@@ -6,7 +6,7 @@ interface UserCardProps {
   user: Pick<User, "id" | "name" | "username" | "avatar" | "bio" | "verified" | "followers" | "mutuals">;
   isFollowing: boolean;
   onFollow: (id: string) => void;
-  onNavigate: (username: string) => void;
+  onNavigate: (id: string) => void;
 }
 
 function formatFollowers(n: number): string {
@@ -20,7 +20,7 @@ export function UserCard({ user, isFollowing, onFollow, onNavigate }: UserCardPr
       role="article"
       aria-label={`${user.name} profile`}
       className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-200 group cursor-pointer"
-      onClick={() => onNavigate(user.username)}
+      onClick={() => onNavigate(user.id)}
     >
       <div className="h-11 w-11 rounded-full bg-brand-gradient flex items-center justify-center font-black text-sm text-white shrink-0 border border-white/10 shadow-glow overflow-hidden">
         {user.avatar ? (
