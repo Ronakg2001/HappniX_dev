@@ -68,8 +68,15 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
       try {
         const response: any = await userApi.search(debouncedQuery);
         const mappedUsers: User[] = (response.users || []).map((u: any) => {
-          const baseUrl = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://happnix-dev-new.ronakgo1.workers.dev/";
-          const cleanAvatar = u.profile_picture_url && u.profile_picture_url !== baseUrl ? u.profile_picture_url : null;
+          let cleanAvatar = u.profile_picture_url || null;
+          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
+          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
+            cleanAvatar = null;
+          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
+            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
+          }
           return {
             id: String(u.id),
             name: u.name || "",

@@ -96,8 +96,15 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
         const response: any = await userApi.publicProfile(id);
         if (response.profile && !response.profile.restricted) {
           const p = response.profile;
-          const baseUrl = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://happnix-dev-new.ronakgo1.workers.dev/";
-          const cleanAvatar = p.avatar && p.avatar !== baseUrl ? p.avatar : null;
+          let cleanAvatar = p.avatar || null;
+          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
+          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
+            cleanAvatar = null;
+          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
+            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
+          }
           setUser({
             id: String(p.id),
             name: p.name || "",
@@ -113,8 +120,15 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           setIsFollowing(!!p.isFollowing);
         } else if (response.profile && response.profile.restricted) {
           const p = response.profile;
-          const baseUrl = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://happnix-dev-new.ronakgo1.workers.dev/";
-          const cleanAvatar = p.avatar && p.avatar !== baseUrl ? p.avatar : null;
+          let cleanAvatar = p.avatar || null;
+          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
+          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
+            cleanAvatar = null;
+          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
+            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
+          }
           setUser({
             id: String(p.id),
             name: p.name || "",
