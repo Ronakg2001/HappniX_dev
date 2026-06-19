@@ -24,7 +24,7 @@ def init_user_storage(user_id: str) -> dict:
     success = True
     
     for folder in folders_to_create:
-        res = r2_bucket.create_folder(folder)
+        res = r2_bucket.create_folder(folder_key=folder)
         results[folder] = res
         if not res.get("success"):
             success = False
