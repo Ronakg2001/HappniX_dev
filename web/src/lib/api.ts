@@ -37,6 +37,11 @@ apiClient.interceptors.request.use((config) => {
       localStorage.removeItem("happnix_access_token");
       localStorage.removeItem("happnix_refresh_token");
       localStorage.removeItem("happnix_session_id");
+      
+      // Clear event caches so data doesn't bleed between accounts
+      localStorage.removeItem("happnix_created_events_v4");
+      localStorage.removeItem("happnix_event_live_states_v4");
+      localStorage.removeItem("happnix_event_stats_v4");
 
       // If a logout call is made to the backend, prevent it from firing since backend auth is removed
       if (isAuthEndpoint || config.url?.includes("/api/home/logout")) {

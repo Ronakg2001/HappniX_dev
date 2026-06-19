@@ -73,7 +73,7 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
           if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
             cleanAvatar = null;
           } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "";
             const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
             cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
           }

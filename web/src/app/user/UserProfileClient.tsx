@@ -101,7 +101,7 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
             cleanAvatar = null;
           } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "";
             const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
             cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
           }
@@ -125,7 +125,7 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
             cleanAvatar = null;
           } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "";
+            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
             const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
             cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
           }
@@ -191,9 +191,9 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
             <div className="flex items-end justify-between -mt-10 sm:-mt-12 mb-3">
               <div className="relative z-10 h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background bg-brand-gradient flex items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-glow overflow-hidden">
                 {!imgError && user.avatar ? (
-                  <img 
-                    src={user.avatar} 
-                    alt={user.name} 
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
                     className="h-full w-full object-cover"
                     onError={() => setImgError(true)}
                   />
@@ -215,11 +215,10 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
                   onClick={() => setIsFollowing((f) => !f)}
                   aria-label={isFollowing ? `Unfollow ${user.name}` : `Follow ${user.name}`}
                   aria-pressed={isFollowing}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-2)] ${
-                    isFollowing
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-2)] ${isFollowing
                       ? "bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/[0.10]"
                       : "bg-brand-gradient text-white shadow-glow hover:scale-[1.03] active:scale-[0.97]"
-                  }`}
+                    }`}
                 >
                   {isFollowing ? (
                     <UserCheck className="h-3.5 w-3.5" />
@@ -258,8 +257,8 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {user.tags.map((tag) => (
                   <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/10 text-[10px] font-bold text-white/50 uppercase tracking-wider"
+                    key={tag}
+                    className="px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/10 text-[10px] font-bold text-white/50 uppercase tracking-wider"
                   >
                     #{tag}
                   </span>
