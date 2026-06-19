@@ -66,8 +66,8 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
     const timer = setTimeout(async () => {
       if (controller.signal.aborted) return;
       try {
-        const response = await userApi.search(debouncedQuery);
-        const mappedUsers: User[] = (response.data?.users || []).map((u: any) => ({
+        const response: any = await userApi.search(debouncedQuery);
+        const mappedUsers: User[] = (response.users || []).map((u: any) => ({
           id: String(u.id),
           name: u.name || "",
           username: u.username || "",
