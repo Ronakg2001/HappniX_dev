@@ -37,9 +37,12 @@ export default function DiscoverScreen() {
       }
       setLoading(true);
       try {
+        console.log(`[Discover] Searching for: ${query.trim()}`);
         const response = await userApi.search(query.trim());
+        console.log(`[Discover] Search success. Found:`, response.data?.users?.length);
         setUsers(response.data?.users || []);
-      } catch {
+      } catch (err: any) {
+        console.error(`[Discover] Search API failed:`, err.message || err);
         setUsers([]);
       } finally {
         setLoading(false);
