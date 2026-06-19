@@ -1,3 +1,4 @@
+import React from "react";
 import { ShieldCheck, UserCheck, UserPlus } from "lucide-react";
 import { type User } from "@/types/user";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ function formatFollowers(n: number): string {
 }
 
 export function UserCard({ user, isFollowing, onFollow, onNavigate }: UserCardProps) {
+  const [imgError, setImgError] = React.useState(false);
+
   return (
     <div
       role="article"
@@ -23,8 +26,13 @@ export function UserCard({ user, isFollowing, onFollow, onNavigate }: UserCardPr
       onClick={() => onNavigate(user.id)}
     >
       <div className="h-11 w-11 rounded-full bg-brand-gradient flex items-center justify-center font-black text-sm text-white shrink-0 border border-white/10 shadow-glow overflow-hidden">
-        {user.avatar ? (
-          <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+        {!imgError && user.avatar ? (
+          <img 
+            src={user.avatar} 
+            alt={user.name} 
+            className="h-full w-full object-cover"
+            onError={() => setImgError(true)}
+          />
         ) : (
           user.name[0].toUpperCase()
         )}

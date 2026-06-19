@@ -87,6 +87,7 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -175,8 +176,13 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           <div className="px-4 sm:px-5 pb-5">
             <div className="flex items-end justify-between -mt-10 sm:-mt-12 mb-3">
               <div className="relative z-10 h-20 w-20 sm:h-24 sm:w-24 rounded-full border-4 border-background bg-brand-gradient flex items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-glow overflow-hidden">
-                {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+                {!imgError && user.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt={user.name} 
+                    className="h-full w-full object-cover"
+                    onError={() => setImgError(true)}
+                  />
                 ) : (
                   user.name[0].toUpperCase()
                 )}
