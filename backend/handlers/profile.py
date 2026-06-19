@@ -115,7 +115,7 @@ def update_user_profile(**kwargs):
         avatar_key = manifest.get_avatar_key(user_id, timestamp)
         updates["avatar"] = avatar_key
         
-        url_res = r2_bucket.generate_presigned_url(avatar_key, content_type="image/jpeg")
+        url_res = r2_bucket.generate_presigned_url(object_key=avatar_key, content_type="image/jpeg")
         if url_res.get("success"):
             presigned_url = url_res.get("url")
         else:
