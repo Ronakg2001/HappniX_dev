@@ -29,25 +29,27 @@ export default function DiscoverScreen() {
     loadEvents();
   }, [loadEvents]);
 
+  const executeSearch = async (searchQuery: string) => {
+    if (searchQuery.trim().length < 2) {
+      setUsers([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      console.log(`[Discover] Searching for: ${searchQuery.trim()}`);
+      const response = await userApi.search(searchQuery.trim());
+      console.log(`[Discover] Search success. Found:`, response.data?.users?.length);
+      setUsers(response.data?.users || []);
+    } catch (err: any) {
+      console.error(`[Discover] Search API failed:`, err.message || err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const handle = setTimeout(async () => {
-      if (query.trim().length < 2) {
-        setUsers([]);
-        return;
-      }
-      setLoading(true);
-      try {
-        console.log(`[Discover] Searching for: ${query.trim()}`);
-        const response = await userApi.search(query.trim());
-        console.log(`[Discover] Search success. Found:`, response.data?.users?.length);
-        setUsers(response.data?.users || []);
-      } catch (err: any) {
-        console.error(`[Discover] Search API failed:`, err.message || err);
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
+    const handle = setTimeout(() => executeSearch(query), 2000);
     return () => clearTimeout(handle);
   }, [query]);
 
@@ -64,6 +66,8 @@ export default function DiscoverScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
+            onSubmitEditing={() => executeSearch(query)}
+            returnKeyType="search"
             placeholder="Search people, DJs, events..."
             placeholderTextColor={colors.faint}
             autoCapitalize="none"
