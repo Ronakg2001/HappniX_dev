@@ -221,3 +221,10 @@ export const processEventMedia = async (eventData: CreatedEventType): Promise<Cr
   return processed;
 };
 
+export const userApi = {
+  search: (query: string, limit = 20) => apiClient.get('/api/users/search', { params: { q: query, limit } }),
+  publicProfile: (userId: number | string) => apiClient.get(`/api/users/${userId}/profile`),
+  follow: (targetUserId: number | string) => apiClient.post('/api/users/follow', { target_user_id: targetUserId }),
+  unfollow: (targetUserId: number | string) => apiClient.post('/api/users/unfollow', { target_user_id: targetUserId }),
+};
+

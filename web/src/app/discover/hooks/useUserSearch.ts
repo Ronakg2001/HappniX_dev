@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MOCK_USERS } from "@/constants/mockData";
 import { type User } from "@/types/user";
 
+import { userApi } from "@/lib/api";
+
 const DEBOUNCE_MS = 350;
 const PAGE_SIZE = 6;
 
@@ -20,18 +22,6 @@ export interface UseUserSearchReturn {
   hasMore: boolean;
   loadMore: () => void;
   isLoadingMore: boolean;
-}
-
-function searchUsers(query: string): User[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return MOCK_USERS.filter(
-    (u) =>
-      u.name.toLowerCase().includes(q) ||
-      u.username.toLowerCase().includes(q) ||
-      u.bio.toLowerCase().includes(q) ||
-      u.tags.some((t) => t.includes(q))
-  );
 }
 
 export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
@@ -73,11 +63,11 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
     setVisibleCount(PAGE_SIZE);
 
     const controller = new AbortController();
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (controller.signal.aborted) return;
       try {
-        const found = searchUsers(debouncedQuery);
-        setAllResults(found);
+        const response = await userApi.search(debouncedQuery);
+        setAllResults(response.data?.users || []);
         setStatus("success");
       } catch {
         setError("Something went wrong. Please try again.");
