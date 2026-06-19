@@ -67,18 +67,21 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
       if (controller.signal.aborted) return;
       try {
         const response: any = await userApi.search(debouncedQuery);
-        const mappedUsers: User[] = (response.users || []).map((u: any) => ({
-          id: String(u.id),
-          name: u.name || "",
-          username: u.username || "",
-          avatar: u.profile_picture_url || null,
-          bio: u.bio || "",
-          verified: !!u.verified,
-          followers: u.follower_count || 0,
-          mutuals: 0,
-          isFollowing: !!u.is_following,
-          tags: []
-        }));
+        const mappedUsers: User[] = (response.users || []).map((u: any) => {
+          const cleanAvatar = u.profile_picture_url && u.profile_picture_url !== "https://happnix-dev-new.ronakgo1.workers.dev/" ? u.profile_picture_url : null;
+          return {
+            id: String(u.id),
+            name: u.name || "",
+            username: u.username || "",
+            avatar: cleanAvatar,
+            bio: u.bio || "",
+            verified: !!u.verified,
+            followers: u.follower_count || 0,
+            mutuals: 0,
+            isFollowing: !!u.is_following,
+            tags: []
+          };
+        });
         setAllResults(mappedUsers);
         setStatus("success");
       } catch {

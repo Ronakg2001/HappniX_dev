@@ -95,11 +95,12 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
         const response: any = await userApi.publicProfile(id);
         if (response.profile && !response.profile.restricted) {
           const p = response.profile;
+          const cleanAvatar = p.avatar && p.avatar !== "https://happnix-dev-new.ronakgo1.workers.dev/" ? p.avatar : null;
           setUser({
             id: String(p.id),
             name: p.name || "",
             username: p.username || "",
-            avatar: p.avatar || null,
+            avatar: cleanAvatar,
             bio: p.bio || "",
             verified: !!p.verified,
             followers: p.followers || 0,
@@ -109,13 +110,13 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           });
           setIsFollowing(!!p.isFollowing);
         } else if (response.profile && response.profile.restricted) {
-          // If restricted, we might just show basic info
           const p = response.profile;
+          const cleanAvatar = p.avatar && p.avatar !== "https://happnix-dev-new.ronakgo1.workers.dev/" ? p.avatar : null;
           setUser({
             id: String(p.id),
             name: p.name || "",
             username: p.username || "",
-            avatar: p.avatar || null,
+            avatar: cleanAvatar,
             bio: "This profile is private.",
             verified: false,
             followers: 0,
