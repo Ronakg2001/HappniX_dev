@@ -77,6 +77,12 @@ def update_user_profile(user_id: str, updates: dict) -> dict:
         rds_updates["gender"] = updates["gender"]
     if "username" in updates:
         rds_updates["userName"] = updates["username"]
+    if "avatar" in updates:
+        from utils import dependencies
+        pub_id = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET_PUBID")
+        if pub_id and not pub_id.endswith('/'):
+            pub_id += '/'
+        rds_updates["profilePictureUrl"] = f"{pub_id}{updates['avatar']}"
 
     if rds_updates:
         rds_res = rds.update_record("users", "userID", user_id, rds_updates)

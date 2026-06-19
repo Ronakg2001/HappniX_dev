@@ -71,6 +71,9 @@ Parameters:
   R2UserMediaBucketName:
     Type: String
     Default: ""
+  R2UserMediaBucketPubId:
+    Type: String
+    Default: ""
   R2StaticMediaBucketName:
     Type: String
     Default: ""
@@ -178,6 +181,8 @@ Globals:
           Ref: R2SecretAccessKey
         R2_USERMEDIA_BUCKET:
           Ref: R2UserMediaBucketName
+        NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID:
+          Ref: R2UserMediaBucketPubId
         R2_STATIC_MEDIA_BUCKET:
           Ref: R2StaticMediaBucketName
         R2_ENDPOINT:

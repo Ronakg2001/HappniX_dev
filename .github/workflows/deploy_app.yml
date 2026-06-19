@@ -67,6 +67,7 @@ jobs:
           ParameterKey=TestOtpMode,ParameterValue=true
           ParameterKey=AllowFixedTestOtp,ParameterValue=true
           ParameterKey=R2UserMediaBucketName,ParameterValue='${{ secrets.R2_USERMEDIA_BUCKET }}'
+          ParameterKey=R2UserMediaBucketPubId,ParameterValue='${{ vars.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID }}'
           ParameterKey=R2StaticMediaBucketName,ParameterValue='${{ secrets.R2_STATIC_MEDIA_BUCKET }}'
           ParameterKey=R2Endpoint,ParameterValue='${{ secrets.R2_ENDPOINT }}'
           ParameterKey=CloudflareAccountId,ParameterValue='${{ secrets.CLOUDFLARE_ACCOUNT_ID }}'
