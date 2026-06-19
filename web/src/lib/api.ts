@@ -233,3 +233,25 @@ export const userApi = {
   unfollow: (targetUserId: number | string) => apiClient.post('/api/users/unfollow', { target_user_id: targetUserId }),
 };
 
+export const fixAvatarUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  
+  const oldBase1 = "https://happnix-dev-new.ronakgo1.workers.dev/";
+  const oldBase2 = "https://happnix-dev-new.ronakgo1.workers.dev";
+  
+  if (url === oldBase1 || url === oldBase2) {
+    console.log("[Avatar Fixer] URL was literally just the dead base url, returning null.");
+    return null;
+  }
+  
+  if (url.includes("happnix-dev-new.ronakgo1.workers.dev")) {
+    const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
+    const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
+    const newUrl = url.replace(oldBase1, cleanNewBase).replace(oldBase2, cleanNewBase.slice(0, -1));
+    console.log(`[Avatar Fixer] Intercepted dead URL!\n  Old: ${url}\n  New: ${newUrl}`);
+    return newUrl;
+  }
+  
+  return url;
+};
+

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MOCK_USERS } from "@/constants/mockData";
 import { type User } from "@/types/user";
 
-import { userApi } from "@/lib/api";
+import { userApi, fixAvatarUrl } from "@/lib/api";
 
 const DEBOUNCE_MS = 350;
 const PAGE_SIZE = 6;
@@ -68,15 +68,7 @@ export function useUserSearch(initialQuery: string = ""): UseUserSearchReturn {
       try {
         const response: any = await userApi.search(debouncedQuery);
         const mappedUsers: User[] = (response.users || []).map((u: any) => {
-          let cleanAvatar = u.profile_picture_url || null;
-          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
-          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
-            cleanAvatar = null;
-          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "";
-            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
-            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
-          }
+          let cleanAvatar = fixAvatarUrl(u.profile_picture_url);
           return {
             id: String(u.id),
             name: u.name || "",

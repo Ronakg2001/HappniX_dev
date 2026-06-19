@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ProfileStat } from "@/components/ui/profile-stat";
 import { MOCK_USERS } from "@/constants/mockData";
 import { type User } from "@/types/user";
-import { userApi } from "@/lib/api";
+import { userApi, fixAvatarUrl } from "@/lib/api";
 
 function ProfileSkeleton() {
   return (
@@ -96,15 +96,7 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
         const response: any = await userApi.publicProfile(id);
         if (response.profile && !response.profile.restricted) {
           const p = response.profile;
-          let cleanAvatar = p.avatar || null;
-          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
-          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
-            cleanAvatar = null;
-          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || "";
-            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
-            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
-          }
+          let cleanAvatar = fixAvatarUrl(p.avatar);
           setUser({
             id: String(p.id),
             name: p.name || "",
@@ -120,15 +112,7 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           setIsFollowing(!!p.isFollowing);
         } else if (response.profile && response.profile.restricted) {
           const p = response.profile;
-          let cleanAvatar = p.avatar || null;
-          const oldBase = "https://happnix-dev-new.ronakgo1.workers.dev/";
-          if (cleanAvatar === oldBase || cleanAvatar === "https://happnix-dev-new.ronakgo1.workers.dev") {
-            cleanAvatar = null;
-          } else if (cleanAvatar && cleanAvatar.startsWith(oldBase)) {
-            const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
-            const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
-            cleanAvatar = cleanAvatar.replace(oldBase, cleanNewBase);
-          }
+          let cleanAvatar = fixAvatarUrl(p.avatar);
           setUser({
             id: String(p.id),
             name: p.name || "",
