@@ -77,7 +77,13 @@ def get_user_profile(**kwargs):
             profile_data["dob"] = kwargs.get("dob")
         if "gender" not in profile_data and kwargs.get("gender"):
             profile_data["gender"] = kwargs.get("gender")
-            
+        if profile_data.get("avatar"):
+            from utils import dependencies
+            pub_id = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET_PUBID")
+            if pub_id and not pub_id.endswith('/'):
+                pub_id += '/'
+            profile_data["avatar"] = f"{pub_id}{profile_data['avatar']}"
+
         return success_response({
             "success": True,
             "profile": profile_data,

@@ -93,13 +93,22 @@ def handle_user_search(event):
     users = search_res.get("data", [])
     
     # Map to frontend expected format
+    from utils import dependencies
+    pub_id = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET_PUBID")
+    if pub_id and not pub_id.endswith('/'):
+        pub_id += '/'
+        
     formatted_users = []
     for u in users:
+        avatar = u.get("profilePictureUrl")
+        if avatar and pub_id and not avatar.startswith("http"):
+            avatar = f"{pub_id}{avatar}"
+            
         formatted_users.append({
             "id": u.get("userID"),
             "username": u.get("userName"),
             "name": u.get("fullName"),
-            "profile_picture_url": u.get("profilePictureUrl"),
+            "profile_picture_url": avatar,
             "is_following": False # Can be enhanced later to check true follow status
         })
     
@@ -148,11 +157,20 @@ def handle_public_profile(event, target_user_id):
     # 4. Build response based on privacy
     can_view_full = not is_private or is_following or (current_user_id == target_user_id)
     
+    raw_avatar = profile_data.get("avatar") or target_data.get("profilePictureUrl")
+    if raw_avatar:
+        from utils import dependencies
+        pub_id = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET_PUBID")
+        if pub_id and not pub_id.endswith('/'):
+            pub_id += '/'
+        if pub_id and not raw_avatar.startswith("http"):
+            raw_avatar = f"{pub_id}{raw_avatar}"
+
     response_profile = {
         "id": target_user_id,
         "username": target_data.get("userName"),
         "name": target_data.get("fullName"),
-        "avatar": profile_data.get("avatar") or target_data.get("profilePictureUrl"),
+        "avatar": raw_avatar,
         "isPrivate": is_private,
         "isFollowing": is_following
     }
