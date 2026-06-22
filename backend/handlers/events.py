@@ -126,12 +126,34 @@ def delete_media(**kwargs):
         util.log("error", "delete_media", f"Error deleting media {kwargs.get('objectKey')}: {str(exc)}")
         return error_response(str(exc), 500)
 
+def delete_event(**kwargs):
+    """Handles deleting an event."""
+    try:
+        user_id = kwargs.get("user_id")
+        event_id = kwargs.get("eventID")
+        
+        if not event_id:
+            return error_response("Missing eventID", 400)
+            
+        result = event_services.delete_event(event_id, user_id)
+        
+        if result.get("success"):
+            return success_response({
+                "success": True,
+                "message": result.get("message")
+            })
+        return error_response(result.get("error", "Failed to delete event."), 500)
+    except Exception as exc:
+        util.log("error", "events.delete_event", f"Error deleting event: {str(exc)}")
+        return error_response(str(exc), 500)
+
 ACTION_HANDLERS = {
     "GetMyEvents": get_my_events,
     "CreateEventDraft": create_draft,
     "PublishEvent": publish_event,
     "GetMediaUploadUrl": media_upload_url,
     "DeleteMedia": delete_media,
+    "DeleteEvent": delete_event,
 }
 
 def lambda_handler(event, context):

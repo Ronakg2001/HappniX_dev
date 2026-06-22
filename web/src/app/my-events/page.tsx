@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 
 export default function MyEventsPage() {
   const router = useRouter();
-  const { createdEvents, duplicateCreatedEvent } = useMyEvents();
+  const { createdEvents, duplicateCreatedEvent, deleteCreatedEvent } = useMyEvents();
   const [filter, setFilter]           = useState<FilterType>("Live");
   const [search, setSearch]           = useState("");
 
@@ -126,6 +126,7 @@ export default function MyEventsPage() {
                 }
               }}
               onDuplicate={() => duplicateCreatedEvent(ev.id)}
+              onDelete={() => deleteCreatedEvent(ev.id)}
             />
           ))}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Calendar, MapPin, Clock, Copy, ChevronRight } from "lucide-react";
+import { Calendar, MapPin, Clock, Copy, ChevronRight, Trash2 } from "lucide-react";
 import { CreatedEventType } from "@/types/event";
 import { STATUS_CONFIG, fmtRev } from "./constants";
 import { useMyEvents } from "../layout";
@@ -11,10 +11,12 @@ export function EventCard({
   ev,
   onView,
   onDuplicate,
+  onDelete,
 }: {
   ev: CreatedEventType;
   onView: () => void;
   onDuplicate: () => void;
+  onDelete?: () => void;
 }) {
   const { eventStats } = useMyEvents();
   const cfg = STATUS_CONFIG[ev.status];
@@ -83,6 +85,21 @@ export function EventCard({
             )}
           </div>
           <div className="flex gap-1.5">
+            {onDelete && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm("Are you sure you want to delete this event?")) {
+                    onDelete();
+                  }
+                }}
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-all"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               onClick={onView}
               variant="outline"

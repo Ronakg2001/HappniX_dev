@@ -11,6 +11,7 @@ interface MyEventsContextType {
   eventLiveStates: Record<string, EventLiveState>;
   eventStats: Record<string, EventStats>;
   updateCreatedEvent: (id: string, patch: Partial<CreatedEventType>) => void;
+  deleteCreatedEvent: (id: string) => void;
   updateEventLiveState: (id: string, patch: Partial<EventLiveState>) => void;
   updateEventStats: (id: string, patch: Partial<EventStats>) => void;
   duplicateCreatedEvent: (id: string) => void;
@@ -133,7 +134,6 @@ function transformBackendEvent(ev: any): CreatedEventType {
   const start = parseDateTime(ev.startAt);
   const end = parseDateTime(ev.endAt);
 
-  // Map backend status to frontend status
   const statusMap: Record<string, CreatedEventType["status"]> = {
     "Draft": "Draft",
     "Published": "Upcoming",
@@ -143,13 +143,31 @@ function transformBackendEvent(ev: any): CreatedEventType {
     "Suspended": "Archived",
   };
 
+  let dynamicStatus = statusMap[ev.status] || "Draft";
+  
+  if (dynamicStatus === "Upcoming" || dynamicStatus === "Live" || dynamicStatus === "Completed") {
+    const now = new Date();
+    const startObj = ev.startAt ? new Date(ev.startAt) : null;
+    const endObj = ev.endAt ? new Date(ev.endAt) : null;
+    
+    if (startObj && endObj) {
+      if (now < startObj) {
+        dynamicStatus = "Upcoming";
+      } else if (now >= startObj && now <= endObj) {
+        dynamicStatus = "Live";
+      } else if (now > endObj) {
+        dynamicStatus = "Completed";
+      }
+    }
+  }
+
   const tags = Array.isArray(ev.tags)
     ? ev.tags
     : (typeof ev.tags === "string" ? ev.tags.replace(/[{}]/g, "").split(",").filter(Boolean) : []);
 
   return {
     id: ev.eventID || ev.id,
-    status: statusMap[ev.status] || "Draft",
+    status: dynamicStatus,
     title: ev.title || "",
     category: ev.eventCategory || ev.category || "General",
     description: ev.description || "",
@@ -280,12 +298,38 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
           apiClient.post("/api/events", {
             actionItem,
             eventData: processedEvent
-          }).catch(err => console.error("Event Sync Error:", err));
+          })
+          .then((res: any) => {
+            const backendEventId = res.data?.eventID || res.eventID;
+            if (backendEventId && id.startsWith("c_")) {
+              setCreatedEvents((curr) => {
+                const updatedCurr = curr.map(e => e.id === id ? { ...e, id: backendEventId } : e);
+                localStorage.setItem("happnix_created_events_v4", JSON.stringify(updatedCurr));
+                return updatedCurr;
+              });
+            }
+          })
+          .catch(err => console.error("Event Sync Error:", err));
         });
       }
       
       return updated;
     });
+  };
+
+  const deleteCreatedEvent = (id: string) => {
+    setCreatedEvents((prev) => {
+      const updated = prev.filter((ev) => ev.id !== id);
+      localStorage.setItem("happnix_created_events_v4", JSON.stringify(updated));
+      return updated;
+    });
+
+    if (!id.startsWith("c_")) {
+      apiClient.post("/api/events", {
+        actionItem: "DeleteEvent",
+        eventID: id
+      }).catch(err => console.error("Event Delete Error:", err));
+    }
   };
 
   const updateEventLiveState = (id: string, patch: Partial<EventLiveState>) => {
@@ -391,6 +435,7 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
         eventLiveStates,
         eventStats,
         updateCreatedEvent,
+        deleteCreatedEvent,
         updateEventLiveState,
         updateEventStats,
         duplicateCreatedEvent,

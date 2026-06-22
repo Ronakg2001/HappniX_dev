@@ -264,3 +264,52 @@ def update_event(event_id: str, updates: dict) -> dict:
         )
 
     return {"success": True}
+
+def delete_event(event_id: str, host_user_id: str) -> dict:
+    """
+    Deletes an event from RDS and removes the CARD from DynamoDB.
+    Security: only deletes if the event belongs to the host_user_id.
+    """
+    conn = rds.get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # First verify ownership
+            cur.execute(
+                'SELECT "hostUserID" FROM events WHERE "eventID" = %s',
+                (event_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"success": False, "error": "Event not found."}
+                
+            if row["hostUserID"] != host_user_id:
+                return {"success": False, "error": "Unauthorized to delete this event."}
+
+            # Delete the event from RDS
+            cur.execute(
+                'DELETE FROM events WHERE "eventID" = %s',
+                (event_id,)
+            )
+            conn.commit()
+
+            # Delete the CARD from DynamoDB
+            try:
+                dynamo_db.delete_item(
+                    table_key="events",
+                    pk_value=f"EVENT#{event_id}",
+                    sk_value="CARD"
+                )
+            except Exception as e:
+                util.log("warning", "event_services.delete_event", f"Failed to delete DynamoDB card: {e}")
+
+            return {"success": True, "message": "Event deleted successfully."}
+    except Exception as exc:
+        conn.rollback()
+        util.log("error", "event_services.delete_event", f"Failed to delete event: {str(exc)}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
