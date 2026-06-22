@@ -5,7 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, Flame, TrendingUp, Clock, X, ArrowLeft, ShieldCheck, Compass, Play, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DISCOVER_ITEMS, CATEGORY_PILLS, TRENDING_SEARCHES, MOCK_DISCOVER_FEED } from "@/constants/mockData";
+import { DISCOVER_ITEMS, CATEGORY_PILLS, TRENDING_SEARCHES } from "@/constants/mockData";
 import { DiscoverItem } from "@/types/event";
 import { DiscoverSearchPanel } from "./components/DiscoverSearchPanel";
 import { DiscoverPageFallback } from "./components/DiscoverPageFallback";
