@@ -104,6 +104,7 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           hype: "HOT", // Static for now
           attending: "0",
           host: e.host_username || "Unknown",
+          host_avatar: fixAvatarUrl(e.host_avatar),
           verified: false,
           price: e.price || "Free",
           venue: e.venue || "TBA",

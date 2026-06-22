@@ -125,6 +125,21 @@ export function DiscoverSearchPanel({ query, onSeeMoreUsers, onSeeMoreEvents, sh
                       <MapPin className="h-2.5 w-2.5" /> {item.venue.split(",")[0]}
                     </span>
                   </div>
+                  <div className="flex items-center gap-2 border-t border-white/5 pt-2 mt-0.5">
+                    <div className="h-5 w-5 rounded-full bg-brand-gradient flex items-center justify-center font-black text-[8px] text-white select-none overflow-hidden shrink-0">
+                      {item.host_avatar ? (
+                        <img src={item.host_avatar} alt={item.host} className="h-full w-full object-cover" />
+                      ) : (
+                        item.host[0]?.toUpperCase()
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-1">
+                      <span className="text-[9px] font-bold text-white/80 truncate">{item.host}</span>
+                      {item.verified && (
+                        <ShieldCheck className="h-2.5 w-2.5 text-[var(--brand-3)] shrink-0" aria-label="Verified host" />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

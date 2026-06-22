@@ -70,6 +70,10 @@ def handle_discover_search(event):
         if cover and pub_id and not cover.startswith("http"):
             cover = f"{pub_id}{cover}"
             
+        host_avatar = e.get("host_profilePictureUrl")
+        if host_avatar and pub_id and not host_avatar.startswith("http"):
+            host_avatar = f"{pub_id}{host_avatar}"
+            
         formatted_events.append({
             "id": e.get("eventID"),
             "title": e.get("title"),
@@ -80,6 +84,7 @@ def handle_discover_search(event):
             "price": f"{e.get('currency')} {e.get('basePrice')}" if e.get("basePrice") > 0 else "Free",
             "venue": e.get("locationName"),
             "host_username": e.get("host_userName"),
+            "host_avatar": host_avatar,
             "status": e.get("status")
         })
     

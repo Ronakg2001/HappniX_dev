@@ -108,6 +108,7 @@ export interface DiscoverItem {
   hype: string;
   attending: string;
   host: string;
+  host_avatar?: string | null;
   verified: boolean;
   price: string;
   venue: string;
