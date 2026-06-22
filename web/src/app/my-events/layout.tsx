@@ -262,7 +262,15 @@ export default function MyEventsLayout({ children }: { children: React.ReactNode
             // Merge: backend events take priority, keep any local-only drafts
             setCreatedEvents((prev) => {
               const backendIds = new Set(transformed.map((e: CreatedEventType) => e.id));
-              const localOnly = prev.filter((e) => !backendIds.has(e.id) && e.id.startsWith("c_"));
+              const backendTitles = new Set(transformed.map((e: CreatedEventType) => e.title.toLowerCase().trim()));
+              
+              const localOnly = prev.filter((e) => {
+                if (!e.id.startsWith("c_") || backendIds.has(e.id)) return false;
+                // If a backend event has the exact same title, assume this draft was already synced
+                if (backendTitles.has(e.title.toLowerCase().trim())) return false;
+                return true;
+              });
+              
               const merged = [...transformed, ...localOnly];
               localStorage.setItem("happnix_created_events_v4", JSON.stringify(merged));
               return merged;

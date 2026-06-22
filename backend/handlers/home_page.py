@@ -7,6 +7,7 @@ from utils import utilities as util
 from integration import cognito_auth as cognito
 from integration import rds
 from integration import dynamo_db
+from services import feed_services
 
 def handle_logout(event, body):
     """
@@ -65,14 +66,26 @@ def handle_home_feed(event):
         
     user_data = rds_result.get("data")
     
-    # TODO: Fetch live events, social graph, and personalized feed here
+    # Fetch feed using the hybrid feed generator
+    query_params = event.get("queryStringParameters") or {}
+    cursor = query_params.get("cursor")
     
-    return success_response({
+    feed_result = feed_services.get_hybrid_feed(user_data.get("userID"), cursor=cursor)
+    
+    response_data = {
         "success": True,
         "message": "Welcome to the HappniX home feed!",
         "profile": user_data,
-        "feed": []
-    })
+    }
+    
+    if feed_result.get("success"):
+        response_data.update(feed_result.get("data", {}))
+    else:
+        response_data["feed_items"] = []
+        response_data["live_now"] = []
+        response_data["error"] = "Failed to load feed."
+
+    return success_response(response_data)
 
 def handle_user_search(event):
     """

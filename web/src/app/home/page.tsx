@@ -4,9 +4,12 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import RightSidebar from "@/components/layout/RightSidebar";
-import { MOCK_POSTS, MOCK_FEED_EVENTS, MOCK_SPONSORED_EVENT } from "@/constants/mockData";
+import { MOCK_SPONSORED_EVENT } from "@/constants/mockData";
 import { ProfilePreviewModal, EventPreviewModal } from "@/components/modals/HomeModals";
-import { SocialPostCard, EventCard, SponsoredEventCard } from "@/components/feed/FeedCards";
+import { SponsoredEventCard } from "@/components/feed/FeedCards";
+import { FeedItem } from "@/components/feed/FeedItem";
+import { LiveNowCarousel } from "@/components/feed/LiveNowCarousel";
+import { useFeed } from "@/hooks/useFeed";
 
 export default function HomePage() {
   const router = useRouter();
@@ -16,9 +19,19 @@ export default function HomePage() {
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
   const [selectedEventPreview, setSelectedEventPreview] = useState<string | null>(null);
 
-  // Mock Feed Data
-  const mockPosts = MOCK_POSTS;
-  const mockEvents = MOCK_FEED_EVENTS;
+  // Hook for feed
+  const {
+    feedItems,
+    liveNow,
+    isLoading,
+    isFetchingNext,
+    hasMore,
+    loadMore,
+    refresh,
+    hasNewPosts
+  } = useFeed();
+
+  // Mock Sponsored Event
   const mockSponsoredEvent = MOCK_SPONSORED_EVENT;
 
   const handleBookNow = (title: string, price: string, e?: React.MouseEvent) => {
@@ -61,31 +74,57 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Live Now Carousel */}
+        {(activeTab === "all" || activeTab === "events") && liveNow.length > 0 && (
+          <LiveNowCarousel 
+            events={liveNow} 
+            onEventClick={(id) => router.push(`/event?id=${id}`)} 
+          />
+        )}
+
+        {/* New Posts Bubble */}
+        {hasNewPosts && (
+          <div className="flex justify-center -mt-2 mb-4">
+            <button 
+              onClick={refresh}
+              className="bg-brand-primary text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg hover:bg-brand-secondary transition transform hover:scale-105 z-10"
+            >
+              New Posts
+            </button>
+          </div>
+        )}
+
         {/* Feed List */}
         <div className="flex flex-col">
-          {/* Posts */}
-          {(activeTab === "all" || activeTab === "posts" || (activeTab === "nearby" && currentLocation)) && (
-            mockPosts
-              .filter(post => activeTab !== "nearby" || post.location?.toLowerCase().includes(currentLocation.toLowerCase()))
-              .map((post) => (
-                <div key={post.id} onClick={() => setSelectedProfile(post.user.username)} className="cursor-pointer">
-                  <SocialPostCard post={post} />
-                </div>
-              ))
+          {isLoading ? (
+            <div className="flex justify-center p-8 text-white/50">Loading feed...</div>
+          ) : feedItems.length === 0 ? (
+            <div className="text-center p-8 text-white/50 border border-white/5 rounded-xl">
+              No posts to show right now.
+            </div>
+          ) : (
+            feedItems.map((item) => (
+              <FeedItem
+                key={`${item.entityType}-${item.postID || item.eventID}`}
+                item={item}
+                onProfileClick={setSelectedProfile}
+                onEventClick={(id) => router.push(`/event?id=${id}`)}
+                onBookNow={handleBookNow}
+              />
+            ))
           )}
 
-          {/* Events */}
-          {(activeTab === "all" || activeTab === "events" || (activeTab === "nearby" && currentLocation)) && (
-            mockEvents
-              .filter(event => activeTab !== "nearby" || event.venue.toLowerCase().includes(currentLocation.toLowerCase()))
-              .map((event) => (
-                <div key={event.id} onClick={() => router.push(`/event?id=${event.id}`)} className="cursor-pointer">
-                  <EventCard
-                    event={event}
-                    onBookNow={(e) => handleBookNow(event.title, event.price, e)}
-                  />
-                </div>
-              ))
+          {/* Load More Button (Infinite scroll proxy) */}
+          {hasMore && (
+            <div className="flex justify-center py-6">
+              <button
+                onClick={loadMore}
+                disabled={isFetchingNext}
+                className="px-6 py-2 rounded-full border border-white/20 text-white/70 hover:bg-white/5 hover:text-white transition disabled:opacity-50"
+              >
+                {isFetchingNext ? "Loading..." : "Load More"}
+              </button>
+            </div>
           )}
         </div>
       </main>
