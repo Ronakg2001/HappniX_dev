@@ -39,16 +39,22 @@ def rank_feed_items(items: list) -> list:
         # Time decay
         created_at_str = item.get("createdAt")
         try:
-            # Assuming ISO format like "2026-06-22T12:00:00Z"
-            # Python 3.11+ can parse "Z" with fromisoformat, earlier needs replace
-            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
+            if created_at_str:
+                created_at = datetime.fromisoformat(str(created_at_str).replace("Z", "+00:00"))
+            else:
+                created_at = datetime.now(timezone.utc)
+        except (ValueError, TypeError, AttributeError):
             created_at = datetime.now(timezone.utc)
             
         time_score = calculate_time_decay(created_at)
         
         # Engagement (assume normalized 0-100)
-        engagement = float(item.get("engagementScore", 0))
+        raw_engagement = item.get("engagementScore")
+        try:
+            engagement = float(raw_engagement) if raw_engagement is not None else 0.0
+        except (ValueError, TypeError):
+            engagement = 0.0
+            
         engagement_factor = 1.0 + (engagement / 100.0)
         
         final_score = base_weight * time_score * engagement_factor
