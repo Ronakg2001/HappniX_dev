@@ -289,6 +289,43 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
     finally:
         conn.close()
 
+def search_public_events(query: str, limit: int = 20) -> dict:
+    """
+    Search for events in RDS.
+    Only returns events that are not Private and whose hosts are not Private.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+        
+    search_pattern = f"%{query}%"
+    sql = '''
+        SELECT 
+            e."eventID", e."title", e."eventCategory", e."coverImageUrl", e."startAt", e."ticketType", e."basePrice", e."currency", e."locationName", e."engagementScore", e."status", e."visibility",
+            u."userName" as host_userName, u."profilePictureUrl" as host_profilePictureUrl, u."status" as host_status
+        FROM events e
+        JOIN users u ON e."hostUserID" = u."userID"
+        WHERE (e."title" ILIKE %s OR e."eventCategory" ILIKE %s)
+          AND e."visibility" != 'Private'
+          AND e."status" = 'Published'
+          AND u."privacyMode" != 'private'
+          AND u."status" = 'Active'
+        ORDER BY e."engagementScore" DESC, e."createdAt" DESC
+        LIMIT %s;
+    '''
+    
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (search_pattern, search_pattern, limit))
+            rows = cur.fetchall()
+            data = [util.format_rds_row(r) for r in rows]
+            return {"success": True, "data": data}
+    except Exception as exc:
+        util.log("error", "rds.search_public_events", f"Search failed: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
 def check_if_following(follower_id: str, following_id: str) -> bool:
     """
     Check if a follower_id is following a following_id.

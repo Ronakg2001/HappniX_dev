@@ -233,6 +233,10 @@ export const userApi = {
   unfollow: (targetUserId: number | string) => apiClient.post('/api/users/unfollow', { target_user_id: targetUserId }),
 };
 
+export const discoverApi = {
+  search: (query: string, limit = 50) => apiClient.get('/api/discover/search', { params: { q: query, limit } }),
+};
+
 export const fixAvatarUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   

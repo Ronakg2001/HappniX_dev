@@ -5,8 +5,9 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, Flame, TrendingUp, Clock, X, ArrowLeft, ShieldCheck, Compass, Play, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DISCOVER_ITEMS, CATEGORY_PILLS, TRENDING_SEARCHES } from "@/constants/mockData";
-import { UsersSearchPanel } from "./components/UsersSearchPanel";
+import { DISCOVER_ITEMS, CATEGORY_PILLS, TRENDING_SEARCHES, MOCK_DISCOVER_FEED } from "@/constants/mockData";
+import { DiscoverItem } from "@/types/event";
+import { DiscoverSearchPanel } from "./components/DiscoverSearchPanel";
 import { DiscoverPageFallback } from "./components/DiscoverPageFallback";
 
 type SearchTab = "Top" | "Events" | "Users";
@@ -278,9 +279,15 @@ function DiscoverPageInner() {
           )}
 
           <div id="discover-results">
-            {searchQuery && activeSearchTab === "Users" ? (
+            {searchQuery ? (
               <div className="animate-in fade-in duration-200">
-                <UsersSearchPanel query={searchQuery} />
+                <DiscoverSearchPanel 
+                  query={searchQuery} 
+                  showOnlyUsers={activeSearchTab === "Users"}
+                  showOnlyEvents={activeSearchTab === "Events"}
+                  onSeeMoreUsers={() => setActiveSearchTab("Users")}
+                  onSeeMoreEvents={() => setActiveSearchTab("Events")}
+                />
               </div>
             ) : (
               <>

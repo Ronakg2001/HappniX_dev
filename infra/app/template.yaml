@@ -121,6 +121,11 @@ Parameters:
     Default: "true"
     AllowedValues: ["true", "false"]
     Description: Enable Profile Lambda.
+  EnableDiscoverApi:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable Discover Lambda.
 
 Conditions:
   HasEventsApi:
@@ -138,6 +143,10 @@ Conditions:
   HasProfileApi:
     Fn::Equals:
       - Ref: EnableProfileApi
+      - "true"
+  HasDiscoverApi:
+    Fn::Equals:
+      - Ref: EnableDiscoverApi
       - "true"
   HasUsersTable:
     Fn::Not:
@@ -637,6 +646,37 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/settings/people/{category}
             Method: DELETE
+
+  DiscoverApi:
+    Type: AWS::Serverless::Function
+    Condition: HasDiscoverApi
+    Properties:
+      CodeUri: ../../backend/
+      Handler: handlers.discover.lambda_handler
+      Description: Discover API - unified search for users and events
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/Happnix-*-${EnvironmentName}"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/HappniX-*-${EnvironmentName}"
+            - Effect: Allow
+              Action:
+                - cognito-idp:GetUser
+              Resource: "*"
+      Events:
+        DiscoverSearch:
+          Type: Api
+          Properties:
+            RestApiId: { Ref: HappnixDevApi }
+            Path: /api/discover/search
+            Method: GET
 
   EventsApi:
     Type: AWS::Serverless::Function
