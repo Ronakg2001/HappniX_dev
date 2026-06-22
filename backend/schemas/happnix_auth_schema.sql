@@ -70,4 +70,12 @@ CREATE TABLE IF NOT EXISTS user_devices (
 CREATE UNIQUE INDEX IF NOT EXISTS user_devices_user_fingerprint_idx
 ON user_devices ("userID", "deviceFingerprintHash");
 
+-- Add columns if they were missing from earlier deployments
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "profilePictureUrl" VARCHAR(500);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "bio" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "privacyMode" VARCHAR(10) NOT NULL DEFAULT 'public';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "userType" user_type_enum NOT NULL DEFAULT 'General';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "uniqueNationalID" VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "unidIsVerified" BOOLEAN;
+
 COMMIT;

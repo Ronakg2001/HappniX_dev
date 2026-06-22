@@ -77,7 +77,8 @@
       "users": {
         "columns": [
           "userID", "cognitoSub", "userName", "fullName", "emailAddress",
-          "phoneNumber", "dateOfBirth", "gender", "region", "emailVerified", "status"
+          "phoneNumber", "dateOfBirth", "gender", "region", "emailVerified", "status",
+          "profilePictureUrl", "bio", "privacyMode", "userType", "uniqueNationalID", "unidIsVerified"
         ],
         "default_status": "Active"
       },
