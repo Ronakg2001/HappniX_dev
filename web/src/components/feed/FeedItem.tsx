@@ -21,13 +21,18 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
         username: item.authorUserID || 'user',
         name: 'User',
         avatar: '/default-avatar.png',
-        isVerified: false,
+        verified: false,
       },
-      content: item.caption,
-      media: item.mediaItems ? JSON.parse(item.mediaItems) : [],
+      timestamp: 'Just now', // Could parse from createdAt
+      privacy: 'public' as 'public' | 'friends',
+      content: item.caption || '',
+      hashtags: [],
+      mentions: [],
+      images: item.mediaItems ? JSON.parse(item.mediaItems) : [],
       likes: item.likesCount || 0,
       comments: item.commentsCount || 0,
-      timeAgo: 'Just now', // Could parse from createdAt
+      liked: false,
+      saved: false,
     };
     
     return (
@@ -39,16 +44,20 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
     // It's an event
     const eventMock = {
       id: item.eventID,
+      organizer: 'Host',
+      verifiedOrganizer: false,
+      banner: item.coverImageUrl || '/default-event.png',
       title: item.title,
-      date: item.startAt,
+      category: item.eventCategory || 'General',
+      musicGenre: 'Any',
+      ageRestricted: false,
+      date: item.startAt ? new Date(item.startAt).toLocaleDateString() : 'TBD',
+      time: item.startAt ? new Date(item.startAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'TBD',
       venue: item.locationName || 'Online',
+      distance: 'Nearby',
+      ticketsLeft: item.maxAttendees || 100,
+      trending: false,
       price: item.ticketType === 'Free' ? 'Free' : `₹${item.basePrice}`,
-      image: item.coverImageUrl || '/default-event.png',
-      host: {
-        name: 'Host',
-        avatar: '/default-avatar.png',
-      },
-      attendees: [],
     };
     
     return (
