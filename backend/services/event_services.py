@@ -242,10 +242,26 @@ def get_my_events(host_user_id: str) -> dict:
         conn.close()
 
 
-def update_event(event_id: str, updates: dict) -> dict:
+def update_event(event_id: str, host_user_id: str, updates: dict) -> dict:
     """
     Update an event in RDS and re-sync the EVENT_CARD to DynamoDB.
     """
+    conn = rds.get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT "hostUserID" FROM events WHERE "eventID" = %s', (event_id,))
+            row = cur.fetchone()
+            if not row:
+                return {"success": False, "error": "Event not found."}
+            if row["hostUserID"] != host_user_id:
+                return {"success": False, "error": "Unauthorized to update this event."}
+    finally:
+        conn.close()
+
     updates["updatedAt"] = util.now_iso()
     rds_result = rds.update_record("events", "eventID", event_id, updates)
 

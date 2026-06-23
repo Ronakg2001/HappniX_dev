@@ -26,22 +26,41 @@ def get_my_events(**kwargs):
         util.log("error", "get_my_events", f"Error fetching events: {str(exc)}")
         return error_response(str(exc), 500)
 
-def create_draft(**kwargs):
-    """Handles saving an event draft."""
-    try:
-        username = kwargs.get("username")
-        user_id = kwargs.get("user_id")
 
-        result = event_services.create_event(host_user_id=user_id, raw_payload=kwargs, status="Draft")
-
+def _handle_event_save(kwargs, status):
+    username = kwargs.get("username")
+    user_id = kwargs.get("user_id")
+    event_data = kwargs.get("eventData", {})
+    event_id = event_data.get("id") or kwargs.get("id")
+    
+    if event_id and not str(event_id).startswith("c_"):
+        # Update existing
+        updates = event_services._format_event_payload(kwargs)
+        updates["status"] = status
+        result = event_services.update_event(event_id, user_id, updates)
         if result.get("success"):
             return success_response({
                 "success": True,
-                "message": "Draft saved successfully.",
+                "message": f"Event {status.lower()} successfully.",
+                "eventID": event_id,
+            })
+    else:
+        # Create new
+        result = event_services.create_event(host_user_id=user_id, raw_payload=kwargs, status=status)
+        if result.get("success"):
+            return success_response({
+                "success": True,
+                "message": f"Event {status.lower()} successfully.",
                 "eventID": result.get("eventID"),
                 "eventUID": result.get("eventUID"),
             })
-        return error_response(result.get("error", "Failed to save draft."), 500)
+            
+    return error_response(result.get("error", f"Failed to {status.lower()} event."), 500)
+
+def create_draft(**kwargs):
+    """Handles saving an event draft."""
+    try:
+        return _handle_event_save(kwargs, "Draft")
     except Exception as exc:
         util.log("error", "create_draft", f"Error saving draft: {str(exc)}")
         return error_response(str(exc), 500)
@@ -49,19 +68,7 @@ def create_draft(**kwargs):
 def publish_event(**kwargs):
     """Handles publishing an event."""
     try:
-        username = kwargs.get("username")
-        user_id = kwargs.get("user_id")
-
-        result = event_services.create_event(host_user_id=user_id, raw_payload=kwargs, status="Published")
-
-        if result.get("success"):
-            return success_response({
-                "success": True,
-                "message": "Event published successfully.",
-                "eventID": result.get("eventID"),
-                "eventUID": result.get("eventUID"),
-            })
-        return error_response(result.get("error", "Failed to publish event."), 500)
+        return _handle_event_save(kwargs, "Published")
     except Exception as exc:
         util.log("error", "publish_event", f"Error publishing event: {str(exc)}")
         return error_response(str(exc), 500)
