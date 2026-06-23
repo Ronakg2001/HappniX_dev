@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { STATIC_MEDIA_URL } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Bell,
   MapPin,
@@ -44,17 +45,25 @@ export default function Header({
 
         {/* ACTIONS */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Location Picker (Always Visible/Active) */}
-          <button
+          {/* Location Picker */}
+          <Button
+            id="location-picker-btn"
             onClick={onLocationClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full liquid-glass liquid-edge hover:scale-[1.03] active:scale-[0.98] transition-all text-xs font-semibold text-foreground/95"
+            variant="outline"
+            size="sm"
+            className="rounded-full hover:scale-[1.03] active:scale-[0.98] text-xs font-semibold text-foreground/95 relative h-7 px-3 gap-1.5"
           >
-            <MapPin className="h-3.5 w-3.5 text-[var(--brand-1)]" />
-            <span className="max-w-[80px] sm:max-w-none truncate">{currentLocation}</span>
-            <ChevronDown className="h-3 w-3 text-foreground/40" />
-          </button>
+            <MapPin
+              className="h-3.5 w-3.5 shrink-0"
+              style={{ color: "var(--brand-1)" }}
+            />
+            <span className="max-w-[80px] sm:max-w-[120px] truncate">
+              {currentLocation || "Set Location"}
+            </span>
+            <ChevronDown className="h-3 w-3 text-foreground/40 shrink-0" />
+          </Button>
 
-          {/* Messages (Mobile/Desktop) */}
+          {/* Messages (Mobile) */}
           <Link
             href="/messages"
             className="p-2 rounded-full liquid-glass hover:liquid-edge text-foreground/80 hover:text-foreground transition-all md:hidden relative"
@@ -66,14 +75,16 @@ export default function Header({
           </Link>
 
           {/* Notifications */}
-          <button
+          <Button
             onClick={onNotificationsClick}
-            className="p-2 rounded-full liquid-glass hover:liquid-edge text-foreground/80 hover:text-foreground transition-all relative"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-full text-foreground/80 hover:text-foreground relative"
             aria-label="Notifications"
           >
             <Bell className="h-4 sm:h-5 w-4 sm:w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-[var(--brand-2)] ring-2 ring-background" />
-          </button>
+          </Button>
         </div>
       </div>
     </header>

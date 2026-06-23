@@ -8,6 +8,8 @@ import LeftSidebar from "./LeftSidebar";
 import BottomNav from "./BottomNav";
 import { BookingModal, NotificationsModal } from "@/components/modals/HomeModals";
 import { TicketType } from "@/types/booking";
+import { LocationProvider, useLocation } from "@/lib/locationStore";
+import { MOCK_EVENTS, MOCK_LIVE_STATES, MOCK_STATS, MOCK_BOOKED_TICKETS } from "@/constants/mockData";
 
 interface LayoutContextType {
   openBooking: (title: string, price: string) => void;
@@ -28,14 +30,13 @@ export function useLayout() {
   return context;
 }
 
-import { MOCK_EVENTS, MOCK_LIVE_STATES, MOCK_STATS, MOCK_BOOKED_TICKETS } from "@/constants/mockData";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { locationState } = useLocation();
 
-  // Location States
-  const [currentLocation, setCurrentLocation] = useState("Jaipur");
+  const currentLocation = locationState.address || "Set Location";
   const [radius, setRadius] = useState(10);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
@@ -45,9 +46,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Load state from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedLoc = localStorage.getItem("happnix_location");
-      if (savedLoc) setCurrentLocation(savedLoc);
-
       const savedRadius = localStorage.getItem("happnix_radius");
       if (savedRadius) setRadius(Number(savedRadius));
 
@@ -81,16 +79,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     }
   }, []);
-
-  const handleLocationChange = (loc: string) => {
-    setCurrentLocation(loc);
-    localStorage.setItem("happnix_location", loc);
-  };
-
-  const handleRadiusChange = (rad: number) => {
-    setRadius(rad);
-    localStorage.setItem("happnix_radius", String(rad));
-  };
 
   const addTicket = (title: string, price: string) => {
     const newTicket: TicketType = {
@@ -151,12 +139,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           onNotificationsClick={() => setIsNotificationsOpen(true)}
         />
 
-        {/* Location Bar */}
         <LocationBar
-          currentLocation={currentLocation}
-          radius={radius}
-          onLocationChange={handleLocationChange}
-          onRadiusChange={handleRadiusChange}
           isModalOpen={isLocationModalOpen}
           setIsModalOpen={setIsLocationModalOpen}
         />
@@ -190,5 +173,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </div>
     </LayoutContext.Provider>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <LocationProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </LocationProvider>
   );
 }
