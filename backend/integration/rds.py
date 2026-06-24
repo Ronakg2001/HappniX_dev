@@ -274,6 +274,7 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
         FROM users
         WHERE ("userName" ILIKE %s OR "fullName" ILIKE %s)
           AND "status" = 'Active'
+          AND "privacyMode" != 'private'
         LIMIT %s;
     '''
     

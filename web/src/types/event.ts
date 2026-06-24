@@ -112,7 +112,9 @@ export interface DiscoverItem {
   verified: boolean;
   price: string;
   venue: string;
-}export interface CountryInfo {
+}
+
+export interface CountryInfo {
   name: string;
   region_code: string;
   dial_code: string;
