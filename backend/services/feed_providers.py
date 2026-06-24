@@ -5,32 +5,54 @@ from utils import utilities as util
 from integration import rds, dynamo_db
 from services.interaction_services import get_discover_feed
 
-def get_live_events(user_id: str) -> list:
+
+def get_live_events(user_id: str, lat: float = None, lng: float = None, conn=None) -> list:
     """
     Fetch events that are currently 'Live'.
     For V1, this means `startAt` <= now <= `endAt`.
-    Returns events hosted by the user, followed users, and nearby/public ones.
+    Includes the host's profile info via JOIN.
+    Optionally filters by geographic radius if lat/lng are provided.
     """
-    conn = rds.get_connection()
+    owns_conn = conn is None
+    if owns_conn:
+        conn = rds.get_connection()
     if not conn:
         return []
 
     try:
         from psycopg2.extras import RealDictCursor
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Simple query for public live events (we can restrict this to following/location later)
-            # COALESCE is used in case endAt is null
-            cur.execute(
-                '''
-                SELECT * FROM events 
-                WHERE "visibility" = 'Public' 
-                  AND "startAt" <= CURRENT_TIMESTAMP 
-                  AND ( "endAt" IS NULL OR "endAt" >= CURRENT_TIMESTAMP )
-                  AND "status" != 'Cancelled'
-                ORDER BY "startAt" DESC
+            # Build geo filter clause if coordinates are available
+            geo_clause = ""
+            params = []
+            
+            if lat is not None and lng is not None:
+                # Haversine-based radius filter (50 km default)
+                geo_clause = """
+                  AND e."latitude" IS NOT NULL
+                  AND e."longitude" IS NOT NULL
+                  AND (6371 * acos(
+                      cos(radians(%s)) * cos(radians(e."latitude"))
+                      * cos(radians(e."longitude") - radians(%s))
+                      + sin(radians(%s)) * sin(radians(e."latitude"))
+                  )) <= 50
+                """
+                params = [lat, lng, lat]
+            
+            query = f'''
+                SELECT e.*, u."fullName" AS "hostName", u."userName" AS "hostUserName",
+                       u."profilePictureUrl" AS "hostAvatar"
+                FROM events e
+                LEFT JOIN users u ON e."hostUserID" = u."userID"
+                WHERE e."visibility" = 'Public' 
+                  AND e."startAt" <= CURRENT_TIMESTAMP 
+                  AND ( e."endAt" IS NULL OR e."endAt" >= CURRENT_TIMESTAMP )
+                  AND e."status" != 'Cancelled'
+                  {geo_clause}
+                ORDER BY e."startAt" DESC
                 LIMIT 10;
-                '''
-            )
+            '''
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
             events = [util.format_rds_row(row) for row in rows]
             # Add a source flag
@@ -42,38 +64,51 @@ def get_live_events(user_id: str) -> list:
         util.log("error", "feed_providers.get_live_events", f"Failed: {exc}")
         return []
     finally:
-        conn.close()
+        if owns_conn and conn:
+            conn.close()
 
-def get_own_content(user_id: str, limit: int = 10) -> list:
+
+def get_own_content(user_id: str, limit: int = 10, offset: int = 0, conn=None) -> list:
     """
     Fetch recent posts and upcoming/active events for the user.
+    Excludes drafts and cancelled events.
+    JOINs the users table to include author profile info.
     """
-    conn = rds.get_connection()
+    owns_conn = conn is None
+    if owns_conn:
+        conn = rds.get_connection()
     if not conn:
         return []
 
     try:
         from psycopg2.extras import RealDictCursor
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Get latest posts
+            # Get latest posts with author info
             cur.execute(
                 '''
-                SELECT *, 'FEED_POST' as "entityType" FROM posts 
-                WHERE "userID" = %s 
-                ORDER BY "createdAt" DESC LIMIT %s;
+                SELECT p.*, 'FEED_POST' as "entityType",
+                       u."fullName", u."userName", u."profilePictureUrl"
+                FROM posts p
+                LEFT JOIN users u ON p."userID" = u."userID"
+                WHERE p."userID" = %s 
+                ORDER BY p."createdAt" DESC LIMIT %s OFFSET %s;
                 ''',
-                (user_id, limit)
+                (user_id, limit, offset)
             )
             posts = [util.format_rds_row(row) for row in cur.fetchall()]
             
-            # Get latest events
+            # Get latest events with host info
             cur.execute(
                 '''
-                SELECT *, 'EVENT_CARD' as "entityType" FROM events 
-                WHERE "hostUserID" = %s 
-                ORDER BY "createdAt" DESC LIMIT %s;
+                SELECT e.*, 'EVENT_CARD' as "entityType",
+                       u."fullName" AS "hostName", u."userName" AS "hostUserName",
+                       u."profilePictureUrl" AS "hostAvatar"
+                FROM events e
+                LEFT JOIN users u ON e."hostUserID" = u."userID"
+                WHERE e."hostUserID" = %s AND e."status" NOT IN ('Draft', 'Cancelled')
+                ORDER BY e."createdAt" DESC LIMIT %s OFFSET %s;
                 ''',
-                (user_id, limit)
+                (user_id, limit, offset)
             )
             events = [util.format_rds_row(row) for row in cur.fetchall()]
             
@@ -86,38 +121,45 @@ def get_own_content(user_id: str, limit: int = 10) -> list:
         util.log("error", "feed_providers.get_own_content", f"Failed: {exc}")
         return []
     finally:
-        conn.close()
+        if owns_conn and conn:
+            conn.close()
 
-def get_following_content(user_id: str, limit: int = 20) -> list:
+
+def get_following_content(user_id: str, limit: int = 20, last_key: dict = None) -> tuple[list, dict]:
     """
     Fetch posts and events from followed users.
-    We leverage the existing DynamoDB fan-out partition USER#<user_id>
+    Returns (items, next_evaluated_key)
     """
     from boto3.dynamodb.conditions import Key
     table = dynamo_db._get_table("events")
     if not table:
-        return []
+        return [], None
 
     try:
-        response = table.query(
-            KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("FEED#"),
-            ScanIndexForward=False,
-            Limit=limit,
-        )
+        query_params = {
+            "KeyConditionExpression": Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("FEED#"),
+            "ScanIndexForward": False,
+            "Limit": limit
+        }
+        if last_key:
+            query_params["ExclusiveStartKey"] = last_key
+            
+        response = table.query(**query_params)
         items = response.get("Items", [])
         for item in items:
             item["source"] = "FOLLOWING"
-        return items
+        return items, response.get("LastEvaluatedKey")
     except Exception as exc:
         util.log("error", "feed_providers.get_following_content", f"Failed: {exc}")
-        return []
+        return [], None
 
-def get_recommendations(user_id: str, limit: int = 10) -> list:
+
+def get_recommendations(user_id: str, limit: int = 10, offset: int = 0) -> list:
     """
     Fetch algorithmic recommendations.
     We leverage the discover feed generator for now.
     """
-    result = get_discover_feed(user_id, limit=limit)
+    result = get_discover_feed(user_id, limit=limit, offset=offset)
     if not result.get("success"):
         return []
         

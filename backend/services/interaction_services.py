@@ -112,7 +112,7 @@ def recalculate_engagement(entity_id: str, entity_type: str) -> dict:
         conn.close()
 
 
-def get_discover_feed(user_id: str, limit: int = 20) -> dict:
+def get_discover_feed(user_id: str, limit: int = 20, offset: int = 0) -> dict:
     """
     Fetch the Discover feed by scatter-gathering across GSI-Discover shards,
     then re-ranking with the user's PREFERENCE_CLUSTER.
@@ -169,4 +169,4 @@ def get_discover_feed(user_id: str, limit: int = 20) -> dict:
     for item in all_items:
         item.pop("_personalizedScore", None)
 
-    return {"success": True, "data": all_items[:limit]}
+    return {"success": True, "data": all_items[offset:offset+limit]}
