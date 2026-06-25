@@ -190,6 +190,101 @@ def cancel_ticket(ticket_id: str) -> dict:
     return {"success": True}
 
 
+def get_user_bookings(user_id: str) -> dict:
+    """
+    Fetch all tickets for a user, JOINed with event and tier details.
+    Returns data shaped for the frontend My Bookings page.
+    """
+    conn = rds.get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT
+                    t."ticketID",
+                    t."orderID",
+                    t."eventID",
+                    t."tierID",
+                    t."status"          AS ticket_status,
+                    t."ticketQrPayload",
+                    t."checkedInAt",
+                    t."createdAt"       AS ticket_created_at,
+                    o."orderNumber",
+                    o."totalAmount",
+                    o."paymentStatus",
+                    e."title"           AS event_title,
+                    e."startAt"         AS event_start_at,
+                    e."endAt"           AS event_end_at,
+                    e."locationName"    AS event_venue,
+                    e."coverImageUrl"   AS event_cover,
+                    e."status"          AS event_status,
+                    e."isOnline"        AS event_is_online,
+                    tt."name"           AS tier_name,
+                    tt."price"          AS tier_price
+                FROM event_tickets t
+                JOIN event_orders o    ON t."orderID"  = o."orderID"
+                JOIN events e          ON t."eventID"  = e."eventID"
+                JOIN event_ticket_tiers tt ON t."tierID" = tt."tierID"
+                WHERE t."attendeeUserID" = %s
+                ORDER BY t."createdAt" DESC;
+            ''', (user_id,))
+            rows = cur.fetchall()
+
+        bookings = []
+        for row in rows:
+            row = util.format_rds_row(row)
+
+            # Format date/time for display
+            start_at = row.get("event_start_at", "")
+            display_date = ""
+            display_time = ""
+            if start_at:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(str(start_at))
+                    display_date = dt.strftime("%b %d")
+                    display_time = dt.strftime("%I:%M %p")
+                except Exception:
+                    display_date = str(start_at)[:10]
+                    display_time = ""
+
+            bookings.append({
+                "id": row.get("ticketID"),
+                "orderID": row.get("orderID"),
+                "orderNumber": row.get("orderNumber"),
+                "eventID": row.get("eventID"),
+                "eventTitle": row.get("event_title", "Untitled Event"),
+                "tierName": row.get("tier_name", "General"),
+                "tierID": row.get("tierID"),
+                "date": display_date,
+                "time": display_time,
+                "seat": row.get("tier_name", "General Entry"),
+                "venue": row.get("event_venue", "Venue TBD"),
+                "status": row.get("ticket_status", "Pending"),
+                "totalPaid": row.get("totalAmount"),
+                "tierPrice": row.get("tier_price"),
+                "paymentStatus": row.get("paymentStatus"),
+                "qrPayload": row.get("ticketQrPayload"),
+                "coverImageUrl": row.get("event_cover"),
+                "eventStartAt": start_at,
+                "eventEndAt": row.get("event_end_at"),
+                "eventStatus": row.get("event_status"),
+                "checkedInAt": row.get("checkedInAt"),
+                "createdAt": row.get("ticket_created_at"),
+            })
+
+        return {"success": True, "data": bookings}
+
+    except Exception as exc:
+        util.log("error", "booking_services.get_user_bookings", f"Failed: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
+
 def _sync_event_card_tickets_sold(event_id: str):
     """
     Re-compute the total ticketsSold from all tiers and update the DynamoDB EVENT_CARD.

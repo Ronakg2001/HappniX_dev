@@ -25,17 +25,37 @@
 | `/api/home/feed` | GET | `Authorization: Bearer`* | `None` | **200** (OK)<br>**401** (Unauth) | `{"success": true, "profile": {...}, "feed": [...]}` |
 | `/api/home/logout` | POST | `Authorization: Bearer` | `{ "actionItem": "Logout" }` | **200** (OK) | `{"success": true, "message": "Logged out globally."}` |
 
-## Events APIs
-*(Note: These are handled by the `EventsApi` Lambda. Currently returns 501 — not yet implemented).*
+## Discover APIs
+*(Note: These are handled by the `DiscoverApi` Lambda. This is a **public endpoint** — no authentication required.)*
 
 | API / Endpoint | Method | Request Header | Request Data | Status Code | Response Data |
 |---|---|---|---|---|---|
-| `/api/events/create` | POST | `Authorization: Bearer`* | `title`*, `description`*, `locationName`*, `price`*, `startLabel`*, `endLabel`*, `vibeCover`* | **501** (Not Implemented) | `{"message": "Events handler not implemented yet."}` |
-| `/api/events/live` | GET | `None` | `None` | **501** | — |
-| `/api/events/nearby` | GET | `None` | `?geohash=*`<br>`&radiusKm=*` | **501** | — |
-| `/api/events/mine` | GET | `Authorization: Bearer`* | `None` | **501** | — |
-| `/api/events/{id}` | GET | `None` | `None` | **501** | — |
-| `/api/events/{id}` | DELETE | `Authorization: Bearer`* | `None` | **501** | — |
+| `/api/discover/search` | GET | `None` | Query Params: `q` (string, min 2 chars)*, `limit` (int, default 50) | **200** (OK)<br>**500** (Error) | See response shape below |
+
+**Response Shape (`/api/discover/search`):**
+```json
+{
+  "success": true,
+  "users": [
+    { "id": "uuid", "username": "ronak", "name": "Ronak G", "profile_picture_url": "https://...", "is_following": false }
+  ],
+  "events": [
+    { "id": "uuid", "title": "Summer Fest", "category": "Music", "image": "https://...", "start_at": "2026-07-01T18:00:00Z", "ticket_type": "Paid", "price": "INR 500", "venue": "Mumbai", "host_username": "ronak", "host_avatar": "https://...", "status": "Published" }
+  ]
+}
+```
+
+## Events APIs
+*(Note: These are handled by the `EventsApi` Lambda utilizing `actionItem` routing for POST).*
+
+| API / Endpoint | Method | Request Header | Request Data | Status Code | Response Data |
+|---|---|---|---|---|---|
+| `/api/events` | GET | `Authorization: Bearer`* | `None` | **200** (OK)<br>**500** (Error) | `{"success": true, "events": [...]}` |
+| `/api/events` | POST | `Authorization: Bearer`* | `{ "actionItem": "CreateEventDraft"*, "eventData": {...}* }` | **200** (OK)<br>**500** (Error) | `{"success": true, "eventID": "..."}` |
+| `/api/events` | POST | `Authorization: Bearer`* | `{ "actionItem": "PublishEvent"*, "eventData": {...}* }` | **200** (OK)<br>**500** (Error) | `{"success": true, "eventID": "..."}` |
+| `/api/events` | POST | `Authorization: Bearer`* | `{ "actionItem": "DeleteEvent"*, "eventID": "..."* }` | **200** (OK)<br>**400** (Bad Req)<br>**403** (Forbidden) | `{"success": true, "message": "Event deleted successfully."}` |
+| `/api/events` | POST | `Authorization: Bearer`* | `{ "actionItem": "GetMediaUploadUrl"*, "fileName": "...", "fileType": "..." }` | **200** (OK)<br>**500** (Error) | `{"success": true, "uploadUrl": "...", "mediaUrl": "..."}` |
+| `/api/events` | POST | `Authorization: Bearer`* | `{ "actionItem": "DeleteMedia"*, "objectKey": "..."* }` | **200** (OK)<br>**403** (Forbidden) | `{"success": true, "message": "Media deleted."}` |
 
 ## Profiles & Settings APIs
 *(Note: These are handled by the `ProfileApi` Lambda. Uses `Authorization: Bearer` for all endpoints.)*

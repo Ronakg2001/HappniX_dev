@@ -212,8 +212,79 @@ def get_event_detail(event_id: str) -> dict:
     if not event_result.get("success"):
         return {"success": False, "error": "Event not found."}
 
-    # TODO: JOIN ticket tiers via raw SQL for richer detail
-    return {"success": True, "data": event_result.get("data")}
+    event_data = event_result.get("data")
+
+    # Fetch tiers for this event
+    conn = rds.get_connection()
+    tiers = []
+    if conn:
+        try:
+            from psycopg2.extras import RealDictCursor
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    'SELECT * FROM event_ticket_tiers WHERE "eventID" = %s ORDER BY "price" ASC;',
+                    (event_id,)
+                )
+                rows = cur.fetchall()
+                tiers = [util.format_rds_row(row) for row in rows]
+        except Exception as exc:
+            util.log("warning", "event_services.get_event_detail",
+                     f"Tier fetch failed (non-fatal): {exc}")
+        finally:
+            conn.close()
+
+    event_data["tiers"] = tiers
+    return {"success": True, "data": event_data}
+
+
+def get_event_with_tiers(event_id: str) -> dict:
+    """
+    Fetch event + active tiers. Shaped for the booking modal dropdown.
+    Returns { event: {...}, tiers: [{tierID, name, price, capacity, ticketsSold, isActive}] }
+    """
+    event_result = rds.get_record("events", eventID=event_id)
+    if not event_result.get("success"):
+        return {"success": False, "error": "Event not found."}
+
+    event_data = event_result.get("data", {})
+
+    conn = rds.get_connection()
+    tiers = []
+    if conn:
+        try:
+            from psycopg2.extras import RealDictCursor
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    '''SELECT "tierID", "name", "description", "price", "capacity",
+                              "ticketsSold", "isActive"
+                       FROM event_ticket_tiers
+                       WHERE "eventID" = %s AND "isActive" = TRUE
+                       ORDER BY "price" ASC;''',
+                    (event_id,)
+                )
+                rows = cur.fetchall()
+                tiers = [util.format_rds_row(row) for row in rows]
+        except Exception as exc:
+            util.log("warning", "event_services.get_event_with_tiers",
+                     f"Tier fetch failed: {exc}")
+        finally:
+            conn.close()
+
+    return {
+        "success": True,
+        "event": {
+            "eventID": event_data.get("eventID"),
+            "title": event_data.get("title"),
+            "startAt": event_data.get("startAt"),
+            "endAt": event_data.get("endAt"),
+            "locationName": event_data.get("locationName"),
+            "coverImageUrl": event_data.get("coverImageUrl"),
+            "ticketType": event_data.get("ticketType"),
+            "basePrice": event_data.get("basePrice"),
+            "status": event_data.get("status"),
+        },
+        "tiers": tiers,
+    }
 
 
 def get_my_events(host_user_id: str) -> dict:

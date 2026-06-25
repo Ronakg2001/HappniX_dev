@@ -70,7 +70,20 @@ def handle_home_feed(event):
     query_params = event.get("queryStringParameters") or {}
     cursor = query_params.get("cursor")
     
-    feed_result = feed_services.get_hybrid_feed(user_data.get("userID"), cursor=cursor)
+    lat = query_params.get("lat")
+    lng = query_params.get("lng")
+    if lat is not None and lng is not None:
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except ValueError:
+            lat = None
+            lng = None
+    else:
+        lat = None
+        lng = None
+    
+    feed_result = feed_services.get_hybrid_feed(user_data.get("userID"), cursor=cursor, lat=lat, lng=lng)
     
     response_data = {
         "success": True,
@@ -86,6 +99,56 @@ def handle_home_feed(event):
         response_data["error"] = "Failed to load feed."
 
     return success_response(response_data)
+
+def handle_feed_check(event):
+    """
+    Handle GET /api/home/feed/check?since=<ISO timestamp>
+    Lightweight endpoint for polling — only counts if new content exists.
+    Returns {has_new: true/false} without rebuilding the entire feed.
+    """
+    headers = event.get("headers", {})
+    auth_header = headers.get("Authorization") or headers.get("authorization")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return error_response("Missing or invalid Authorization header.", 401)
+    
+    access_token = auth_header.split(" ")[1]
+    cognito_user = cognito.get_user(access_token)
+    if not cognito_user:
+        return error_response("Unauthorized.", 401)
+    
+    query_params = event.get("queryStringParameters") or {}
+    since = query_params.get("since")
+    
+    if not since:
+        return success_response({"success": True, "has_new": True})
+    
+    conn = rds.get_connection()
+    if not conn:
+        return success_response({"success": True, "has_new": False})
+    
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                '''
+                SELECT EXISTS(
+                    SELECT 1 FROM events WHERE "createdAt" > %s AND "status" = 'Published' AND "visibility" = 'Public' LIMIT 1
+                ) AS has_new_events,
+                EXISTS(
+                    SELECT 1 FROM posts WHERE "createdAt" > %s LIMIT 1
+                ) AS has_new_posts;
+                ''',
+                (since, since)
+            )
+            row = cur.fetchone()
+            has_new = bool(row and (row.get("has_new_events") or row.get("has_new_posts")))
+            return success_response({"success": True, "has_new": has_new})
+    except Exception as exc:
+        util.log("error", "handle_feed_check", f"Failed: {exc}")
+        return success_response({"success": True, "has_new": False})
+    finally:
+        conn.close()
 
 def handle_user_search(event):
     """
@@ -218,7 +281,9 @@ def lambda_handler(event, context):
         
         # ── Handle GET paths (no actionItem in body) ──
         if http_method == "GET":
-            if path.endswith("/feed"):
+            if path.endswith("/feed/check"):
+                return handle_feed_check(event)
+            elif path.endswith("/feed"):
                 return handle_home_feed(event)
             elif path.endswith("/search"):
                 return handle_user_search(event)

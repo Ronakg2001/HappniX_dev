@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import RightSidebar from "@/components/layout/RightSidebar";
 import { MOCK_SPONSORED_EVENT } from "@/constants/mockData";
-import { ProfilePreviewModal, EventPreviewModal } from "@/components/modals/HomeModals";
+import { ProfilePreviewModal } from "@/components/modals/HomeModals";
 import { SponsoredEventCard } from "@/components/feed/FeedCards";
 import { FeedItem } from "@/components/feed/FeedItem";
 import { LiveNowCarousel } from "@/components/feed/LiveNowCarousel";
@@ -17,7 +17,6 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState("all");
   const { openBooking, currentLocation } = useLayout();
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
-  const [selectedEventPreview, setSelectedEventPreview] = useState<string | null>(null);
 
   // Hook for feed
   const {
@@ -30,6 +29,14 @@ export default function HomePage() {
     refresh,
     hasNewPosts
   } = useFeed();
+
+  // Hole C fix: Filter feed items client-side based on the active tab
+  const filteredItems = useMemo(() => {
+    if (activeTab === "posts") return feedItems.filter(item => item.entityType === "FEED_POST");
+    if (activeTab === "events") return feedItems.filter(item => item.entityType === "EVENT_CARD");
+    // "all" and "nearby" show everything (nearby will be refined when live location is implemented)
+    return feedItems;
+  }, [feedItems, activeTab]);
 
   // Mock Sponsored Event
   const mockSponsoredEvent = MOCK_SPONSORED_EVENT;
@@ -98,20 +105,28 @@ export default function HomePage() {
         <div className="flex flex-col">
           {isLoading ? (
             <div className="flex justify-center p-8 text-white/50">Loading feed...</div>
-          ) : feedItems.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <div className="text-center p-8 text-white/50 border border-white/5 rounded-xl">
-              No posts to show right now.
+              {activeTab === "all" ? "No posts to show right now." : `No ${activeTab} to show right now.`}
             </div>
           ) : (
-            feedItems.map((item) => (
-              <FeedItem
-                key={`${item.entityType}-${item.postID || item.eventID}`}
-                item={item}
-                onProfileClick={setSelectedProfile}
-                onEventClick={(id) => router.push(`/event?id=${id}`)}
-                onBookNow={handleBookNow}
-              />
-            ))
+            filteredItems.map((item) => {
+              // Hole J: Per-item error boundary via try/catch render
+              try {
+                return (
+                  <FeedItem
+                    key={`${item.entityType}-${item.postID || item.eventID}`}
+                    item={item}
+                    onProfileClick={setSelectedProfile}
+                    onEventClick={(id) => router.push(`/event?id=${id}`)}
+                    onBookNow={handleBookNow}
+                  />
+                );
+              } catch (err) {
+                console.error("Failed to render feed item", item, err);
+                return null;
+              }
+            })
           )}
 
           {/* Load More Button (Infinite scroll proxy) */}
@@ -138,14 +153,6 @@ export default function HomePage() {
           isOpen={!!selectedProfile}
           onClose={() => setSelectedProfile(null)}
           username={selectedProfile}
-        />
-      )}
-
-      {selectedEventPreview && (
-        <EventPreviewModal
-          isOpen={!!selectedEventPreview}
-          onClose={() => setSelectedEventPreview(null)}
-          eventTitle={selectedEventPreview}
         />
       )}
     </>

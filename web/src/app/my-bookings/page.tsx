@@ -32,15 +32,21 @@ export default function MyBookingsPage() {
   const [selectedTicket, setSelectedTicket] = useState<typeof bookedTickets[0] | null>(null);
 
   // Helper to match ticket metadata
-  const getMeta = (title: string) => {
+  const getMeta = (ticket: typeof bookedTickets[0]) => {
+    // Use real backend cover image if available
+    const realCover = ticket.coverImageUrl;
+    const realVenue = ticket.venue;
+
     // Strip ticket tier suffixes like " (General Entry)" or " (VIP Access Pass)" if present
-    const cleanedTitle = title.replace(/\s*\(.*?\)\s*$/, "");
+    const cleanedTitle = ticket.eventTitle.replace(/\s*\(.*?\)\s*$/, "");
     const key = cleanedTitle.toLowerCase();
-    return EVENT_META[key] || {
-      banner: "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
-      venue: "Main Venue, HappniX Space",
-      locationLink: `https://maps.google.com/?q=${encodeURIComponent(cleanedTitle)}`,
-      instructions: ["Show ticket code at the entrance gate.", "Enjoy the night safely! Respect others."]
+    const mockMeta = EVENT_META[key];
+
+    return {
+      banner: realCover || mockMeta?.banner || "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=600&q=80",
+      venue: realVenue || mockMeta?.venue || "Main Venue, HappniX Space",
+      locationLink: mockMeta?.locationLink || `https://maps.google.com/?q=${encodeURIComponent(realVenue || cleanedTitle)}`,
+      instructions: mockMeta?.instructions || ["Show ticket code at the entrance gate.", "Enjoy the night safely! Respect others."]
     };
   };
 
@@ -108,7 +114,9 @@ export default function MyBookingsPage() {
       ) : (
         <div className="flex flex-wrap gap-6 justify-center sm:justify-start">
           {bookedTickets.map((t) => {
-            const meta = getMeta(t.eventTitle);
+            const meta = getMeta(t);
+            const isActive = !t.status || t.status === "Pending" || t.status === "Confirmed";
+            const statusLabel = t.status === "Cancelled" ? "Cancelled" : "Active Pass";
             return (
               <div 
                 key={t.id} 
@@ -124,8 +132,10 @@ export default function MyBookingsPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#050508]/90 to-transparent" />
                   
                   <div className="relative z-10 flex justify-between items-start">
-                    <span className="px-2 py-0.5 rounded bg-brand-gradient text-white text-[8px] font-black uppercase tracking-widest border border-white/10 shadow-glow">
-                      Active Pass
+                    <span className={`px-2 py-0.5 rounded text-white text-[8px] font-black uppercase tracking-widest border border-white/10 shadow-glow ${
+                      isActive ? 'bg-brand-gradient' : 'bg-red-500/80'
+                    }`}>
+                      {statusLabel}
                     </span>
                     <span className="text-[8px] text-white/50 font-black tracking-widest uppercase">HNX-{t.id.slice(-6).toUpperCase()}</span>
                   </div>
@@ -194,7 +204,7 @@ export default function MyBookingsPage() {
 
       {/* Ticket QR Modal / Digital Wallet Overlay */}
       {selectedTicket && (() => {
-        const meta = getMeta(selectedTicket.eventTitle);
+        const meta = getMeta(selectedTicket);
         return (
           <div 
             onClick={() => setSelectedTicket(null)}
