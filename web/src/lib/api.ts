@@ -237,6 +237,17 @@ export const discoverApi = {
   search: (query: string, limit = 50) => apiClient.get('/api/discover/search', { params: { q: query, limit } }),
 };
 
+export const bookingApi = {
+  bookTicket: (data: { eventID: string; tierID: string; quantity: number }) =>
+    apiClient.post('/api/booking', { actionItem: 'BookTicket', ...data }),
+  getMyBookings: () =>
+    apiClient.get('/api/booking'),
+  cancelTicket: (ticketID: string) =>
+    apiClient.post('/api/booking', { actionItem: 'CancelTicket', ticketID }),
+  getEventTiers: (eventID: string) =>
+    apiClient.get('/api/booking', { params: { eventID } }),
+};
+
 export const fixAvatarUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   

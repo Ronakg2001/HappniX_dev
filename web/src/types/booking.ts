@@ -1,9 +1,26 @@
 export interface TicketType {
-  id: string;
+  id: string;              // ticketID
+  orderID?: string;
+  orderNumber?: string;
+  eventID?: string;
   eventTitle: string;
-  date: string;
-  time: string;
-  seat: string;
+  tierName?: string;
+  tierID?: string;
+  date: string;            // event startAt formatted (e.g. "Jun 06")
+  time: string;            // event startAt time portion (e.g. "9:00 PM")
+  seat: string;            // tier name (e.g. "General Entry", "VIP Access")
+  venue?: string;
+  status?: string;         // "Pending" | "Confirmed" | "Cancelled"
+  totalPaid?: number;
+  tierPrice?: number;
+  paymentStatus?: string;
+  qrPayload?: string | null;
+  coverImageUrl?: string | null;
+  eventStartAt?: string;
+  eventEndAt?: string;
+  eventStatus?: string;
+  checkedInAt?: string | null;
+  createdAt?: string;
 }
 
 export interface AttendeeType {

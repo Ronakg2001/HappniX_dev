@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Bell, Ticket, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
+import { bookingApi } from "@/lib/api";
 
 // --- QUICK NOTIFICATIONS MODAL ---
 export function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -125,8 +126,9 @@ export function EventPreviewModal({ isOpen, onClose, eventTitle }: { isOpen: boo
 }
 
 // --- MINI BOOKING MODAL ---
-export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: boolean; onClose: () => void; eventTitle: string; price: string }) {
-  const { addTicket } = useLayout();
+export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { isOpen: boolean; onClose: () => void; eventTitle: string; price: string; eventID?: string }) {
+  const { addTicket, refreshBookings } = useLayout();
+  const isRealEvent = eventID && !eventID.startsWith("e") && !eventID.startsWith("c_");
 
   // Booking States
   const [qty, setQty] = useState(1);
@@ -134,8 +136,28 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
   const [promoCode, setPromoCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
   const [promoError, setPromoError] = useState("");
-  const [stage, setStage] = useState<"checkout" | "processing" | "confirmed">("checkout");
+  const [stage, setStage] = useState<"checkout" | "processing" | "confirmed" | "error">("checkout");
   const [processMsg, setProcessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Real tiers fetched from backend
+  const [realTiers, setRealTiers] = useState<any[]>([]);
+  const [selectedTierID, setSelectedTierID] = useState<string | null>(null);
+
+  // Fetch real tiers when modal opens for a real event
+  useEffect(() => {
+    if (isOpen && isRealEvent && eventID) {
+      bookingApi.getEventTiers(eventID).then((res: any) => {
+        if (res.success && res.tiers?.length > 0) {
+          setRealTiers(res.tiers);
+          setSelectedTierID(res.tiers[0].tierID);
+        }
+      }).catch(() => {
+        // Fallback to mock tiers if backend fails
+        setRealTiers([]);
+      });
+    }
+  }, [isOpen, isRealEvent, eventID]);
 
   if (!isOpen) return null;
 
@@ -169,22 +191,50 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
     }
   };
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     setStage("processing");
     setProcessMsg("Securing spot with venue hosts...");
-    
-    setTimeout(() => {
-      setProcessMsg("Generating secure gate QR keys...");
-    }, 800);
 
-    setTimeout(() => {
-      setProcessMsg("Authorizing secure check-out transaction...");
-    }, 1600);
+    if (isRealEvent && selectedTierID && eventID) {
+      // Real API booking flow
+      try {
+        setTimeout(() => setProcessMsg("Generating secure gate QR keys..."), 800);
 
-    setTimeout(() => {
-      addTicket(`${eventTitle} (${categoryLabel})`, `₹${total}`);
-      setStage("confirmed");
-    }, 2400);
+        const res = await bookingApi.bookTicket({
+          eventID: eventID,
+          tierID: selectedTierID,
+          quantity: qty,
+        }) as any;
+
+        if (res.success) {
+          setProcessMsg("Authorizing secure check-out transaction...");
+          await new Promise(r => setTimeout(r, 600));
+          // Refresh bookings from backend so My Bookings is up to date
+          await refreshBookings();
+          setStage("confirmed");
+        } else {
+          setErrorMsg(res.error || res.message || "Booking failed. Please try again.");
+          setStage("error");
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || "Booking failed. Please try again.");
+        setStage("error");
+      }
+    } else {
+      // Mock booking flow (for demo/mock events)
+      setTimeout(() => {
+        setProcessMsg("Generating secure gate QR keys...");
+      }, 800);
+
+      setTimeout(() => {
+        setProcessMsg("Authorizing secure check-out transaction...");
+      }, 1600);
+
+      setTimeout(() => {
+        addTicket(`${eventTitle} (${categoryLabel})`, `₹${total}`);
+        setStage("confirmed");
+      }, 2400);
+    }
   };
 
   const handleClose = () => {
@@ -195,6 +245,9 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
     setDiscountApplied(false);
     setPromoError("");
     setStage("checkout");
+    setErrorMsg("");
+    setRealTiers([]);
+    setSelectedTierID(null);
     onClose();
   };
 
@@ -376,6 +429,35 @@ export function BookingModal({ isOpen, onClose, eventTitle, price }: { isOpen: b
             >
               Done & Close
             </button>
+          </div>
+        )}
+
+        {/* Stage 4: Error Screen */}
+        {stage === "error" && (
+          <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-300 py-6">
+            <div className="h-12 w-12 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
+              <X className="h-6 w-6" />
+            </div>
+            
+            <h3 className="text-base font-black text-white uppercase tracking-wider">Booking Failed</h3>
+            <p className="text-[11px] text-white/50 mt-1.5 max-w-xs px-2 leading-relaxed">
+              {errorMsg}
+            </p>
+
+            <div className="flex gap-3 mt-5 w-full">
+              <button
+                onClick={() => { setStage("checkout"); setErrorMsg(""); }}
+                className="flex-1 py-3 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={handleClose}
+                className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white cursor-pointer active:scale-95 transition-all"
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
 
