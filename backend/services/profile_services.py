@@ -167,7 +167,7 @@ def toggle_follow_user(actor_user_id: str, target_user_id: str) -> dict:
     if is_currently_following:
         del_res = rds.delete_record("follows", followerUserID=actor_user_id, followingUserID=target_user_id)
         if not del_res.get("success"):
-            return {"success": False, "error": "Failed to unfollow user in database."}
+            return {"success": False, "error": f"Failed to unfollow user in database: {del_res.get('error', '')}"}
             
         dynamo_db.increment_counter("users", actor_user_id, "PROFILE", "following", -1)
         target_counter = dynamo_db.increment_counter("users", target_user_id, "PROFILE", "followers", -1)
@@ -180,9 +180,9 @@ def toggle_follow_user(actor_user_id: str, target_user_id: str) -> dict:
             }
         }
     else:
-        ins_res = rds.insert_record("follows", followerUserID=actor_user_id, followingUserID=target_user_id)
+        ins_res = rds.insert_record("follows", followerUserID=actor_user_id, followingUserID=target_user_id, createdAt=util.now_iso())
         if not ins_res.get("success"):
-            return {"success": False, "error": "Failed to save follow relationship."}
+            return {"success": False, "error": f"Failed to save follow relationship: {ins_res.get('error', '')}"}
             
         dynamo_db.increment_counter("users", actor_user_id, "PROFILE", "following", 1)
         target_counter = dynamo_db.increment_counter("users", target_user_id, "PROFILE", "followers", 1)

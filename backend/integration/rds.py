@@ -155,7 +155,11 @@ def insert_record(table_name: str, **kwargs) -> dict:
     values = tuple(insert_data.values())
     
     pk = table_config.get("pk", "userID")
-    sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) ON CONFLICT ("{pk}") DO NOTHING;'
+    if isinstance(pk, (list, tuple)):
+        pk_str = ", ".join([f'"{k}"' for k in pk])
+    else:
+        pk_str = f'"{pk}"'
+    sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) ON CONFLICT ({pk_str}) DO NOTHING;'
     
     try:
         with conn.cursor() as cur:
