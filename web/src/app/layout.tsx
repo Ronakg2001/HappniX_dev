@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   title: "Happnix — Find Your Next Experience",
   description: "Discover live events near you, book tickets in seconds, invite your squad, and stay connected — all in one place.",
   icons: {
-    icon: `${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`,
-    apple: `${STATIC_MEDIA_URL}/Happnix_logo_full_transparent.svg`
+    icon: `${STATIC_MEDIA_URL}/happnix_logo2_full_transparent.svg`,
+    apple: `${STATIC_MEDIA_URL}/happnix_logo2_full_transparent.svg`
   },
   manifest: "/manifest.json"
 };

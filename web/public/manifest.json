@@ -8,13 +8,13 @@
   "theme_color": "#050508",
   "icons": [
     {
-      "src": "/Happnix.svg",
+      "src": "/Happnix2.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
     },
     {
-      "src": "/Happnix.png",
+      "src": "/Happnix2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
