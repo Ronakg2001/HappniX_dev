@@ -30,13 +30,30 @@ export default function HomePage() {
     hasNewPosts
   } = useFeed();
 
-  // Hole C fix: Filter feed items client-side based on the active tab
+  // Deduplicate LiveNow carousel items
+  const uniqueLiveNow = useMemo(() => {
+    const seen = new Set();
+    return (liveNow || []).filter((e: any) => {
+      const id = e.eventID || e.postID || e.id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [liveNow]);
+
+  // Hole C fix: Filter feed items client-side & deduplicate against live carousel
   const filteredItems = useMemo(() => {
-    if (activeTab === "posts") return feedItems.filter(item => item.entityType === "FEED_POST");
-    if (activeTab === "events") return feedItems.filter(item => item.entityType === "EVENT_CARD");
-    if (activeTab === "nearby") return feedItems.filter(item => item.source === "NEARBY" || (item.entityType === "EVENT_CARD" && item.source === "OWN_CONTENT"));
-    return feedItems;
-  }, [feedItems, activeTab]);
+    const liveIds = new Set(uniqueLiveNow.map((e: any) => e.eventID || e.postID || e.id));
+    const base = feedItems.filter(item => {
+      const id = item.eventID || item.postID || item.id;
+      if (item.entityType === "EVENT_CARD" && liveIds.has(id)) return false;
+      return true;
+    });
+    if (activeTab === "posts") return base.filter(item => item.entityType === "FEED_POST");
+    if (activeTab === "events") return base.filter(item => item.entityType === "EVENT_CARD");
+    if (activeTab === "nearby") return base.filter(item => item.source === "NEARBY" || (item.entityType === "EVENT_CARD" && item.source === "OWN_CONTENT"));
+    return base;
+  }, [feedItems, uniqueLiveNow, activeTab]);
 
   // Mock Sponsored Event
   const mockSponsoredEvent = MOCK_SPONSORED_EVENT;
@@ -82,9 +99,9 @@ export default function HomePage() {
         )}
 
         {/* Live Now Carousel */}
-        {(activeTab === "all" || activeTab === "events") && liveNow.length > 0 && (
+        {(activeTab === "all" || activeTab === "events") && uniqueLiveNow.length > 0 && (
           <LiveNowCarousel 
-            events={liveNow} 
+            events={uniqueLiveNow} 
             onEventClick={(id) => router.push(`/event?id=${id}`)} 
           />
         )}

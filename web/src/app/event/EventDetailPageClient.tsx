@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
 import { useLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -32,6 +33,70 @@ import {
 import { EventDetail } from "@/types/event";
 import { MOCK_EVENTS_DETAILS } from "@/constants/mockData";
 
+function formatRealEventToDetail(raw: any, fallbackId: string): EventDetail {
+  if (!raw) return MOCK_EVENTS_DETAILS[fallbackId] || MOCK_EVENTS_DETAILS.e1;
+  if (raw.about && raw.lineup && raw.gallery && raw.verifiedOrganizer !== undefined) return raw;
+
+  let metadata: any = {};
+  try {
+    const cleaned = typeof raw.metadata === 'string' ? raw.metadata.replace(/'/g, '"').replace(/False/g, 'false').replace(/True/g, 'true') : "{}";
+    metadata = typeof raw.metadata === 'object' ? raw.metadata : JSON.parse(cleaned || "{}");
+  } catch {}
+
+  let dateStr = "Upcoming";
+  let timeStr = "8:00 PM";
+  if (raw.startAt) {
+    try {
+      const d = new Date(raw.startAt);
+      dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch {}
+  } else if (raw.schedule) {
+    dateStr = raw.schedule.startDate || "Upcoming";
+    timeStr = raw.schedule.startTime || "8:00 PM";
+  }
+
+  const artistsList: string[] = Array.isArray(metadata.artists) ? metadata.artists : (Array.isArray(raw.artists) ? raw.artists : []);
+  const lineup = artistsList.map((a: any) => ({
+    name: typeof a === 'string' ? a : a?.name || "Artist",
+    role: "Featured Headliner",
+    avatarBg: "bg-purple-600"
+  }));
+
+  const gallery: string[] = Array.isArray(metadata.gallery) && metadata.gallery.length > 0
+    ? metadata.gallery
+    : [raw.coverImageUrl || raw.bannerUrl || "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80"];
+
+  let priceRaw = raw.basePrice || raw.ticketing?.price || "499";
+  const priceStr = raw.ticketType === "Paid" || (raw.ticketing?.mode === "paid")
+    ? (str => str.startsWith('₹') ? str : `₹${str}`)(String(priceRaw))
+    : "Free Entry";
+
+  return {
+    id: raw.eventID || raw.id || fallbackId,
+    organizer: raw.hostName || raw.hostUserName || raw.organizer || "HappniX Host",
+    verifiedOrganizer: true,
+    title: raw.title || "HappniX Event",
+    category: raw.eventCategory || raw.category || "Party",
+    musicGenre: raw.eventCategory || raw.category || "Open Format",
+    ageRestricted: metadata.ageGroup === "18+" || raw.ageGroup === "18+" || true,
+    date: dateStr,
+    time: timeStr,
+    venue: raw.locationName || raw.location?.venue || "HappniX Venue",
+    distance: raw.locationAddress || raw.location?.address || "Mumbai",
+    ticketsLeft: raw.maxAttendees ? parseInt(raw.maxAttendees) : (raw.ticketing?.capacity || 100),
+    trending: true,
+    price: priceStr,
+    about: raw.description || "Join us for an electrifying party experience curated on HappniX!",
+    lineup,
+    friendsAttending: [],
+    banner: raw.coverImageUrl || raw.bannerUrl || gallery[0],
+    lat: raw.latitude ? parseFloat(raw.latitude) : (raw.location?.lat || 19.076),
+    lng: raw.longitude ? parseFloat(raw.longitude) : (raw.location?.lng || 72.877),
+    gallery
+  };
+}
+
 export default function EventDetailPageClient({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { openBooking } = useLayout();
@@ -45,7 +110,39 @@ export default function EventDetailPageClient({ params }: { params: { id: string
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
 
   const eventId = params?.id || "e1";
-  const event = MOCK_EVENTS_DETAILS[eventId] || MOCK_EVENTS_DETAILS.e1;
+  const [event, setEvent] = useState<EventDetail>(() => {
+    const fallback = MOCK_EVENTS_DETAILS[eventId] || MOCK_EVENTS_DETAILS.e1;
+    if (typeof window === 'undefined') return fallback;
+    try {
+      const created = JSON.parse(localStorage.getItem("happnix_created_events_v4") || "[]");
+      const cached = JSON.parse(localStorage.getItem("happnix_cached_feed_events") || "[]");
+      const match = [...created, ...cached].find((e: any) => (e.eventID || e.id) === eventId);
+      if (match) return formatRealEventToDetail(match, eventId);
+    } catch {}
+    return fallback;
+  });
+
+  useEffect(() => {
+    if (!eventId) return;
+    try {
+      const created = JSON.parse(localStorage.getItem("happnix_created_events_v4") || "[]");
+      const cached = JSON.parse(localStorage.getItem("happnix_cached_feed_events") || "[]");
+      const match = [...created, ...cached].find((e: any) => (e.eventID || e.id) === eventId);
+      if (match) {
+        setEvent(formatRealEventToDetail(match, eventId));
+        return;
+      }
+    } catch {}
+
+    apiClient.get("api/events")
+      .then((res: any) => {
+        const list = res?.events || res?.data || [];
+        if (Array.isArray(list)) {
+          const match = list.find((e: any) => (e.eventID || e.id) === eventId);
+          if (match) setEvent(formatRealEventToDetail(match, eventId));
+        }
+      }).catch(() => {});
+  }, [eventId]);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);

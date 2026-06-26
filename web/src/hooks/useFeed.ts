@@ -65,13 +65,26 @@ export function useFeed() {
       );
       
       if (data && data.success) {
+        const newFeed = data.feed_items || [];
+        const newLive = data.live_now || [];
         if (isInitial) {
-          setFeedItems(data.feed_items || []);
-          setLiveNow(data.live_now || []);
+          setFeedItems(newFeed);
+          setLiveNow(newLive);
           setHasNewPosts(false);
           lastFetchedAt.current = new Date().toISOString();
+          try {
+            const evs = [...newLive, ...newFeed].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
+            localStorage.setItem("happnix_cached_feed_events", JSON.stringify(evs));
+          } catch {}
         } else {
-          setFeedItems(prev => [...prev, ...(data.feed_items || [])]);
+          setFeedItems(prev => {
+            const merged = [...prev, ...newFeed];
+            try {
+              const evs = [...newLive, ...merged].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
+              localStorage.setItem("happnix_cached_feed_events", JSON.stringify(evs));
+            } catch {}
+            return merged;
+          });
         }
         setNextCursor(data.next_cursor || null);
       }
