@@ -256,7 +256,10 @@ def update_record(table_name: str, pk_name: str, pk_value: str, updates: dict) -
         conn.close()
 
 def get_user_by_username(username: str) -> dict:
-    """Helper for legacy routines."""
+    """Helper for routines where username could be userID or userName."""
+    res = get_record("users", userID=username)
+    if res.get("success"):
+        return res
     return get_record("users", userName=username)
 
 def search_users_by_name(query: str, limit: int = 20) -> dict:

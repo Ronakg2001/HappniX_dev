@@ -210,7 +210,7 @@ Globals:
         SOCIAL_TABLE_NAME:
           Fn::Sub: HappniX-social-${EnvironmentName}
         EVENTS_TABLE_NAME:
-          Fn::Sub: HappniX-events-${EnvironmentName}
+          Fn::Sub: HappniX-events-v2-${EnvironmentName}
         SETTINGS_TABLE_NAME:
           Fn::Sub: HappniX-settings-${EnvironmentName}
 

@@ -213,6 +213,9 @@ def lambda_handler(event, context):
                 user_id = attr.get("Value")
                 break
 
+        if not user_id:
+            user_id = username
+
         payload["event"] = event
         payload["username"] = username
         payload["user_id"] = user_id

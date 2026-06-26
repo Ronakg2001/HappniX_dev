@@ -1,46 +1,107 @@
-# Home Page Feed Flow
+# Home Page Feed & Hybrid Orchestration Flow
 
-This document describes the request lifecycle when a user opens the HappniX app and views the Home Page.
+This document details the end-to-end request lifecycle, hybrid service orchestration, and modular provider architecture when a user opens the HappniX app and views the Home Page timeline.
+
+---
 
 ## 1. Client Initialization (React / Next.js)
 
-1. The user navigates to the Home Page (`/home`).
-2. The custom hook `useFeed.ts` mounts, retrieves active user coordinates from `localStorage.getItem("userLocation")` (managed by `locationStore.tsx`) or browser GPS, and calls `loadFeed(isInitial = true)`.
-3. An authenticated HTTP `GET` request is dispatched via `apiClient.get('api/home/feed')` with the user's Bearer token and optional `lat`, `lng`, and `radius=5` query parameters.
-4. A `setInterval` is established to poll the lightweight endpoint `GET /api/home/feed/check?since=<timestamp>` every 30 seconds. If new content exists, a "New Posts" UI bubble appears without disrupting scroll position.
+1. **Navigation**: The user navigates to the Home Page (`/home`).
+2. **State & Location Mounting**: The custom hook `useFeed.ts` mounts. It retrieves active user coordinates from `localStorage.getItem("userLocation")` (managed by `locationStore.tsx`) or browser GPS fallback, and invokes `loadFeed(isInitial = true)`.
+3. **HTTP Dispatch**: An authenticated HTTP `GET` request is dispatched via `apiClient.get('api/home/feed')` attaching the user's Bearer JWT access token and optional `lat`, `lng`, and `radius` query parameters.
+4. **Non-Disruptive Polling**: A lightweight background `setInterval` polls `GET /api/home/feed/check?since=<timestamp>` every 30 seconds. If new content is detected, a "New Posts" UI bubble appears without shifting the scroll position.
 
-## 2. API Gateway & Authentication
+---
 
-1. The request hits the AWS API Gateway route for `GET /api/home/feed`.
-2. The `HomePageApi` Lambda function (`backend/handlers/home_page.py`) is invoked.
-3. The handler validates the Bearer token against Cognito, verifies user existence in RDS, and parses `cursor`, `lat`, and `lng` query parameters.
+## 2. API Gateway & Authentication Gateway
 
-## 3. Feed Orchestration & Geolocation Providers
+1. **API Gateway Routing**: The HTTP request hits AWS API Gateway route `GET /api/home/feed`.
+2. **Lambda Handler**: `HomePageApi` Lambda function (`backend/handlers/home_page.py`) is invoked.
+3. **Dual Auth Resolution**: The handler extracts the token and queries `cognito.get_user(access_token)`. To support both modern UUIDv7 logins and legacy handle signups, it performs a dual-lookup via `rds.get_user_by_username()`:
+   - First checks `SELECT * FROM users WHERE "userID" = :cognito_username`
+   - Fallback checks `SELECT * FROM users WHERE "userName" = :cognito_username`
+4. **Parameter Extraction**: Parses `cursor`, `lat`, and `lng` query parameters before delegating to the service layer.
 
-1. The request is routed to `feed_services.get_hybrid_feed(user_id, cursor, lat, lng)`.
-2. **Cursor Parsing**: The Base64-encoded JSON cursor is decoded to restore provider-specific offsets (`own_offset`, `following_key`, `rec_offset`) and last-seen `_rankingScore` + `item_id` for tie-breaking.
-3. **Carousel Data Fetching**: If no cursor score exists (fresh load), `feed_providers.get_live_events` fetches active public events within 50km using safeguarded Haversine formula.
-4. **Sequential Data Fetching**: A single shared RDS connection is opened and reused across RDS-based providers:
-   - `get_own_content(conn=shared)` — own posts + published events (JOINed with users table for author info)
-   - `get_nearby_events(conn=shared)` — public events within 5km radius using Haversine formula safeguarded with `LEAST(1.0, GREATEST(-1.0, ...))` against DB float precision crashes
-   - `get_following_content()` — DynamoDB fan-out, passes `ExclusiveStartKey` for deep pagination
-   - `get_recommendations()` — Discover feed via GSI-Discover scatter-gather
-5. **Deduplication**: Items are merged and deduplicated by `eventID` / `postID`.
-6. **Ranking**: `ranking_services.rank_feed_items()` scores items: `Base Weight × Time Decay × Engagement Factor`.
+---
 
-## 4. Pagination & Security Response
+## 3. Hybrid Feed Orchestration (`feed_services.py`)
 
-1. The ranked list is sorted descending by `_rankingScore`.
-2. If a cursor was provided, items are filtered by composite tie-breaker: `score < cursor_score` OR (`score == cursor_score` AND `item_id < cursor_item_id`).
-3. The list is sliced to requested limit (default 15).
-4. A Base64-encoded JSON `next_cursor` is generated containing score, item_id, and provider offsets.
-5. **Internal fields are stripped** (`_rankingScore`, `source`, `engagementScore`, etc.) before returning to prevent algorithm leakage.
-6. The API responds with HTTP 200.
+Located in `backend/services/feed_services.py`, the orchestrator merges disparate SQL and NoSQL data sources into a unified timeline:
 
-## 5. Client Rendering & Event Creation Sync
+```
+                      ┌─────────────────────────────────────────┐
+                      │      HomePageApi Lambda Handler         │
+                      └────────────────────┬────────────────────┘
+                                           ▼
+                      ┌─────────────────────────────────────────┐
+                      │   feed_services.get_hybrid_feed()       │
+                      └──────┬───────────────────────────┬──────┘
+                             │ (Shared DB Conn)          │ (Scatter-Gather)
+                             ▼                           ▼
+                 ┌───────────────────────┐   ┌───────────────────────┐
+                 │    RDS PostgreSQL     │   │     AWS DynamoDB      │
+                 ├───────────────────────┤   ├───────────────────────┤
+                 │ • get_live_events()   │   │ • get_following()     │
+                 │ • get_own_content()   │   │ • get_recs() (10 Shrd)│
+                 │ • get_nearby_events() │   └───────────────────────┘
+                 └───────────┬───────────┘               │
+                             │                           │
+                             └─────────────┬─────────────┘
+                                           ▼
+                      ┌─────────────────────────────────────────┐
+                      │  Deduplication & Heuristic Ranking      │
+                      └────────────────────┬────────────────────┘
+                                           ▼
+                      ┌─────────────────────────────────────────┐
+                      │ Composite Cursor & Stripped Payload     │
+                      └─────────────────────────────────────────┘
+```
 
-1. **Event Creation**: When an event is built in `EventBuilder.tsx`, coordinates (`latitude`, `longitude`) and `visibility: 'Public'` are extracted by `event_services._format_event_payload` and saved to RDS.
-2. `useFeed.ts` receives feed response and records timestamp.
-3. `live_now` populates `<LiveNowCarousel />`.
-4. `feed_items` render in vertical list via `<FeedItem />`, matching real author/organizer profiles.
-5. **Tab filters** (`all`, `posts`, `events`, `nearby`) filter feed client-side via `useMemo`. When `"nearby"` is clicked, location-aware events (`source === 'NEARBY'`) surface immediately.
+### Key Architectural Safeguards:
+1. **Connection Sharing**: A single PostgreSQL connection is opened and injected into all SQL providers (`get_live_events`, `get_own_content`, `get_nearby_events`), then closed *before* querying DynamoDB. This prevents Lambda concurrency spikes from exhausting RDS connection limits (`max_connections = 80` on `db.t4g.micro`).
+2. **Precision Crash Prevention**: Trigonometric Haversine SQL queries wrap domain values inside `LEAST(1.0, GREATEST(-1.0, ...))` to prevent floating-point arithmetic errors (`ACOS > 1.0`) from crashing PostgreSQL queries.
+3. **Deduplication**: Since items can appear across multiple sources (e.g., an event hosted by the user and also recommended trending), items are deduplicated strictly by `eventID` / `postID`.
+
+---
+
+## 4. Modular Data Providers (`feed_providers.py`)
+
+Located in `backend/services/feed_providers.py`, each function isolates a specific content slice:
+
+| Provider | Backend Source | Retrieval Strategy | User Metadata Joined |
+| :--- | :--- | :--- | :--- |
+| **`get_live_events`** | RDS PostgreSQL | `startAt <= now AND (endAt IS NULL OR endAt >= now) AND status != Cancelled`. Safeguarded Haversine filter (50km). | `hostName`, `hostUserName`, `hostAvatar` |
+| **`get_own_content`** | RDS PostgreSQL | Fetches user's active posts + published events (`hostUserID = current_user`). | `authorName`, `authorAvatar` |
+| **`get_nearby_events`** | RDS PostgreSQL | Public events within 5km radius using Haversine formula. | `hostName`, `hostUserName`, `hostAvatar` |
+| **`get_following_content`**| AWS DynamoDB | Fan-out lookup across followed target tables. Returns `ExclusiveStartKey`. | Embedded in fan-out item |
+| **`get_recommendations`** | AWS DynamoDB | Scatter-gather query across 10 sharded GSI partitions (`DISCOVER#SHARD_0`..`9`). | Embedded in projection |
+
+---
+
+## 5. Ranking Engine (`ranking_services.py`)
+
+Each item is assigned a dynamic mathematical `_rankingScore`:
+
+$$\text{Final Score} = \text{Base Weight} \times \text{Time Decay} \times \text{Engagement Factor}$$
+
+- **Base Weights**: `OWN_CONTENT` ($1.2$), `FOLLOWING` ($1.0$), `RECOMMENDATION` ($0.8$).
+- **Time Decay**: Exponential half-life decay where content loses $50\%$ score every 12 hours ($\text{half\_life\_hours} = 12.0$).
+- **Engagement Boost**: $+1\%$ boost per database engagement score point ($1.0 + \frac{\text{score}}{100}$).
+
+---
+
+## 6. Composite Pagination & Security Stripping
+
+1. **Tie-Breaker Sort**: Items are sorted descending by `_rankingScore`. Tie-breakers compare `item_id` to ensure deterministic ordering across refreshes.
+2. **Composite State**: Generates a Base64 JSON `next_cursor` preserving exact offsets/keys (`own_offset`, `following_key`, `rec_offset`) for independent provider resumption.
+3. **Security Stripping**: Strips internal algorithmic markers (`_rankingScore`, `source`, `engagementScore`, `discoverShard`) before JSON serialization to eliminate proprietary algorithm leakage.
+
+---
+
+## 7. Extending the Pipeline
+
+To add a new content provider (e.g., Sponsored Ads):
+1. Define `get_sponsored_posts(user_id, limit, offset, conn)` in `feed_providers.py`.
+2. Register provider execution in `feed_services.py` and attach `sponsored_offset` to cursor state.
+3. Assign algorithm base weight in `ranking_services.py`.
+4. Append any proprietary metadata tags to `_INTERNAL_FIELDS` blacklist.
