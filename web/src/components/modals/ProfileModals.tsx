@@ -32,6 +32,8 @@ import {
 
 // ─── SHARED TYPES ─────────────────────────────────────────────
 export interface UserProfile {
+  id?: string;
+  userID?: string;
   name: string;
   username: string;
   bio: string;

@@ -81,11 +81,12 @@ export default function ProfilePage() {
   const [graphList, setGraphList] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!followGraphType || !profile?.userID) return;
+    const targetId = profile?.userID || profile?.id || profile?.username;
+    if (!followGraphType || !targetId) return;
     const fetchGraph = async () => {
       try {
         const fn = followGraphType === "followers" ? userApi.getFollowers : userApi.getFollowing;
-        const res: any = await fn(profile.userID);
+        const res: any = await fn(targetId);
         if (res && res.success && Array.isArray(res.data)) {
           const mapped = res.data.map((u: any) => ({
             id: u.userID,
@@ -103,7 +104,7 @@ export default function ProfilePage() {
       }
     };
     fetchGraph();
-  }, [followGraphType, profile?.userID]);
+  }, [followGraphType, profile?.userID, profile?.id, profile?.username]);
 
   const handleVerified = () =>
     setProfile((prev) => (prev ? { ...prev, verified: true } : null));
