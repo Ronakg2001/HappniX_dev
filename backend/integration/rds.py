@@ -277,7 +277,7 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
         FROM users
         WHERE ("userName" ILIKE %s OR "fullName" ILIKE %s)
           AND "status" = 'Active'
-          AND "privacyMode" != 'private'
+          AND ("privacyMode" IS NULL OR "privacyMode" != 'private')
         LIMIT %s;
     '''
     
@@ -312,9 +312,9 @@ def search_public_events(query: str, limit: int = 20) -> dict:
         WHERE (e."title" ILIKE %s OR e."eventCategory" ILIKE %s)
           AND e."visibility" != 'Private'
           AND e."status" = 'Published'
-          AND u."privacyMode" != 'private'
+          AND (u."privacyMode" IS NULL OR u."privacyMode" != 'private')
           AND u."status" = 'Active'
-        ORDER BY e."engagementScore" DESC, e."createdAt" DESC
+        ORDER BY COALESCE(e."engagementScore", 0) DESC, e."createdAt" DESC
         LIMIT %s;
     '''
     

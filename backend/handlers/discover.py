@@ -75,6 +75,11 @@ def handle_discover_search(event):
             host_avatar = f"{pub_id}{host_avatar}"
             
         base_price = e.get("basePrice") or 0
+        try:
+            base_price_num = float(base_price)
+        except (ValueError, TypeError):
+            base_price_num = 0
+
         formatted_events.append({
             "id": e.get("eventID"),
             "title": e.get("title"),
@@ -82,7 +87,7 @@ def handle_discover_search(event):
             "image": cover,
             "start_at": e.get("startAt"),
             "ticket_type": e.get("ticketType"),
-            "price": f"{e.get('currency', '')} {base_price}" if base_price > 0 else "Free",
+            "price": f"{e.get('currency', '')} {base_price}" if base_price_num > 0 else "Free",
             "venue": e.get("locationName"),
             "host_username": e.get("host_userName"),
             "host_avatar": host_avatar,
