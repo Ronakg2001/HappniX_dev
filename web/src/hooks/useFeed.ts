@@ -10,7 +10,8 @@ const fetchFeed = async (cursor?: string, location?: {lat: number, lng: number})
   }
   
   const res = await apiClient.get('api/home/feed', { params });
-  return res.data;
+  const payload: any = res;
+  return payload.data || payload;
 };
 
 export function useFeed() {
@@ -94,7 +95,9 @@ export function useFeed() {
       try {
         const since = lastFetchedAt.current;
         const res = await apiClient.get('api/home/feed/check', { params: { since } });
-        if (res.data && res.data.success && res.data.has_new) {
+        const payload: any = res;
+        const d = payload.data || payload;
+        if (d && d.success && d.has_new) {
           setHasNewPosts(true);
         }
       } catch (e) {
