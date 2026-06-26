@@ -349,3 +349,68 @@ def check_if_following(follower_id: str, following_id: str) -> bool:
         return False
     finally:
         conn.close()
+
+
+def get_followers(user_id: str, limit: int = 20, offset: int = 0) -> dict:
+    """
+    Fetch the list of users following `user_id`.
+    Returns basic profile cards joined from the `users` table.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    sql = '''
+        SELECT u."userID", u."userName", u."fullName", u."profilePictureUrl", u."bio", u."status", u."privacyMode", f."createdAt" as followedAt
+        FROM follows f
+        JOIN users u ON f."followerUserID" = u."userID"
+        WHERE f."followingUserID" = %s
+          AND u."status" = 'Active'
+        ORDER BY f."createdAt" DESC
+        LIMIT %s OFFSET %s;
+    '''
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, limit, offset))
+            rows = cur.fetchall()
+            data = [util.format_rds_row(r) for r in rows]
+            return {"success": True, "data": data}
+    except Exception as exc:
+        util.log("error", "rds.get_followers", f"Failed to fetch followers: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+
+
+def get_following(user_id: str, limit: int = 20, offset: int = 0) -> dict:
+    """
+    Fetch the list of users followed by `user_id`.
+    Returns basic profile cards joined from the `users` table.
+    """
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
+
+    sql = '''
+        SELECT u."userID", u."userName", u."fullName", u."profilePictureUrl", u."bio", u."status", u."privacyMode", f."createdAt" as followedAt
+        FROM follows f
+        JOIN users u ON f."followingUserID" = u."userID"
+        WHERE f."followerUserID" = %s
+          AND u."status" = 'Active'
+        ORDER BY f."createdAt" DESC
+        LIMIT %s OFFSET %s;
+    '''
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, limit, offset))
+            rows = cur.fetchall()
+            data = [util.format_rds_row(r) for r in rows]
+            return {"success": True, "data": data}
+    except Exception as exc:
+        util.log("error", "rds.get_following", f"Failed to fetch following: {exc}")
+        return {"success": False, "error": str(exc)}
+    finally:
+        conn.close()
+

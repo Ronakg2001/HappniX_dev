@@ -25,7 +25,7 @@ import {
   type UserProfile,
 } from "@/components/modals/ProfileModals";
 
-import { apiClient } from "@/lib/api";
+import { apiClient, userApi, fixAvatarUrl } from "@/lib/api";
 import { getMediaUrl } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,32 @@ export default function ProfilePage() {
   const [showNotifs, setShowNotifs] = useState(false);
   const [followGraphType, setFollowGraphType] = useState<"followers" | "following" | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [graphList, setGraphList] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!followGraphType || !profile?.userID) return;
+    const fetchGraph = async () => {
+      try {
+        const fn = followGraphType === "followers" ? userApi.getFollowers : userApi.getFollowing;
+        const res: any = await fn(profile.userID);
+        if (res && res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((u: any) => ({
+            id: u.userID,
+            name: u.fullName || u.userName || "User",
+            username: u.userName || "",
+            avatar: fixAvatarUrl(u.profilePictureUrl),
+            bio: u.bio
+          }));
+          setGraphList(mapped);
+        } else {
+          setGraphList(followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING);
+        }
+      } catch (err) {
+        setGraphList(followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING);
+      }
+    };
+    fetchGraph();
+  }, [followGraphType, profile?.userID]);
 
   const handleVerified = () =>
     setProfile((prev) => (prev ? { ...prev, verified: true } : null));
@@ -312,7 +338,7 @@ export default function ProfilePage() {
           isOpen={!!followGraphType}
           onClose={() => setFollowGraphType(null)}
           type={followGraphType}
-          list={followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING}
+          list={graphList.length > 0 ? graphList : (followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING)}
         />
       )}
 

@@ -246,3 +246,44 @@ def delete_item(table_key: str, pk_value: str, sk_value: str) -> dict:
                  f"DynamoDB delete_item failed: {exc}",
                  table_key=table_key, pk_value=pk_value, sk_value=sk_value)
         return {"success": False, "error": str(exc)}
+
+def increment_counter(table_key: str, pk_value: str, sk_value: str, attr_name: str, val: int = 1) -> dict:
+    """
+    Atomically increment (or decrement if val is negative) a numeric attribute on a DynamoDB item.
+    Prevents race conditions on follower/following counts.
+    """
+    table = _get_table(table_key)
+    if not table:
+        return {"success": False, "error": f"DynamoDB table {table_key} not available."}
+
+    table_config = _MANIFEST.get("dynamodb", {}).get("tables", {}).get(table_key, {})
+    pk_name = table_config.get("keys", {}).get("pk", "PK")
+    sk_name = table_config.get("keys", {}).get("sk", "SK")
+
+    try:
+        response = table.update_item(
+            Key={
+                pk_name: pk_value,
+                sk_name: sk_value,
+            },
+            UpdateExpression=f"ADD #{attr_name} :val",
+            ExpressionAttributeNames={f"#{attr_name}": attr_name},
+            ExpressionAttributeValues={":val": val},
+            ReturnValues="UPDATED_NEW"
+        )
+        updated_val = response.get("Attributes", {}).get(attr_name, 0)
+        if isinstance(updated_val, (int, float)) and updated_val < 0:
+            table.update_item(
+                Key={pk_name: pk_value, sk_name: sk_value},
+                UpdateExpression=f"SET #{attr_name} :zero",
+                ExpressionAttributeNames={f"#{attr_name}": attr_name},
+                ExpressionAttributeValues={":zero": 0}
+            )
+            updated_val = 0
+        return {"success": True, "newValue": int(updated_val)}
+    except ClientError as exc:
+        util.log("error", "dynamo_db.increment_counter",
+                 f"DynamoDB increment_counter failed: {exc}",
+                 table_key=table_key, pk_value=pk_value, sk_value=sk_value)
+        return {"success": False, "error": str(exc)}
+

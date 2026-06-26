@@ -229,8 +229,11 @@ export const processEventMedia = async (eventData: CreatedEventType): Promise<Cr
 export const userApi = {
   search: (query: string, limit = 20) => apiClient.get('/api/users/search', { params: { q: query, limit } }),
   publicProfile: (userId: number | string) => apiClient.get(`/api/users/${userId}/profile`),
-  follow: (targetUserId: number | string) => apiClient.post('/api/users/follow', { target_user_id: targetUserId }),
-  unfollow: (targetUserId: number | string) => apiClient.post('/api/users/unfollow', { target_user_id: targetUserId }),
+  follow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
+  unfollow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
+  toggleFollow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
+  getFollowers: (userId: number | string, limit = 20, offset = 0) => apiClient.get('/api/profile/followers', { params: { userId, limit, offset } }),
+  getFollowing: (userId: number | string, limit = 20, offset = 0) => apiClient.get('/api/profile/following', { params: { userId, limit, offset } }),
 };
 
 export const discoverApi = {

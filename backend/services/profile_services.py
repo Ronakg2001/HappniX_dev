@@ -145,3 +145,71 @@ def delete_user_data(user_id: str, username: str, access_token: str) -> dict:
     # Note: Even if some steps fail (like R2 missing files), we consider the action successful
     # because the user's core auth/DB footprint is gone, enabling them to re-register.
     return results
+
+
+def toggle_follow_user(actor_user_id: str, target_user_id: str) -> dict:
+    """
+    Toggle follow status between actor and target user.
+    Orchestrates RDS insertion/deletion and atomic counter updates in DynamoDB.
+    """
+    if not actor_user_id or not target_user_id:
+        return {"success": False, "error": "User identifiers required."}
+        
+    if actor_user_id == target_user_id:
+        return {"success": False, "error": "You cannot follow yourself."}
+
+    target_check = rds.get_record("users", userID=target_user_id)
+    if not target_check.get("success"):
+        return {"success": False, "error": "Target user not found."}
+
+    is_currently_following = rds.check_if_following(actor_user_id, target_user_id)
+
+    if is_currently_following:
+        del_res = rds.delete_record("follows", followerUserID=actor_user_id, followingUserID=target_user_id)
+        if not del_res.get("success"):
+            return {"success": False, "error": "Failed to unfollow user in database."}
+            
+        dynamo_db.increment_counter("users", actor_user_id, "PROFILE", "following", -1)
+        target_counter = dynamo_db.increment_counter("users", target_user_id, "PROFILE", "followers", -1)
+        
+        return {
+            "success": True,
+            "data": {
+                "isFollowing": False,
+                "targetFollowersCount": target_counter.get("newValue", 0)
+            }
+        }
+    else:
+        ins_res = rds.insert_record("follows", followerUserID=actor_user_id, followingUserID=target_user_id)
+        if not ins_res.get("success"):
+            return {"success": False, "error": "Failed to save follow relationship."}
+            
+        dynamo_db.increment_counter("users", actor_user_id, "PROFILE", "following", 1)
+        target_counter = dynamo_db.increment_counter("users", target_user_id, "PROFILE", "followers", 1)
+        
+        return {
+            "success": True,
+            "data": {
+                "isFollowing": True,
+                "targetFollowersCount": target_counter.get("newValue", 0)
+            }
+        }
+
+
+def get_user_followers_list(user_id: str, limit: int = 20, offset: int = 0) -> dict:
+    """
+    Fetch followers list for user profile view.
+    """
+    if not user_id:
+        return {"success": False, "error": "user_id required."}
+    return rds.get_followers(user_id, limit, offset)
+
+
+def get_user_following_list(user_id: str, limit: int = 20, offset: int = 0) -> dict:
+    """
+    Fetch following list for user profile view.
+    """
+    if not user_id:
+        return {"success": False, "error": "user_id required."}
+    return rds.get_following(user_id, limit, offset)
+

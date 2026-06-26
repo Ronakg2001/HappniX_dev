@@ -88,6 +88,25 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  const handleToggleFollow = async () => {
+    if (followLoading || !user) return;
+    setFollowLoading(true);
+    try {
+      const res: any = await userApi.toggleFollow(id);
+      if (res && res.success) {
+        setIsFollowing(res.data?.isFollowing ?? !isFollowing);
+        if (typeof res.data?.targetFollowersCount === "number") {
+          setUser((prev) => prev ? { ...prev, followers: res.data.targetFollowersCount } : prev);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle follow:", err);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -196,10 +215,11 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
                   <MessageCircle className="h-4 w-4" />
                 </Button>
                 <button
-                  onClick={() => setIsFollowing((f) => !f)}
+                  onClick={handleToggleFollow}
+                  disabled={followLoading}
                   aria-label={isFollowing ? `Unfollow ${user.name}` : `Follow ${user.name}`}
                   aria-pressed={isFollowing}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-2)] ${isFollowing
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-2)] disabled:opacity-50 ${isFollowing
                       ? "bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/[0.10]"
                       : "bg-brand-gradient text-white shadow-glow hover:scale-[1.03] active:scale-[0.97]"
                     }`}

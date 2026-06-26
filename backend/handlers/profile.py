@@ -198,6 +198,59 @@ def delete_account(**kwargs):
         return error_response(f"Action error: {str(exc)}", 500)
 
 
+def toggle_follow(**kwargs):
+    """
+    POST actionItem: toggleFollow
+    kwargs: targetUserId (or target_user_id)
+    """
+    actor_id = kwargs.get("user_id")
+    target_id = kwargs.get("targetUserId") or kwargs.get("target_user_id")
+    try:
+        res = profile_services.toggle_follow_user(actor_id, target_id)
+        if not res.get("success"):
+            return error_response(res.get("error", "Failed to toggle follow status."), 400)
+        return success_response(res)
+    except Exception as exc:
+        util.log("error", "profile.toggle_follow", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
+
+def get_followers_list(**kwargs):
+    """
+    GET /api/profile/followers
+    Query params passed via kwargs: userId (or targetUserId), limit, offset
+    """
+    target_id = kwargs.get("userId") or kwargs.get("targetUserId") or kwargs.get("user_id")
+    limit = int(kwargs.get("limit", 20))
+    offset = int(kwargs.get("offset", 0))
+    try:
+        res = profile_services.get_user_followers_list(target_id, limit, offset)
+        if not res.get("success"):
+            return error_response(res.get("error", "Failed to fetch followers."), 500)
+        return success_response(res)
+    except Exception as exc:
+        util.log("error", "profile.get_followers_list", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
+
+def get_following_list(**kwargs):
+    """
+    GET /api/profile/following
+    Query params passed via kwargs: userId (or targetUserId), limit, offset
+    """
+    target_id = kwargs.get("userId") or kwargs.get("targetUserId") or kwargs.get("user_id")
+    limit = int(kwargs.get("limit", 20))
+    offset = int(kwargs.get("offset", 0))
+    try:
+        res = profile_services.get_user_following_list(target_id, limit, offset)
+        if not res.get("success"):
+            return error_response(res.get("error", "Failed to fetch following."), 500)
+        return success_response(res)
+    except Exception as exc:
+        util.log("error", "profile.get_following_list", f"Action failed: {exc}")
+        return error_response(f"Action error: {str(exc)}", 500)
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -207,14 +260,18 @@ ACTION_HANDLERS = {
     "update_user_profile": update_user_profile,
     "check_username": check_username,
     "deleteAccount": delete_account,
-    # Future: "updateProfile", "uploadAvatar", etc.
+    "toggleFollow": toggle_follow,
+    "getFollowers": get_followers_list,
+    "getFollowing": get_following_list,
 }
 
 # Actions that map from GET path → action name
 GET_ROUTE_MAP = {
     "/api/profile/me": "getUserProfile",
-    # Future: "/api/profile/{id}" → "getPublicProfile"
+    "/api/profile/followers": "getFollowers",
+    "/api/profile/following": "getFollowing",
 }
+
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -307,13 +364,18 @@ def lambda_handler(event, context):
             "access_token": access_token,
         }
 
-        # Merge POST body fields into kwargs (if any)
+        # Merge POST body fields or GET query params into kwargs (if any)
         if http_method == "POST":
             body = util.parse_body(event)
             if isinstance(body, dict):
                 for k, v in body.items():
                     if k != "actionItem":
                         kwargs[k] = v
+        elif http_method == "GET":
+            q_params = event.get("queryStringParameters") or {}
+            if isinstance(q_params, dict):
+                for k, v in q_params.items():
+                    kwargs[k] = v
 
         # ── E. Call the action handler ─────────────────────────────────────────
         return handler(**kwargs)
