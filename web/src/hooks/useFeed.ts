@@ -1,27 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiClient } from '@/lib/api';
 
-// Replace with actual API utility
 const fetchFeed = async (cursor?: string, location?: {lat: number, lng: number}) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  let url = `/api/home/feed?`;
-  if (cursor) url += `cursor=${encodeURIComponent(cursor)}&`;
-  if (location) url += `lat=${location.lat}&lng=${location.lng}&`;
-  
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    },
-    cache: 'no-store'
-  });
-  
-  if (!res.ok) {
-    throw new Error('Failed to fetch feed');
+  const params: any = {};
+  if (cursor) params.cursor = cursor;
+  if (location && location.lat !== undefined && location.lng !== undefined) {
+    params.lat = location.lat;
+    params.lng = location.lng;
   }
   
-  return res.json();
+  const res = await apiClient.get('api/home/feed', { params });
+  return res.data;
 };
 
 export function useFeed() {
@@ -35,8 +24,34 @@ export function useFeed() {
   
   // New posts polling state
   const [hasNewPosts, setHasNewPosts] = useState(false);
-  // Track when we last loaded the feed for lightweight polling
   const lastFetchedAt = useRef<string>(new Date().toISOString());
+
+  // Determine user location from localStorage (locationStore) or GPS
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    let foundLocation = false;
+    try {
+      const stored = localStorage.getItem('userLocation');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
+          setUserLocation({ lat: parsed.latitude, lng: parsed.longitude });
+          foundLocation = true;
+        }
+      }
+    } catch {
+      // ignore parse error
+    }
+
+    if (!foundLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.warn("Location access denied or unavailable", err),
+        { timeout: 5000 }
+      );
+    }
+  }, []);
 
   const loadFeed = useCallback(async (isInitial = false) => {
     try {
@@ -48,7 +63,7 @@ export function useFeed() {
         userLocation
       );
       
-      if (data.success) {
+      if (data && data.success) {
         if (isInitial) {
           setFeedItems(data.feed_items || []);
           setLiveNow(data.live_now || []);
@@ -68,38 +83,24 @@ export function useFeed() {
   }, [nextCursor, userLocation]);
 
   useEffect(() => {
-    // Try to get user location once
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.warn("Location access denied or unavailable", err),
-        { timeout: 5000 }
-      );
-    }
     loadFeed(true);
-  }, []);
+  }, [loadFeed]);
 
-  // Lightweight polling — uses /feed/check instead of rebuilding the full feed
+  // Lightweight polling
   useEffect(() => {
     const pollInterval = setInterval(async () => {
-      // Don't poll if we are actively loading
       if (isLoading || isFetchingNext) return;
       
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        const since = encodeURIComponent(lastFetchedAt.current);
-        const res = await fetch(`/api/home/feed/check?since=${since}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        
-        if (data.success && data.has_new) {
+        const since = lastFetchedAt.current;
+        const res = await apiClient.get('api/home/feed/check', { params: { since } });
+        if (res.data && res.data.success && res.data.has_new) {
           setHasNewPosts(true);
         }
       } catch (e) {
         console.error("Polling error", e);
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
     
     return () => clearInterval(pollInterval);
   }, [isLoading, isFetchingNext]);

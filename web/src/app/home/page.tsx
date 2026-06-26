@@ -34,7 +34,7 @@ export default function HomePage() {
   const filteredItems = useMemo(() => {
     if (activeTab === "posts") return feedItems.filter(item => item.entityType === "FEED_POST");
     if (activeTab === "events") return feedItems.filter(item => item.entityType === "EVENT_CARD");
-    // "all" and "nearby" show everything (nearby will be refined when live location is implemented)
+    if (activeTab === "nearby") return feedItems.filter(item => item.source === "NEARBY" || (item.entityType === "EVENT_CARD" && item.source === "OWN_CONTENT"));
     return feedItems;
   }, [feedItems, activeTab]);
 

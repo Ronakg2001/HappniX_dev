@@ -82,6 +82,14 @@ def _format_event_payload(raw_payload: dict) -> dict:
     t_mode = str(ticketing.get("mode", "free")).lower()
     ticket_type = "Paid" if t_mode == "paid" else "Free"
 
+    # Extract geolocation coordinates
+    lat = location.get("lat")
+    if lat is None:
+        lat = location.get("latitude")
+    lng = location.get("lng")
+    if lng is None:
+        lng = location.get("longitude")
+
     return {
         "title": payload.get("title", "Untitled Event"),
         "description": payload.get("description", ""),
@@ -94,11 +102,14 @@ def _format_event_payload(raw_payload: dict) -> dict:
 
         "locationName": location.get("venue", "Venue TBD"),
         "locationAddress": location.get("address", ""),
+        "latitude": lat,
+        "longitude": lng,
         "isOnline": location.get("isOnline", False),
 
         "ticketType": ticket_type,
         "basePrice": 0.00,
         "maxAttendees": ticketing.get("capacity"),
+        "visibility": payload.get("visibility", "Public"),
 
         "coverImageUrl": payload.get("bannerUrl", ""),
 

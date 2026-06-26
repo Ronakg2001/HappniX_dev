@@ -53,6 +53,7 @@ def get_hybrid_feed(user_id: str, cursor: str = None, limit: int = 15, lat: floa
         
     # Fetch from RDS providers using the shared connection
     own_content = feed_providers.get_own_content(user_id, 10, cursor_state.get("own_offset", 0), conn=conn)
+    nearby_content = feed_providers.get_nearby_events(user_id, lat, lng, radius_km=5.0, limit=20, conn=conn) if lat is not None and lng is not None else []
     
     # Close shared connection before non-RDS calls
     if conn:
@@ -65,7 +66,7 @@ def get_hybrid_feed(user_id: str, cursor: str = None, limit: int = 15, lat: floa
     following_content, next_following_key = feed_providers.get_following_content(user_id, 20, cursor_state.get("following_key"))
     recommendations = feed_providers.get_recommendations(user_id, 15, cursor_state.get("rec_offset", 0))
         
-    all_items = own_content + following_content + recommendations
+    all_items = own_content + nearby_content + following_content + recommendations
     
     # Deduplicate items (an event might be both in own_content and recommendations)
     seen = set()

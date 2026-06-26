@@ -31,11 +31,11 @@ def get_live_events(user_id: str, lat: float = None, lng: float = None, conn=Non
                 geo_clause = """
                   AND e."latitude" IS NOT NULL
                   AND e."longitude" IS NOT NULL
-                  AND (6371 * acos(
+                  AND (6371 * acos(LEAST(1.0, GREATEST(-1.0,
                       cos(radians(%s)) * cos(radians(e."latitude"))
                       * cos(radians(e."longitude") - radians(%s))
                       + sin(radians(%s)) * sin(radians(e."latitude"))
-                  )) <= 50
+                  )))) <= 50
                 """
                 params = [lat, lng, lat]
             
@@ -167,3 +167,56 @@ def get_recommendations(user_id: str, limit: int = 10, offset: int = 0) -> list:
     for item in items:
         item["source"] = "RECOMMENDATION"
     return items
+
+
+def get_nearby_events(user_id: str, lat: float = None, lng: float = None, radius_km: float = 5.0, limit: int = 20, conn=None) -> list:
+    """
+    Fetch public events within radius_km (default 5km) of the user coordinates.
+    Excludes drafts and cancelled events.
+    Includes host profile info.
+    """
+    if lat is None or lng is None:
+        return []
+
+    owns_conn = conn is None
+    if owns_conn:
+        conn = rds.get_connection()
+    if not conn:
+        return []
+
+    try:
+        from psycopg2.extras import RealDictCursor
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            query = '''
+                SELECT e.*, 'EVENT_CARD' as "entityType", 'NEARBY' as "source",
+                       u."fullName" AS "hostName", u."userName" AS "hostUserName",
+                       u."profilePictureUrl" AS "hostAvatar",
+                       (6371 * acos(LEAST(1.0, GREATEST(-1.0,
+                           cos(radians(%s)) * cos(radians(e."latitude"))
+                           * cos(radians(e."longitude") - radians(%s))
+                           + sin(radians(%s)) * sin(radians(e."latitude"))
+                       )))) AS distance_km
+                FROM events e
+                LEFT JOIN users u ON e."hostUserID" = u."userID"
+                WHERE e."visibility" = 'Public'
+                  AND e."status" NOT IN ('Draft', 'Cancelled')
+                  AND e."latitude" IS NOT NULL AND e."longitude" IS NOT NULL
+                  AND (6371 * acos(LEAST(1.0, GREATEST(-1.0,
+                           cos(radians(%s)) * cos(radians(e."latitude"))
+                           * cos(radians(e."longitude") - radians(%s))
+                           + sin(radians(%s)) * sin(radians(e."latitude"))
+                       )))) <= %s
+                ORDER BY e."startAt" ASC
+                LIMIT %s;
+            '''
+            params = [lat, lng, lat, lat, lng, lat, radius_km, limit]
+            cur.execute(query, tuple(params))
+            events = [util.format_rds_row(row) for row in cur.fetchall()]
+            return events
+    except Exception as exc:
+        util.log("error", "feed_providers.get_nearby_events", f"Failed: {exc}")
+        return []
+    finally:
+        if owns_conn and conn:
+            conn.close()
+
