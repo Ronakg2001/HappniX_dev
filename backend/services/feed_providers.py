@@ -55,11 +55,18 @@ def get_live_events(user_id: str, lat: float = None, lng: float = None, conn=Non
             cur.execute(query, tuple(params))
             rows = cur.fetchall()
             events = [util.format_rds_row(row) for row in rows]
-            # Add a source flag
+            seen_titles = set()
+            unique_live = []
             for e in events:
+                title = str(e.get("title") or "").lower().strip()
+                if title and title in seen_titles:
+                    continue
+                if title:
+                    seen_titles.add(title)
                 e["source"] = "LIVE_EVENT"
                 e["entityType"] = "EVENT_CARD"
-            return events
+                unique_live.append(e)
+            return unique_live
     except Exception as exc:
         util.log("error", "feed_providers.get_live_events", f"Failed: {exc}")
         return []

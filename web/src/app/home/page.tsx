@@ -30,30 +30,38 @@ export default function HomePage() {
     hasNewPosts
   } = useFeed();
 
-  // Deduplicate LiveNow carousel items
+  // Deduplicate LiveNow carousel items by Title & ID
   const uniqueLiveNow = useMemo(() => {
-    const seen = new Set();
+    const seenIds = new Set();
+    const seenTitles = new Set();
     return (liveNow || []).filter((e: any) => {
       const id = e.eventID || e.postID || e.id;
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
+      const title = (e.title || "").toLowerCase().trim();
+      if (!id || seenIds.has(id) || (title && seenTitles.has(title))) return false;
+      seenIds.add(id);
+      if (title) seenTitles.add(title);
       return true;
     });
   }, [liveNow]);
 
-  // Hole C fix: Filter feed items client-side & deduplicate against live carousel
+  // Hole C fix: Filter feed items client-side & deduplicate by ID & Title
   const filteredItems = useMemo(() => {
-    const liveIds = new Set(uniqueLiveNow.map((e: any) => e.eventID || e.postID || e.id));
-    const base = feedItems.filter(item => {
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    const base = (feedItems || []).filter((item: any) => {
       const id = item.eventID || item.postID || item.id;
-      if (item.entityType === "EVENT_CARD" && liveIds.has(id)) return false;
+      const title = (item.title || "").toLowerCase().trim();
+      if (!id || seenIds.has(id)) return false;
+      if (item.entityType === "EVENT_CARD" && title && seenTitles.has(title)) return false;
+      seenIds.add(id);
+      if (item.entityType === "EVENT_CARD" && title) seenTitles.add(title);
       return true;
     });
     if (activeTab === "posts") return base.filter(item => item.entityType === "FEED_POST");
     if (activeTab === "events") return base.filter(item => item.entityType === "EVENT_CARD");
     if (activeTab === "nearby") return base.filter(item => item.source === "NEARBY" || (item.entityType === "EVENT_CARD" && item.source === "OWN_CONTENT"));
     return base;
-  }, [feedItems, uniqueLiveNow, activeTab]);
+  }, [feedItems, activeTab]);
 
   // Mock Sponsored Event
   const mockSponsoredEvent = MOCK_SPONSORED_EVENT;

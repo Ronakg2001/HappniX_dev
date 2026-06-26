@@ -69,17 +69,20 @@ def get_hybrid_feed(user_id: str, cursor: str = None, limit: int = 15, lat: floa
     all_items = own_content + nearby_content + following_content + recommendations
     
     # Deduplicate items (an event might be both in own_content and recommendations)
-    seen = set()
+    seen_ids = set()
+    seen_titles = set()
     unique_items = []
     for item in all_items:
-        # Determine the primary key for the item
         item_id = item.get("postID") or item.get("eventID")
-        if not item_id:
+        if not item_id or item_id in seen_ids:
             continue
-            
-        if item_id not in seen:
-            seen.add(item_id)
-            unique_items.append(item)
+        title = str(item.get("title") or "").lower().strip()
+        if item.get("entityType") == "EVENT_CARD" and title and title in seen_titles:
+            continue
+        if item.get("entityType") == "EVENT_CARD" and title:
+            seen_titles.add(title)
+        seen_ids.add(item_id)
+        unique_items.append(item)
             
     # Rank the items
     ranked_items = ranking_services.rank_feed_items(unique_items)
