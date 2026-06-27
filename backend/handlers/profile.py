@@ -338,15 +338,17 @@ def lambda_handler(event, context):
 
         clean_path = path.rstrip("/")
         if http_method == "GET":
-            # Match GET path to an action
-            action_name = GET_ROUTE_MAP.get(clean_path)
+            for route_path, act_name in GET_ROUTE_MAP.items():
+                if clean_path.endswith(route_path):
+                    action_name = act_name
+                    break
         elif http_method == "POST":
             # Extract actionItem from the POST body
             body = util.parse_body(event)
             if body == "400":
                 return error_response("Malformed JSON in request body.", 400)
             action_name = body.get("actionItem")
-            if not action_name and clean_path in ["/api/users/follow", "/api/profile/follow"]:
+            if not action_name and (clean_path.endswith("/api/users/follow") or clean_path.endswith("/api/profile/follow")):
                 action_name = "toggleFollow"
 
         if not action_name:

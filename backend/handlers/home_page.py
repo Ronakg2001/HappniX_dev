@@ -278,24 +278,25 @@ def lambda_handler(event, context):
             
         action_item = body.get("actionItem")
         path = event.get("path", "")
+        clean_path = path.rstrip("/")
         
-        if path.startswith("/api/profile") or path.rstrip("/") == "/api/users/follow":
+        if "/api/profile" in clean_path or clean_path.endswith("/api/users/follow"):
             from handlers import profile as profile_handler
             return profile_handler.lambda_handler(event, context)
         
         # ── Handle GET paths (no actionItem in body) ──
         if http_method == "GET":
-            if path.endswith("/feed/check"):
+            if clean_path.endswith("/feed/check"):
                 return handle_feed_check(event)
-            elif path.endswith("/feed"):
+            elif clean_path.endswith("/feed"):
                 return handle_home_feed(event)
-            elif path.endswith("/search"):
+            elif clean_path.endswith("/search"):
                 return handle_user_search(event)
-            elif "/profile" in path and path.startswith("/api/users/"):
+            elif "/profile" in clean_path and "/api/users/" in clean_path:
                 # Extract target user ID from /api/users/{id}/profile
-                parts = path.strip("/").split("/")
-                if len(parts) >= 4 and parts[3] == "profile":
-                    target_user_id = parts[2]
+                parts = clean_path.split("/")
+                if len(parts) >= 4 and parts[-1] == "profile":
+                    target_user_id = parts[-2]
                     return handle_public_profile(event, target_user_id)
             # Add future GET routes here (e.g. /live, /nearby)
             return error_response("GET endpoint not implemented.", 501)
