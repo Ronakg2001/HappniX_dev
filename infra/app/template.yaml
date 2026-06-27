@@ -574,18 +574,6 @@ Resources:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/profile/privacy
             Method: POST
-        ProfileMeGet:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/profile/me
-            Method: GET
-        ProfileMePost:
-          Type: Api
-          Properties:
-            RestApiId: { Ref: HappnixDevApi }
-            Path: /api/profile/me
-            Method: POST
         GetFollowing:
           Type: Api
           Properties:
