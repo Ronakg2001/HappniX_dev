@@ -573,6 +573,7 @@ Resources:
           Properties:
             RestApiId: { Ref: HappnixDevApi }
             Path: /api/profile/privacy
+            Method: POST
         ProfileMeGet:
           Type: Api
           Properties:
