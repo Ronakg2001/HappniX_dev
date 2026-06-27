@@ -279,6 +279,10 @@ def lambda_handler(event, context):
         action_item = body.get("actionItem")
         path = event.get("path", "")
         
+        if path.startswith("/api/profile") or path.rstrip("/") == "/api/users/follow":
+            from handlers import profile as profile_handler
+            return profile_handler.lambda_handler(event, context)
+        
         # ── Handle GET paths (no actionItem in body) ──
         if http_method == "GET":
             if path.endswith("/feed/check"):
