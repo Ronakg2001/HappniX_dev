@@ -147,6 +147,18 @@ def delete_user_data(user_id: str, username: str, access_token: str) -> dict:
     return results
 
 
+def _resolve_user_id(user_id: str) -> str:
+    if not user_id:
+        return user_id
+    res = rds.get_record("users", userID=user_id)
+    if res.get("success"):
+        return res["data"]["userID"]
+    res = rds.get_record("users", userName=user_id)
+    if res.get("success"):
+        return res["data"]["userID"]
+    return user_id
+
+
 def toggle_follow_user(actor_user_id: str, target_user_id: str) -> dict:
     """
     Toggle follow status between actor and target user.
@@ -154,6 +166,9 @@ def toggle_follow_user(actor_user_id: str, target_user_id: str) -> dict:
     """
     if not actor_user_id or not target_user_id:
         return {"success": False, "error": "User identifiers required."}
+        
+    actor_user_id = _resolve_user_id(actor_user_id)
+    target_user_id = _resolve_user_id(target_user_id)
         
     if actor_user_id == target_user_id:
         return {"success": False, "error": "You cannot follow yourself."}
@@ -202,6 +217,7 @@ def get_user_followers_list(user_id: str, limit: int = 20, offset: int = 0) -> d
     """
     if not user_id:
         return {"success": False, "error": "user_id required."}
+    user_id = _resolve_user_id(user_id)
     return rds.get_followers(user_id, limit, offset)
 
 
@@ -211,5 +227,6 @@ def get_user_following_list(user_id: str, limit: int = 20, offset: int = 0) -> d
     """
     if not user_id:
         return {"success": False, "error": "user_id required."}
+    user_id = _resolve_user_id(user_id)
     return rds.get_following(user_id, limit, offset)
 

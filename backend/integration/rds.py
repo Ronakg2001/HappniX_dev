@@ -369,7 +369,7 @@ def get_followers(user_id: str, limit: int = 20, offset: int = 0) -> dict:
         FROM follows f
         JOIN users u ON f."followerUserID" = u."userID"
         WHERE f."followingUserID" = %s
-          AND u."status" = 'Active'
+          AND (u."status" IS NULL OR u."status" != 'Deleted')
         ORDER BY f."createdAt" DESC
         LIMIT %s OFFSET %s;
     '''
@@ -401,7 +401,7 @@ def get_following(user_id: str, limit: int = 20, offset: int = 0) -> dict:
         FROM follows f
         JOIN users u ON f."followingUserID" = u."userID"
         WHERE f."followerUserID" = %s
-          AND u."status" = 'Active'
+          AND (u."status" IS NULL OR u."status" != 'Deleted')
         ORDER BY f."createdAt" DESC
         LIMIT %s OFFSET %s;
     '''
