@@ -16,6 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ProfileStat } from "@/components/ui/profile-stat";
+import { FollowGraphModal } from "@/components/modals/ProfileModals";
 import { MOCK_USERS } from "@/constants/mockData";
 import { type User } from "@/types/user";
 import { userApi, fixAvatarUrl } from "@/lib/api";
@@ -89,6 +90,8 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [followGraphType, setFollowGraphType] = useState<"followers" | "following" | null>(null);
+  const [graphList, setGraphList] = useState<any[]>([]);
 
   const handleToggleFollow = async () => {
     if (followLoading || !user) return;
@@ -109,6 +112,31 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
   };
 
   useEffect(() => {
+    if (!followGraphType || !id) return;
+    const fetchGraph = async () => {
+      try {
+        const fn = followGraphType === "followers" ? userApi.getFollowers : userApi.getFollowing;
+        const res: any = await fn(id);
+        if (res && res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((u: any) => ({
+            id: u.userID,
+            name: u.fullName || u.userName || "User",
+            username: u.userName || "",
+            avatar: fixAvatarUrl(u.profilePictureUrl),
+            bio: u.bio
+          }));
+          setGraphList(mapped);
+        } else {
+          setGraphList([]);
+        }
+      } catch (err) {
+        setGraphList([]);
+      }
+    };
+    fetchGraph();
+  }, [followGraphType, id]);
+
+  useEffect(() => {
     if (!id) return;
     const fetchProfile = async () => {
       try {
@@ -123,7 +151,8 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
             avatar: cleanAvatar,
             bio: p.bio || "",
             verified: !!p.verified,
-            followers: p.followers || 0,
+            followers: Number(p.followers || 0),
+            following: Number(p.following || 0),
             mutuals: 0,
             isFollowing: !!p.isFollowing,
             tags: []
@@ -277,11 +306,11 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
             )}
 
             <div className="flex items-center gap-0 border-t border-border pt-3">
-              <ProfileStat label="Fans" value={user.followers} />
+              <ProfileStat label="Fans" value={user.followers} onClick={() => setFollowGraphType("followers")} />
+              <div className="w-px h-8 bg-border" />
+              <ProfileStat label="Following" value={user.following || 0} onClick={() => setFollowGraphType("following")} />
               <div className="w-px h-8 bg-border" />
               <ProfileStat label="Vibes" value={0} />
-              <div className="w-px h-8 bg-border" />
-              <ProfileStat label="Events" value={0} />
             </div>
           </div>
         </div>
@@ -299,6 +328,15 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
           </p>
         </div>
       </main>
+
+      {followGraphType && (
+        <FollowGraphModal
+          isOpen={!!followGraphType}
+          onClose={() => setFollowGraphType(null)}
+          type={followGraphType}
+          list={graphList}
+        />
+      )}
     </>
   );
 }

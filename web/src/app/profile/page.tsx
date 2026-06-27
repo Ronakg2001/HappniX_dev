@@ -97,10 +97,10 @@ export default function ProfilePage() {
           }));
           setGraphList(mapped);
         } else {
-          setGraphList(followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING);
+          setGraphList([]);
         }
       } catch (err) {
-        setGraphList(followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING);
+        setGraphList([]);
       }
     };
     fetchGraph();
@@ -339,7 +339,7 @@ export default function ProfilePage() {
           isOpen={!!followGraphType}
           onClose={() => setFollowGraphType(null)}
           type={followGraphType}
-          list={graphList.length > 0 ? graphList : (followGraphType === "followers" ? MOCK_FOLLOWERS : MOCK_FOLLOWING)}
+          list={graphList}
         />
       )}
 

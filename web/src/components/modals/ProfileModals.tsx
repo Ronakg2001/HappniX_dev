@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, userApi } from "@/lib/api";
 import {
   X,
   ShieldCheck,
@@ -197,6 +197,7 @@ interface FollowGraphModalProps {
 }
 
 export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphModalProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [followedIds, setFollowedIds] = useState<string[]>([]);
 
@@ -208,10 +209,17 @@ export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphMod
       p.username.toLowerCase().includes(query.toLowerCase())
   );
 
-  const toggleFollow = (id: string) =>
+  const toggleFollow = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setFollowedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+    try {
+      await userApi.toggleFollow(id);
+    } catch (err) {
+      console.error("Failed to toggle follow in modal:", err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
@@ -250,7 +258,7 @@ export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphMod
             filtered.map((p) => {
               const isFollowing = followedIds.includes(p.id);
               return (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-foreground/5 transition-all">
+                <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-foreground/5 transition-all cursor-pointer" onClick={() => { onClose(); router.push(`/user/${p.id}`); }}>
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-sm border border-border shrink-0 text-white overflow-hidden">
                       {p.avatar ? (
@@ -265,7 +273,7 @@ export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphMod
                     </div>
                   </div>
                   <button
-                    onClick={() => toggleFollow(p.id)}
+                    onClick={(e) => toggleFollow(p.id, e)}
                     className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
                       isFollowing
                         ? "bg-foreground/10 text-foreground border border-border"

@@ -6,6 +6,7 @@ export interface User {
   bio: string;
   verified: boolean;
   followers: number;
+  following?: number;
   mutuals: number;
   isFollowing: boolean;
   tags: string[];
