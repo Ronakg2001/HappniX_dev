@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { type User } from "@/types/user";
 import { type DiscoverItem } from "@/types/event";
-import { discoverApi, fixAvatarUrl } from "@/lib/api";
+import { discoverApi, userApi, fixAvatarUrl } from "@/lib/api";
 
 const DEBOUNCE_MS = 350;
 const TYPING_PAGE_SIZE = 5;
@@ -94,6 +94,12 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           tags: []
         }));
         
+        const initialFollowed = new Set<string>();
+        mappedUsers.forEach((u) => {
+          if (u.isFollowing) initialFollowed.add(u.id);
+        });
+        setFollowedIds(initialFollowed);
+        
         const mappedEvents: DiscoverItem[] = (response.events || []).map((e: any) => ({
           id: String(e.id),
           type: "event",
@@ -128,7 +134,7 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
     };
   }, [debouncedQuery]);
 
-  const toggleFollow = useCallback((id: string) => {
+  const toggleFollow = useCallback(async (id: string) => {
     setFollowedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -138,6 +144,11 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
       }
       return next;
     });
+    try {
+      await userApi.toggleFollow(id);
+    } catch (err) {
+      console.error("Failed to toggle follow:", err);
+    }
   }, []);
 
   const loadAll = useCallback(() => {

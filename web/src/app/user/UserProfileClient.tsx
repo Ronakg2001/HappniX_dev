@@ -119,11 +119,11 @@ export default function UserProfileClient({ id }: UserProfileClientProps) {
         const res: any = await fn(id);
         if (res && res.success && Array.isArray(res.data)) {
           const mapped = res.data.map((u: any) => ({
-            id: u.userID,
-            name: u.fullName || u.userName || "User",
-            username: u.userName || "",
-            avatar: fixAvatarUrl(u.profilePictureUrl),
-            bio: u.bio
+            id: u.userID || u.id || u.userId || "",
+            name: u.fullName || u.name || u.userName || u.username || "User",
+            username: u.userName || u.username || "",
+            avatar: fixAvatarUrl(u.profilePictureUrl || u.profile_picture_url || u.avatar),
+            bio: u.bio || ""
           }));
           setGraphList(mapped);
         } else {

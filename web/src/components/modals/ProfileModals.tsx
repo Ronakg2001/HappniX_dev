@@ -258,7 +258,7 @@ export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphMod
             filtered.map((p) => {
               const isFollowing = followedIds.includes(p.id);
               return (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-foreground/5 transition-all cursor-pointer" onClick={() => { onClose(); router.push(`/user/${p.id}`); }}>
+                <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-foreground/5 transition-all cursor-pointer" onClick={() => { onClose(); router.push(`/user?id=${p.id}`); }}>
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-sm border border-border shrink-0 text-white overflow-hidden">
                       {p.avatar ? (
@@ -335,7 +335,10 @@ export function DiscoverProfileModal({ isOpen, onClose, person }: DiscoverProfil
           ))}
         </div>
         <button
-          onClick={() => setFollowing(!following)}
+          onClick={async () => {
+            setFollowing(!following);
+            try { await userApi.toggleFollow(person.id); } catch (e) { console.error(e); }
+          }}
           className={`w-full py-2.5 rounded-lg text-xs font-bold transition-all ${
             following
               ? "bg-foreground/10 border border-border text-foreground"

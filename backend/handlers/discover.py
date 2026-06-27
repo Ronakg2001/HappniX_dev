@@ -50,18 +50,39 @@ def handle_discover_search(event):
     if pub_id and not pub_id.endswith('/'):
         pub_id += '/'
         
+    headers = event.get("headers", {})
+    auth_header = headers.get("Authorization") or headers.get("authorization", "")
+    current_user_id = None
+    if auth_header.startswith("Bearer "):
+        from integration import cognito_auth as cognito
+        from integration import rds
+        access_token = auth_header.split(" ")[1]
+        cognito_user = cognito.get_user(access_token)
+        if cognito_user:
+            username = cognito_user.get("Username")
+            rds_result = rds.get_record("users", userID=username)
+            if not rds_result.get("success"):
+                rds_result = rds.get_record("users", userName=username)
+            if rds_result.get("success"):
+                current_user_id = rds_result.get("data", {}).get("userID")
+
     formatted_users = []
     for u in users:
         avatar = u.get("profilePictureUrl")
         if avatar and pub_id and not avatar.startswith("http"):
             avatar = f"{pub_id}{avatar}"
             
+        is_following = False
+        if current_user_id and u.get("userID") and current_user_id != u.get("userID"):
+            from integration import rds
+            is_following = rds.check_if_following(current_user_id, u.get("userID"))
+            
         formatted_users.append({
             "id": u.get("userID"),
             "username": u.get("userName"),
             "name": u.get("fullName"),
             "profile_picture_url": avatar,
-            "is_following": False # Can be enhanced later
+            "is_following": is_following
         })
         
     formatted_events = []
