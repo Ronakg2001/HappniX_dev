@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient, userApi } from "@/lib/api";
+import { apiClient, userApi, fixAvatarUrl } from "@/lib/api";
 import {
   X,
   ShieldCheck,
@@ -261,8 +261,8 @@ export function FollowGraphModal({ isOpen, onClose, type, list }: FollowGraphMod
                 <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg hover:bg-foreground/5 transition-all cursor-pointer" onClick={() => { onClose(); router.push(`/user?id=${p.id}`); }}>
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-10 w-10 rounded-full bg-brand-gradient flex items-center justify-center font-bold text-sm border border-border shrink-0 text-white overflow-hidden">
-                      {p.avatar ? (
-                        <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" />
+                      {fixAvatarUrl(p.avatar) ? (
+                        <img src={fixAvatarUrl(p.avatar)!} alt={p.name} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                       ) : (
                         p.name[0]
                       )}

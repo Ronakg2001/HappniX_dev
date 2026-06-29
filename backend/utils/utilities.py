@@ -179,3 +179,25 @@ def format_rds_row(row: dict) -> dict:
         else:
             formatted[k] = str(v)
     return formatted
+
+
+def fix_media_url(url: str | None) -> str | None:
+    """Normalize image and media URLs, replacing dead worker domains and prepending public R2 endpoint."""
+    if not url or not isinstance(url, str):
+        return None
+    url = url.strip()
+    if url in ["null", "None", "", "undefined"]:
+        return None
+        
+    pub_id = env("R2_USERMEDIA_BUCKET_PUBID") or env("NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID") or "https://pub-09453339054e4d8894deb9f536888434.r2.dev"
+    clean_pub_id = pub_id.rstrip('/') + '/'
+    
+    dead_worker = "https://happnix-dev-new.ronakgo1.workers.dev"
+    if dead_worker in url:
+        return url.replace(dead_worker + "/", clean_pub_id).replace(dead_worker, clean_pub_id.rstrip('/'))
+        
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+        
+    return f"{clean_pub_id}{url.lstrip('/')}"
+

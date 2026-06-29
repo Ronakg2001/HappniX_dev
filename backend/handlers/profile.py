@@ -77,12 +77,7 @@ def get_user_profile(**kwargs):
             profile_data["dob"] = kwargs.get("dob")
         if "gender" not in profile_data and kwargs.get("gender"):
             profile_data["gender"] = kwargs.get("gender")
-        if profile_data.get("avatar"):
-            from utils import dependencies
-            pub_id = dependencies.enviroment_variable.get("R2_USERMEDIA_BUCKET_PUBID")
-            if pub_id and not pub_id.endswith('/'):
-                pub_id += '/'
-            profile_data["avatar"] = f"{pub_id}{profile_data['avatar']}"
+        profile_data["avatar"] = util.fix_media_url(profile_data.get("avatar"))
 
         return success_response({
             "success": True,
@@ -227,6 +222,10 @@ def get_followers_list(**kwargs):
         res = profile_services.get_user_followers_list(target_id, limit, offset)
         if not res.get("success"):
             return error_response(res.get("error", "Failed to fetch followers."), 500)
+        if isinstance(res.get("data"), list):
+            for item in res["data"]:
+                if isinstance(item, dict):
+                    item["profilePictureUrl"] = util.fix_media_url(item.get("profilePictureUrl"))
         return success_response(res)
     except Exception as exc:
         util.log("error", "profile.get_followers_list", f"Action failed: {exc}")
@@ -245,6 +244,10 @@ def get_following_list(**kwargs):
         res = profile_services.get_user_following_list(target_id, limit, offset)
         if not res.get("success"):
             return error_response(res.get("error", "Failed to fetch following."), 500)
+        if isinstance(res.get("data"), list):
+            for item in res["data"]:
+                if isinstance(item, dict):
+                    item["profilePictureUrl"] = util.fix_media_url(item.get("profilePictureUrl"))
         return success_response(res)
     except Exception as exc:
         util.log("error", "profile.get_following_list", f"Action failed: {exc}")

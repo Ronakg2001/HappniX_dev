@@ -68,9 +68,7 @@ def handle_discover_search(event):
 
     formatted_users = []
     for u in users:
-        avatar = u.get("profilePictureUrl")
-        if avatar and pub_id and not avatar.startswith("http"):
-            avatar = f"{pub_id}{avatar}"
+        avatar = util.fix_media_url(u.get("profilePictureUrl"))
             
         is_following = False
         if current_user_id and u.get("userID") and current_user_id != u.get("userID"):
@@ -87,13 +85,8 @@ def handle_discover_search(event):
         
     formatted_events = []
     for e in events:
-        cover = e.get("coverImageUrl")
-        if cover and pub_id and not cover.startswith("http"):
-            cover = f"{pub_id}{cover}"
-            
-        host_avatar = e.get("host_profilePictureUrl")
-        if host_avatar and pub_id and not host_avatar.startswith("http"):
-            host_avatar = f"{pub_id}{host_avatar}"
+        cover = util.fix_media_url(e.get("coverImageUrl"))
+        host_avatar = util.fix_media_url(e.get("host_profilePictureUrl"))
             
         base_price = e.get("basePrice") or 0
         try:

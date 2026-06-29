@@ -2,6 +2,7 @@ import React from "react";
 import { ShieldCheck, UserCheck, UserPlus } from "lucide-react";
 import { type User } from "@/types/user";
 import { Button } from "@/components/ui/button";
+import { fixAvatarUrl } from "@/lib/api";
 
 interface UserCardProps {
   user: Pick<User, "id" | "name" | "username" | "avatar" | "bio" | "verified" | "followers" | "mutuals">;
@@ -17,6 +18,11 @@ function formatFollowers(n: number): string {
 
 export function UserCard({ user, isFollowing, onFollow, onNavigate }: UserCardProps) {
   const [imgError, setImgError] = React.useState(false);
+  const fixedAvatar = fixAvatarUrl(user.avatar);
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [fixedAvatar]);
 
   return (
     <div
@@ -26,9 +32,9 @@ export function UserCard({ user, isFollowing, onFollow, onNavigate }: UserCardPr
       onClick={() => onNavigate(user.id)}
     >
       <div className="h-11 w-11 rounded-full bg-brand-gradient flex items-center justify-center font-black text-sm text-white shrink-0 border border-white/10 shadow-glow overflow-hidden">
-        {!imgError && user.avatar ? (
+        {!imgError && fixedAvatar ? (
           <img 
-            src={user.avatar} 
+            src={fixedAvatar} 
             alt={user.name} 
             className="h-full w-full object-cover"
             onError={() => setImgError(true)}
