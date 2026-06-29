@@ -79,7 +79,9 @@ def handle_discover_search(event):
             "id": u.get("userID"),
             "username": u.get("userName"),
             "name": u.get("fullName"),
+            "profilePictureUrl": avatar,
             "profile_picture_url": avatar,
+            "avatar": avatar,
             "is_following": is_following
         })
         
@@ -99,12 +101,15 @@ def handle_discover_search(event):
             "title": e.get("title"),
             "category": e.get("eventCategory"),
             "image": cover,
+            "coverImageUrl": cover,
+            "cover_image": cover,
             "start_at": e.get("startAt"),
             "ticket_type": e.get("ticketType"),
             "price": f"{e.get('currency', '')} {base_price}" if base_price_num > 0 else "Free",
             "venue": e.get("locationName"),
             "host_username": e.get("host_userName"),
             "host_avatar": host_avatar,
+            "host_profilePictureUrl": host_avatar,
             "status": e.get("status")
         })
     
