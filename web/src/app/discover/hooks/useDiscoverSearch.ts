@@ -85,7 +85,7 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           id: String(u.id),
           name: u.name || "",
           username: u.username || "",
-          avatar: fixAvatarUrl(u.profile_picture_url),
+          avatar: fixAvatarUrl(u.profile_picture_url || u.profilePictureUrl || u.avatar),
           bio: u.bio || "",
           verified: !!u.verified,
           followers: u.follower_count || 0,
@@ -106,11 +106,11 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           title: e.title || "",
           category: e.category || "",
           genre: "", // Missing from backend payload currently
-          image: fixAvatarUrl(e.image) || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
+          image: fixAvatarUrl(e.image || e.coverImageUrl || e.cover_image) || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
           hype: "HOT", // Static for now
           attending: "0",
           host: e.host_username || "Unknown",
-          host_avatar: fixAvatarUrl(e.host_avatar),
+          host_avatar: fixAvatarUrl(e.host_avatar || e.host_profilePictureUrl),
           verified: false,
           price: e.price || "Free",
           venue: e.venue || "TBA",

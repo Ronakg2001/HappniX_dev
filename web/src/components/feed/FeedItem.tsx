@@ -1,5 +1,6 @@
 import React from 'react';
 import { SocialPostCard, EventCard } from '@/components/feed/FeedCards';
+import { fixAvatarUrl } from '@/lib/api';
 
 interface FeedItemProps {
   item: any;
@@ -13,13 +14,18 @@ interface FeedItemProps {
  */
 function safeParseMedia(raw: any): string[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  let parsedList: any[] = [];
+  if (Array.isArray(raw)) {
+    parsedList = raw;
+  } else {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) parsedList = parsed;
+    } catch {
+      return [];
+    }
   }
+  return parsedList.map(img => fixAvatarUrl(img) || '').filter(Boolean);
 }
 
 /**
@@ -56,7 +62,7 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
       user: {
         username: item.userName || item.authorUserID || 'user',
         name: item.fullName || 'User',
-        avatar: item.profilePictureUrl || '/default-avatar.png',
+        avatar: fixAvatarUrl(item.profilePictureUrl || item.avatar) || '/default-avatar.png',
         verified: item.verified || false,
       },
       timestamp: formatTimeAgo(item.createdAt),
@@ -82,7 +88,7 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
       id: item.eventID,
       organizer: item.hostName || item.hostUserName || 'Host',
       verifiedOrganizer: item.hostVerified || false,
-      banner: item.coverImageUrl || '/default-event.png',
+      banner: fixAvatarUrl(item.coverImageUrl || item.image || item.bannerUrl) || '/default-event.png',
       title: item.title,
       category: item.eventCategory || 'General',
       musicGenre: item.musicGenre || 'Any',

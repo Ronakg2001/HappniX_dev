@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import { fixAvatarUrl } from '@/lib/api';
 
 interface LiveEvent {
   eventID: string;
@@ -33,7 +34,7 @@ export function LiveNowCarousel({ events, onEventClick }: LiveNowCarouselProps) 
             {/* Background Image */}
             <div className="absolute inset-0">
               <img 
-                src={event.coverImageUrl || '/default-event.png'} 
+                src={fixAvatarUrl(event.coverImageUrl) || '/default-event.png'} 
                 alt={event.title}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />

@@ -197,9 +197,16 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
   return (
     <div className="liquid-glass liquid-edge rounded-lg overflow-hidden mb-4 hover:scale-[1.005] transition-all duration-300">
       {/* Banner / Hero Section */}
-      <div className="relative h-36 sm:h-36 bg-black/45 border-b border-border flex flex-col justify-end p-4">
+      <div className="relative h-36 sm:h-36 bg-black/45 border-b border-border flex flex-col justify-end p-4 overflow-hidden">
+        {event.banner && (
+          <img 
+            src={event.banner} 
+            alt={event.title} 
+            className="absolute inset-0 w-full h-full object-cover z-0 transition-transform duration-500 hover:scale-105"
+          />
+        )}
         {/* Dynamic decorative backdrop */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-0" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent z-0" />
         <div className="absolute inset-0 bg-brand-gradient/10 z-0" />
         
         {/* Tags on image */}
@@ -319,8 +326,15 @@ export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
 
       <div className="flex flex-col sm:flex-row">
         {/* Banner Column */}
-        <div className="relative w-full sm:w-[45%] h-44 sm:h-auto min-h-[180px] bg-black/45 flex flex-col justify-end p-4">
-          <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black via-black/40 to-transparent z-0" />
+        <div className="relative w-full sm:w-[45%] h-44 sm:h-auto min-h-[180px] bg-black/45 flex flex-col justify-end p-4 overflow-hidden">
+          {event.banner && (
+            <img 
+              src={event.banner} 
+              alt={event.title} 
+              className="absolute inset-0 w-full h-full object-cover z-0 transition-transform duration-500 hover:scale-105"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black via-black/60 to-transparent z-0" />
           <div className="absolute inset-0 bg-brand-gradient/20 z-0" />
           
           <span className="relative z-10 px-2 py-0.5 rounded bg-gradient-to-r from-[var(--brand-4)] to-[#FFF5C3] text-black text-[9px] font-extrabold uppercase w-max mb-2">

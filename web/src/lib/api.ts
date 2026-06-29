@@ -262,14 +262,20 @@ export const fixAvatarUrl = (url: string | null | undefined): string | null => {
     return null;
   }
   
+  const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
+  const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
+
   if (url.includes("happnix-dev-new.ronakgo1.workers.dev")) {
-    const newBase = process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID || process.env.NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUB || "https://pub-09453339054e4d8894deb9f536888434.r2.dev";
-    const cleanNewBase = newBase.endsWith("/") ? newBase : newBase + "/";
     const newUrl = url.replace(oldBase1, cleanNewBase).replace(oldBase2, cleanNewBase.slice(0, -1));
     console.log(`[Avatar Fixer] Intercepted dead URL!\n  Old: ${url}\n  New: ${newUrl}`);
     return newUrl;
   }
   
+  if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("data:") && !url.startsWith("blob:") && !url.startsWith("/")) {
+    return `${cleanNewBase}${url}`;
+  }
+  
   return url;
 };
+
 
