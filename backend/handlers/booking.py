@@ -35,8 +35,15 @@ def book_ticket(**kwargs):
             return error_response("Missing eventID.", 400)
         if not tier_id:
             return error_response("Missing tierID.", 400)
-        if quantity < 1 or quantity > 10:
-            return error_response("Quantity must be between 1 and 10.", 400)
+        if quantity != 1:
+            return error_response("You can only book 1 ticket per person.", 400)
+
+        # Enforce 1 ticket per user per event rule
+        if booking_services.has_active_ticket(user_id, event_id):
+            return error_response(
+                "You already hold an active pass for this event. Please cancel your existing pass from My Bookings before booking again.",
+                400
+            )
 
         # Validate event exists and is published
         event_result = rds.get_record("events", eventID=event_id)

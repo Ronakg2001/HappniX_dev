@@ -127,11 +127,20 @@ export function EventPreviewModal({ isOpen, onClose, eventTitle }: { isOpen: boo
 
 // --- MINI BOOKING MODAL ---
 export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { isOpen: boolean; onClose: () => void; eventTitle: string; price: string; eventID?: string }) {
-  const { addTicket, refreshBookings } = useLayout();
-  const isRealEvent = eventID && !eventID.startsWith("e") && !eventID.startsWith("c_");
+  const router = useRouter();
+  const { addTicket, refreshBookings, bookedTickets } = useLayout();
+  const isRealEvent = Boolean(eventID && !eventID.startsWith("e") && !eventID.startsWith("c_"));
 
-  // Booking States
-  const [qty, setQty] = useState(1);
+  // Check if user already has an active pass for this event
+  const hasActiveTicket = Boolean(
+    eventID &&
+    bookedTickets?.some(
+      (t: any) => t.eventID === eventID && (t.status === "Confirmed" || t.status === "Pending" || !t.status)
+    )
+  );
+
+  // Booking States (1 ticket per user strictly enforced)
+  const qty = 1;
   const [category, setCategory] = useState<"general" | "vip" | "squad">("general");
   const [promoCode, setPromoCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
@@ -153,7 +162,6 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
           setSelectedTierID(res.tiers[0].tierID);
         }
       }).catch(() => {
-        // Fallback to mock tiers if backend fails
         setRealTiers([]);
       });
     }
@@ -164,21 +172,28 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
   // Pricing calculations
   const rawBase = parseInt(price.replace(/[^\d]/g, "")) || 499;
   
-  // Category multiplier
   let basePrice = rawBase;
   let categoryLabel = "General Admission";
-  if (category === "vip") {
-    basePrice = rawBase + 500;
-    categoryLabel = "VIP Access Pass";
-  } else if (category === "squad") {
-    basePrice = Math.round(rawBase * 3.2); // Discounted package for multiple entries
-    categoryLabel = "Squad Package (4 Entries)";
+
+  if (isRealEvent && realTiers.length > 0) {
+    const selectedTier = realTiers.find(t => t.tierID === selectedTierID) || realTiers[0];
+    basePrice = selectedTier ? Number(selectedTier.price) || 0 : rawBase;
+    categoryLabel = selectedTier ? selectedTier.name : "General Admission";
+  } else {
+    if (category === "vip") {
+      basePrice = rawBase + 500;
+      categoryLabel = "VIP Access Pass";
+    } else if (category === "squad") {
+      basePrice = Math.round(rawBase * 3.2);
+      categoryLabel = "Squad Package (4 Entries)";
+    }
   }
 
   const subtotal = basePrice * qty;
-  const discount = discountApplied ? Math.round(subtotal * 0.20) : 0; // 20% discount
-  const serviceFee = Math.round((subtotal - discount) * 0.05);
+  const discount = discountApplied ? Math.round(subtotal * 0.20) : 0;
+  const serviceFee = basePrice === 0 ? 0 : Math.round((subtotal - discount) * 0.05);
   const total = subtotal - discount + serviceFee;
+  const isFree = total === 0;
 
   const handleApplyPromo = () => {
     setPromoError("");
@@ -196,20 +211,18 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
     setProcessMsg("Securing spot with venue hosts...");
 
     if (isRealEvent && selectedTierID && eventID) {
-      // Real API booking flow
       try {
         setTimeout(() => setProcessMsg("Generating secure gate QR keys..."), 800);
 
         const res = await bookingApi.bookTicket({
           eventID: eventID,
           tierID: selectedTierID,
-          quantity: qty,
+          quantity: 1,
         }) as any;
 
         if (res.success) {
           setProcessMsg("Authorizing secure check-out transaction...");
           await new Promise(r => setTimeout(r, 600));
-          // Refresh bookings from backend so My Bookings is up to date
           await refreshBookings();
           setStage("confirmed");
         } else {
@@ -221,25 +234,16 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
         setStage("error");
       }
     } else {
-      // Mock booking flow (for demo/mock events)
+      setTimeout(() => setProcessMsg("Generating secure gate QR keys..."), 800);
+      setTimeout(() => setProcessMsg("Authorizing secure check-out transaction..."), 1600);
       setTimeout(() => {
-        setProcessMsg("Generating secure gate QR keys...");
-      }, 800);
-
-      setTimeout(() => {
-        setProcessMsg("Authorizing secure check-out transaction...");
-      }, 1600);
-
-      setTimeout(() => {
-        addTicket(`${eventTitle} (${categoryLabel})`, `₹${total}`);
+        addTicket(`${eventTitle} (${categoryLabel})`, isFree ? "FREE" : `₹${total}`);
         setStage("confirmed");
       }, 2400);
     }
   };
 
   const handleClose = () => {
-    // Reset states
-    setQty(1);
     setCategory("general");
     setPromoCode("");
     setDiscountApplied(false);
@@ -261,7 +265,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
             {/* Modal Header */}
             <div className="flex justify-between items-start mb-4">
               <div>
-                <span className="text-[9px] font-black tracking-widest text-[var(--brand-1)] uppercase text-shadow-glow">Squad Checkout</span>
+                <span className="text-[9px] font-black tracking-widest text-[var(--brand-1)] uppercase text-shadow-glow">Pass Checkout</span>
                 <h3 className="text-sm font-extrabold text-white leading-tight mt-0.5">{eventTitle}</h3>
               </div>
               <button onClick={handleClose} className="p-1 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white cursor-pointer active:scale-95 transition-all">
@@ -269,103 +273,149 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
               </button>
             </div>
 
-            {/* Ticket Categories/Tiers */}
-            <div className="flex flex-col gap-2 mb-4">
-              <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Select Ticket Class</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "general", label: "General", desc: `₹${rawBase}` },
-                  { id: "vip", label: "VIP Pass", desc: `₹${rawBase + 500}` },
-                  { id: "squad", label: "Squad x4", desc: `₹${Math.round(rawBase * 3.2)}` }
-                ].map((tier) => (
-                  <button
-                    key={tier.id}
-                    onClick={() => setCategory(tier.id as any)}
-                    className={`p-2.5 rounded-full border flex flex-col items-center justify-center transition-all cursor-pointer outline-none focus:outline-none ${
-                      category === tier.id
-                        ? "bg-brand-gradient/20 border-[var(--brand-1)] text-white shadow-glow"
-                        : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="text-xs font-bold leading-tight">{tier.label}</span>
-                    <span className="text-[10px] text-white/40 mt-0.5">{tier.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quantity Selector */}
-            <div className="flex items-center justify-between py-2.5 px-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4">
-              <span className="text-xs font-bold text-white/70">Number of tickets</span>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => qty > 1 && setQty(qty - 1)}
-                  className="h-8 w-8 rounded-xl bg-white/5 text-white flex items-center justify-center font-black hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-                >
-                  -
-                </button>
-                <span className="text-sm font-black text-white">{qty}</span>
-                <button 
-                  onClick={() => setQty(qty + 1)}
-                  className="h-8 w-8 rounded-xl bg-white/5 text-white flex items-center justify-center font-black hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Promo Code section */}
-            <div className="flex flex-col gap-1.5 mb-4">
-              <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Apply Promo Code</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Code (e.g. HAPPNIX)"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  disabled={discountApplied}
-                  className="flex-1 px-3 py-2 text-xs rounded-xl bg-white/5 border border-white/10 focus:outline-none focus:border-[var(--brand-2)] text-white placeholder-white/20 disabled:opacity-50 uppercase tracking-widest font-black"
-                />
-                <button
-                  onClick={handleApplyPromo}
-                  disabled={!promoCode || discountApplied}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white cursor-pointer active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
-                >
-                  {discountApplied ? "Applied" : "Apply"}
-                </button>
-              </div>
-              {promoError && <p className="text-[9px] font-bold text-red-400">{promoError}</p>}
-              {discountApplied && <p className="text-[9px] font-black text-green-400">✓ 20% discount applied successfully!</p>}
-            </div>
-
-            {/* Dynamic Receipt Pricing Details */}
-            <div className="space-y-2 mb-6 text-xs text-white/60 p-3.5 rounded-md bg-white/[0.02] border border-white/[0.04]">
-              <div className="flex justify-between">
-                <span>{categoryLabel} ({qty}x)</span>
-                <span>₹{subtotal}</span>
-              </div>
-              {discountApplied && (
-                <div className="flex justify-between text-green-400 font-medium">
-                  <span>Promo Discount (-20%)</span>
-                  <span>-₹{discount}</span>
+            {hasActiveTicket ? (
+              <div className="py-6 flex flex-col items-center text-center">
+                <div className="h-12 w-12 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3.5">
+                  <Ticket className="h-6 w-6 animate-pulse" />
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span>Service processing fee (5%)</span>
-                <span>₹{serviceFee}</span>
+                <h4 className="text-sm font-extrabold text-white uppercase tracking-wider">Active Pass Found</h4>
+                <p className="text-xs text-white/60 mt-2 leading-relaxed px-1">
+                  You already hold an active pass for this event. To book a different ticket tier or re-book, please cancel your existing pass first.
+                </p>
+                <button
+                  onClick={() => {
+                    handleClose();
+                    router.push("/my-bookings");
+                  }}
+                  className="w-full mt-6 py-3 rounded-xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  View My Bookings
+                </button>
               </div>
-              <div className="flex justify-between font-black text-white text-sm border-t border-white/[0.08] pt-2 mt-2">
-                <span>Total Amount</span>
-                <span className="text-brand-gradient text-shadow-glow font-black text-base">₹{total}</span>
-              </div>
-            </div>
+            ) : (
+              <>
+                {/* Ticket Categories/Tiers */}
+                <div className="flex flex-col gap-2 mb-4">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Select Ticket Class</label>
+                  
+                  {isRealEvent && realTiers.length > 0 ? (
+                    <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                      {realTiers.map((tier) => {
+                        const tierPrice = Number(tier.price) || 0;
+                        const isSelected = selectedTierID === tier.tierID;
+                        return (
+                          <button
+                            key={tier.tierID}
+                            onClick={() => setSelectedTierID(tier.tierID)}
+                            className={`p-3 rounded-2xl border flex items-center justify-between transition-all cursor-pointer outline-none text-left ${
+                              isSelected
+                                ? "bg-brand-gradient/20 border-[var(--brand-1)] text-white shadow-glow"
+                                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <span className="text-xs font-bold block truncate">{tier.name}</span>
+                              {tier.description && (
+                                <span className="text-[10px] text-white/40 block truncate mt-0.5">{tier.description}</span>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className={`text-xs font-black ${tierPrice === 0 ? "text-green-400" : "text-white"}`}>
+                                {tierPrice === 0 ? "FREE" : `₹${tierPrice}`}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "general", label: "General", desc: `₹${rawBase}` },
+                        { id: "vip", label: "VIP Pass", desc: `₹${rawBase + 500}` },
+                        { id: "squad", label: "Squad x4", desc: `₹${Math.round(rawBase * 3.2)}` }
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setCategory(t.id as any)}
+                          className={`p-2.5 rounded-full border flex flex-col items-center justify-center transition-all cursor-pointer outline-none focus:outline-none ${
+                            category === t.id
+                              ? "bg-brand-gradient/20 border-[var(--brand-1)] text-white shadow-glow"
+                              : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10"
+                          }`}
+                        >
+                          <span className="text-xs font-bold leading-tight">{t.label}</span>
+                          <span className="text-[10px] text-white/40 mt-0.5">{t.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-            <button
-              onClick={handleBooking}
-              className="w-full py-3.5 rounded-2xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all hover:shadow-[0_0_20px_rgba(255,79,216,0.4)] cursor-pointer"
-            >
-              Pay & Confirm Transaction
-            </button>
+                {/* Single Pass Policy Notice */}
+                <div className="flex items-center justify-between py-2.5 px-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4">
+                  <span className="text-xs font-bold text-white/70">Individual Pass Allocation</span>
+                  <span className="text-xs font-black text-[var(--brand-2)] bg-[var(--brand-2)]/10 px-2.5 py-1 rounded-lg">1 Person Limit</span>
+                </div>
+
+                {/* Promo Code section */}
+                {!isFree && (
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Apply Promo Code</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Code (e.g. HAPPNIX)"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                        disabled={discountApplied}
+                        className="flex-1 px-3 py-2 text-xs rounded-xl bg-white/5 border border-white/10 focus:outline-none focus:border-[var(--brand-2)] text-white placeholder-white/20 disabled:opacity-50 uppercase tracking-widest font-black"
+                      />
+                      <button
+                        onClick={handleApplyPromo}
+                        disabled={!promoCode || discountApplied}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-black text-white cursor-pointer active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        {discountApplied ? "Applied" : "Apply"}
+                      </button>
+                    </div>
+                    {promoError && <p className="text-[9px] font-bold text-red-400">{promoError}</p>}
+                    {discountApplied && <p className="text-[9px] font-black text-green-400">✓ 20% discount applied successfully!</p>}
+                  </div>
+                )}
+
+                {/* Dynamic Receipt Pricing Details */}
+                <div className="space-y-2 mb-6 text-xs text-white/60 p-3.5 rounded-md bg-white/[0.02] border border-white/[0.04]">
+                  <div className="flex justify-between">
+                    <span>{categoryLabel} (1x Pass)</span>
+                    <span>{isFree ? "FREE" : `₹${subtotal}`}</span>
+                  </div>
+                  {discountApplied && !isFree && (
+                    <div className="flex justify-between text-green-400 font-medium">
+                      <span>Promo Discount (-20%)</span>
+                      <span>-₹{discount}</span>
+                    </div>
+                  )}
+                  {!isFree && (
+                    <div className="flex justify-between">
+                      <span>Service processing fee (5%)</span>
+                      <span>₹{serviceFee}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-white text-sm border-t border-white/[0.08] pt-2 mt-2">
+                    <span>Total Amount</span>
+                    <span className="text-brand-gradient text-shadow-glow font-black text-base">{isFree ? "FREE" : `₹${total}`}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleBooking}
+                  className="w-full py-3.5 rounded-2xl bg-brand-gradient text-white text-xs font-black shadow-glow hover:scale-[1.02] active:scale-[0.98] transition-all hover:shadow-[0_0_20px_rgba(255,79,216,0.4)] cursor-pointer"
+                >
+                  {isFree ? "Claim Free Pass" : "Pay & Confirm Transaction"}
+                </button>
+              </>
+            )}
           </>
         )}
 
@@ -376,7 +426,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
               <span className="absolute h-12 w-12 rounded-full border-4 border-white/5 border-t-[var(--brand-1)] animate-spin" />
               <Ticket className="h-6 w-6 text-white animate-pulse" />
             </div>
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">Securing Passes</h3>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Securing Pass</h3>
             <p className="text-[11px] text-white/45 mt-2 animate-pulse">{processMsg}</p>
           </div>
         )}
@@ -390,18 +440,16 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
             
             <h3 className="text-base font-black text-white uppercase tracking-wider text-shadow-glow">Booking Confirmed!</h3>
             <p className="text-[11px] text-white/50 mt-1 max-w-xs px-2 leading-relaxed">
-              Your passes are linked to your profile identity. Scan the digital pass at the entrance gate.
+              Your pass is linked to your identity. Scan the digital QR pass at the entrance gate.
             </p>
 
             {/* Graphic Ticket Card */}
             <div className="w-full mt-5 mb-5 rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col relative">
-              {/* Ticket header */}
               <div className="p-3 bg-white/5 border-b border-dashed border-white/10 flex justify-between items-center text-[10px] font-black text-white/40 uppercase tracking-widest">
                 <span>HappniX Pass</span>
                 <span className="text-[var(--brand-3)]">HNX-{Math.floor(Math.random() * 900000 + 100000)}</span>
               </div>
               
-              {/* Ticket body */}
               <div className="p-4 flex flex-col text-left gap-1">
                 <h4 className="text-xs font-black text-white truncate">{eventTitle}</h4>
                 <p className="text-[9px] text-[var(--brand-2)] font-black uppercase mt-1 tracking-wider">{categoryLabel}</p>
@@ -409,16 +457,15 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-[10px]">
                   <div>
                     <span className="text-white/30 block uppercase tracking-wider text-[8px]">Total paid</span>
-                    <span className="font-bold text-white">₹{total}</span>
+                    <span className="font-bold text-white">{isFree ? "FREE" : `₹${total}`}</span>
                   </div>
                   <div>
-                    <span className="text-white/30 block uppercase tracking-wider text-[8px]">Qty booked</span>
-                    <span className="font-bold text-white">{qty} passes</span>
+                    <span className="text-white/30 block uppercase tracking-wider text-[8px]">Allocation</span>
+                    <span className="font-bold text-white">1x Pass</span>
                   </div>
                 </div>
               </div>
 
-              {/* Decorative Circle notches for ticket cut */}
               <div className="absolute top-[32px] -left-2 h-4 w-4 rounded-full bg-[#050508] border-r border-white/10" />
               <div className="absolute top-[32px] -right-2 h-4 w-4 rounded-full bg-[#050508] border-l border-white/10" />
             </div>

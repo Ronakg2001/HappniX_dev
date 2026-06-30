@@ -24,6 +24,28 @@ def _generate_claim_token() -> str:
     return hashlib.sha256(uuid.uuid4().bytes).hexdigest()[:32]
 
 
+def has_active_ticket(user_id: str, event_id: str) -> bool:
+    """Check if the user already holds an active ticket (Confirmed/Pending) for this event."""
+    conn = rds.get_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute('''
+                SELECT 1 FROM event_tickets
+                WHERE "attendeeUserID" = %s
+                  AND "eventID" = %s
+                  AND ("status" IS NULL OR "status" IN ('Confirmed', 'Pending'))
+                LIMIT 1;
+            ''', (user_id, event_id))
+            return cur.fetchone() is not None
+    except Exception as exc:
+        util.log("error", "booking_services.has_active_ticket", f"Check failed: {exc}")
+        return False
+    finally:
+        conn.close()
+
+
 def create_order(buyer_user_id: str, event_id: str, tickets: list) -> dict:
     """
     Create a group booking order:

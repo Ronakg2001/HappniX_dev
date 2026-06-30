@@ -188,6 +188,8 @@ def create_event(host_user_id: str, raw_payload: dict, status: str = "Draft") ->
             description=tier.get("description"),
             price=tier.get("price", 0.00),
             capacity=tier.get("capacity"),
+            ticketsSold=0,
+            isActive=True,
         )
 
     # ── Step 3: Sync to DynamoDB (EVENT_CARD) ──
@@ -345,10 +347,36 @@ def update_event(event_id: str, host_user_id: str, updates: dict) -> dict:
         conn.close()
 
     updates["updatedAt"] = util.now_iso()
+    tiers_to_update = updates.pop("ticketTiers", None)
     rds_result = rds.update_record("events", "eventID", event_id, updates)
 
     if not rds_result.get("success"):
         return {"success": False, "error": "Failed to update event."}
+
+    # Sync ticket tiers if provided
+    if isinstance(tiers_to_update, list) and len(tiers_to_update) > 0:
+        for tier in tiers_to_update:
+            tier_id = tier.get("tierID") or tier.get("id") or str(uuid.uuid4())
+            existing = rds.get_record("event_ticket_tiers", tierID=tier_id)
+            if existing.get("success"):
+                rds.update_record("event_ticket_tiers", "tierID", tier_id, {
+                    "name": tier.get("name", "General"),
+                    "description": tier.get("description"),
+                    "price": tier.get("price", 0.00),
+                    "capacity": tier.get("capacity"),
+                    "isActive": True
+                })
+            else:
+                rds.insert_record("event_ticket_tiers",
+                    tierID=tier_id,
+                    eventID=event_id,
+                    name=tier.get("name", "General"),
+                    description=tier.get("description"),
+                    price=tier.get("price", 0.00),
+                    capacity=tier.get("capacity"),
+                    ticketsSold=0,
+                    isActive=True
+                )
 
     # Re-sync to DynamoDB
     event_result = rds.get_record("events", eventID=event_id)
