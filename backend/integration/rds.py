@@ -290,6 +290,7 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
             cur.execute(sql, (search_pattern, search_pattern, limit))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
+            data = _enrich_users_with_dynamo_avatar(data)
             return {"success": True, "data": data}
     except Exception as exc:
         util.log("error", "rds.search_users_by_name", f"Search failed: {exc}")
@@ -379,6 +380,7 @@ def get_followers(user_id: str, limit: int = 20, offset: int = 0) -> dict:
             cur.execute(sql, (user_id, limit, offset))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
+            data = _enrich_users_with_dynamo_avatar(data)
             return {"success": True, "data": data}
     except Exception as exc:
         util.log("error", "rds.get_followers", f"Failed to fetch followers: {exc}")
@@ -411,10 +413,34 @@ def get_following(user_id: str, limit: int = 20, offset: int = 0) -> dict:
             cur.execute(sql, (user_id, limit, offset))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
+            data = _enrich_users_with_dynamo_avatar(data)
             return {"success": True, "data": data}
     except Exception as exc:
         util.log("error", "rds.get_following", f"Failed to fetch following: {exc}")
         return {"success": False, "error": str(exc)}
     finally:
         conn.close()
+
+
+def _enrich_users_with_dynamo_avatar(users_list: list) -> list:
+    """If profilePictureUrl is missing in an RDS row, fall back to fetching 'avatar' from DynamoDB PROFILE entity."""
+    try:
+        from integration import dynamo_db
+        for u in users_list:
+            if not u.get("profilePictureUrl") or u.get("profilePictureUrl") in ["null", "None"]:
+                user_id = u.get("userID")
+                if user_id:
+                    res = dynamo_db.get_item("users", pk_value=user_id, sk_value="PROFILE")
+                    if res.get("success") and res.get("data"):
+                        dyn_avatar = res["data"].get("avatar")
+                        if dyn_avatar and dyn_avatar not in ["null", "None"]:
+                            u["profilePictureUrl"] = dyn_avatar
+                            try:
+                                update_record("users", "userID", user_id, {"profilePictureUrl": dyn_avatar})
+                            except Exception:
+                                pass
+    except Exception as exc:
+        util.log("warning", "rds._enrich_users_with_dynamo_avatar", f"Enrichment failed (non-fatal): {exc}")
+    return users_list
+
 
