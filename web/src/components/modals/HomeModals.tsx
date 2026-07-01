@@ -284,7 +284,6 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
   };
 
   const handleClose = () => {
-    setCategory("general");
     setPromoCode("");
     setDiscountApplied(false);
     setPromoError("");
