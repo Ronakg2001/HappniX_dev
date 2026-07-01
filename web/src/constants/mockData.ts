@@ -446,6 +446,11 @@ export const MOCK_EVENTS_DETAILS: Record<string, EventDetail> = {
       "https://images.unsplash.com/photo-1486591978090-58e619d37fe7?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?auto=format&fit=crop&w=600&q=80"
+    ],
+    tiers: [
+      { tierID: "e1_t1", name: "Early Bird Admission", price: 799, description: "Limited early access pass before midnight." },
+      { tierID: "e1_t2", name: "General Entry", price: 999, description: "Standard entry to all dance floors and bars." },
+      { tierID: "e1_t3", name: "VIP Balcony Pass", price: 1499, description: "Exclusive balcony access & dedicated VIP lounge service." }
     ]
   },
   e2: {
@@ -482,6 +487,10 @@ export const MOCK_EVENTS_DETAILS: Record<string, EventDetail> = {
       "https://images.unsplash.com/photo-1493676304818-94cf0cb5ef1e?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1485872299829-967f05efe90a?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=600&q=80"
+    ],
+    tiers: [
+      { tierID: "e2_t1", name: "Standard Acoustic Entry", price: 499, description: "Includes open lawn seating & welcome drink." },
+      { tierID: "e2_t2", name: "Front Row Lounge", price: 899, description: "Reserved premium sofa seating closest to the stage." }
     ]
   },
   sp1: {
@@ -520,6 +529,10 @@ export const MOCK_EVENTS_DETAILS: Record<string, EventDetail> = {
       "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?auto=format&fit=crop&w=600&q=80",
       "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80"
+    ],
+    tiers: [
+      { tierID: "sp1_t1", name: "Warehouse Gate Access", price: 1999, description: "All-night rave access code & security clearance." },
+      { tierID: "sp1_t2", name: "VIP Artist Stage Pass", price: 3499, description: "Backstage artist pit access & open premium bar." }
     ]
   }
 };

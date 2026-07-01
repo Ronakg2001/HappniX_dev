@@ -97,6 +97,7 @@ export interface EventDetail {
   lat: number;
   lng: number;
   gallery: string[];
+  tiers?: any[];
 }
 export interface DiscoverItem {
   id: string;

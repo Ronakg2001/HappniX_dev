@@ -5,7 +5,7 @@ import { X, Bell, Ticket, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import { bookingApi } from "@/lib/api";
-import { MOCK_EVENTS } from "@/constants/mockData";
+import { MOCK_EVENTS, MOCK_EVENTS_DETAILS } from "@/constants/mockData";
 
 // --- QUICK NOTIFICATIONS MODAL ---
 export function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -140,7 +140,6 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
 
   // Booking States (1 ticket per user strictly enforced)
   const qty = 1;
-  const [category, setCategory] = useState<"general" | "vip" | "backstage">("general");
   const [promoCode, setPromoCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
   const [promoError, setPromoError] = useState("");
@@ -164,13 +163,14 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
       try {
         const created = JSON.parse(localStorage.getItem("happnix_created_events_v4") || "[]");
         const cached = JSON.parse(localStorage.getItem("happnix_cached_feed_events") || "[]");
+        const detailsMatch = MOCK_EVENTS_DETAILS[eventID];
         const match = [...created, ...cached, ...MOCK_EVENTS].find((e: any) => (e.eventID || e.id) === eventID);
-        const tiers = match?.ticketing?.tiers || match?.ticketTiers || [];
+        const tiers = match?.ticketing?.tiers || match?.ticketTiers || match?.tiers || detailsMatch?.tiers || [];
         if (Array.isArray(tiers) && tiers.length > 0) {
           const mapped = tiers.map((t: any) => ({
             tierID: t.id || t.tierID || `tier_${Math.random()}`,
             name: t.name || "General Admission",
-            price: Number(t.price) || 0,
+            price: Number(t.price) !== undefined && !isNaN(Number(t.price)) ? Number(t.price) : 0,
             description: t.promoText || t.description || ""
           }));
           setRealTiers(mapped);
@@ -186,18 +186,31 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
     // First check local/mock storage so tiers load immediately
     const foundLocal = loadLocalTiers();
 
+    const generateDefaultTiers = () => {
+      const rawPrice = parseInt((price || "").replace(/[^\d]/g, "")) || 0;
+      const defaults = [
+        { tierID: "std", name: "Standard Entry Pass", price: rawPrice, description: "Standard admission to event zones & stages." },
+        { tierID: "vip", name: "VIP Guest Access", price: rawPrice === 0 ? 0 : rawPrice + 500, description: "Fast-track VIP entry & exclusive lounge access." }
+      ];
+      setRealTiers(defaults);
+      setSelectedTierID(defaults[0].tierID);
+    };
+
     // Also attempt backend API if UUID
-    if (!eventID.startsWith("e") && !eventID.startsWith("c_")) {
+    const isBackendUUID = !eventID.startsWith("e") && !eventID.startsWith("c_") && !eventID.startsWith("sp") && !eventID.startsWith("mock");
+    if (isBackendUUID) {
       bookingApi.getEventTiers(eventID).then((res: any) => {
         if (res.success && res.tiers?.length > 0) {
           setRealTiers(res.tiers);
           setSelectedTierID(res.tiers[0].tierID);
         } else if (!foundLocal) {
-          setRealTiers([]);
+          generateDefaultTiers();
         }
       }).catch(() => {
-        if (!foundLocal) setRealTiers([]);
+        if (!foundLocal) generateDefaultTiers();
       });
+    } else if (!foundLocal) {
+      generateDefaultTiers();
     }
   }, [isOpen, eventID]);
 
@@ -209,18 +222,10 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
   let basePrice = rawBase;
   let categoryLabel = "General Admission";
 
-  if (realTiers.length > 0) {
-    const selectedTier = realTiers.find(t => t.tierID === selectedTierID) || realTiers[0];
-    basePrice = selectedTier ? Number(selectedTier.price) || 0 : rawBase;
-    categoryLabel = selectedTier ? selectedTier.name : "General Admission";
-  } else {
-    if (category === "vip") {
-      basePrice = rawBase + 500;
-      categoryLabel = "VIP Access Pass";
-    } else if (category === "backstage") {
-      basePrice = rawBase + 1200;
-      categoryLabel = "Backstage Pass";
-    }
+  const selectedTier = realTiers.find(t => t.tierID === selectedTierID) || realTiers[0];
+  if (selectedTier) {
+    basePrice = Number(selectedTier.price) !== undefined && !isNaN(Number(selectedTier.price)) ? Number(selectedTier.price) : rawBase;
+    categoryLabel = selectedTier.name || "Standard Pass";
   }
 
   const subtotal = basePrice * qty;
@@ -333,58 +338,35 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
                 <div className="flex flex-col gap-2 mb-4">
                   <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Select Ticket Class</label>
                   
-                  {realTiers.length > 0 ? (
-                    <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-                      {realTiers.map((tier) => {
-                        const tierPrice = Number(tier.price) || 0;
-                        const isSelected = selectedTierID === tier.tierID;
-                        return (
-                          <button
-                            key={tier.tierID}
-                            onClick={() => setSelectedTierID(tier.tierID)}
-                            className={`p-3 rounded-2xl border flex items-center justify-between transition-all cursor-pointer outline-none text-left ${
-                              isSelected
-                                ? "bg-brand-gradient/20 border-[var(--brand-1)] text-white shadow-glow"
-                                : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
-                            }`}
-                          >
-                            <div className="min-w-0 pr-2">
-                              <span className="text-xs font-bold block truncate">{tier.name}</span>
-                              {tier.description && (
-                                <span className="text-[10px] text-white/40 block truncate mt-0.5">{tier.description}</span>
-                              )}
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span className={`text-xs font-black ${tierPrice === 0 ? "text-green-400" : "text-white"}`}>
-                                {tierPrice === 0 ? "FREE" : `₹${tierPrice}`}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "general", label: "General", desc: `₹${rawBase}` },
-                        { id: "vip", label: "VIP Pass", desc: `₹${rawBase + 500}` },
-                        { id: "backstage", label: "Backstage", desc: `₹${rawBase + 1200}` }
-                      ].map((t) => (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                    {realTiers.map((tier) => {
+                      const tierPrice = Number(tier.price) || 0;
+                      const isSelected = selectedTierID === tier.tierID;
+                      return (
                         <button
-                          key={t.id}
-                          onClick={() => setCategory(t.id as any)}
-                          className={`p-2.5 rounded-full border flex flex-col items-center justify-center transition-all cursor-pointer outline-none focus:outline-none ${
-                            category === t.id
+                          key={tier.tierID}
+                          onClick={() => setSelectedTierID(tier.tierID)}
+                          className={`p-3 rounded-2xl border flex items-center justify-between transition-all cursor-pointer outline-none text-left ${
+                            isSelected
                               ? "bg-brand-gradient/20 border-[var(--brand-1)] text-white shadow-glow"
-                              : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10"
+                              : "bg-white/5 border-white/5 text-white/70 hover:bg-white/10"
                           }`}
                         >
-                          <span className="text-xs font-bold leading-tight">{t.label}</span>
-                          <span className="text-[10px] text-white/40 mt-0.5">{t.desc}</span>
+                          <div className="min-w-0 pr-2">
+                            <span className="text-xs font-bold block truncate">{tier.name}</span>
+                            {tier.description && (
+                              <span className="text-[10px] text-white/40 block truncate mt-0.5">{tier.description}</span>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className={`text-xs font-black ${tierPrice === 0 ? "text-green-400" : "text-white"}`}>
+                              {tierPrice === 0 ? "FREE" : `₹${tierPrice}`}
+                            </span>
+                          </div>
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Single Pass Policy Notice */}
