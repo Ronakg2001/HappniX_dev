@@ -98,6 +98,9 @@ export interface EventDetail {
   lng: number;
   gallery: string[];
   tiers?: any[];
+  status?: string;
+  endAt?: string;
+  startAt?: string;
 }
 export interface DiscoverItem {
   id: string;

@@ -100,6 +100,9 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
       ticketsLeft: item.maxAttendees || 100,
       trending: (item.engagementScore || 0) > 50,
       price: item.ticketType === 'Free' ? 'Free' : `₹${item.basePrice || 0}`,
+      status: item.status,
+      startAt: item.startAt,
+      endAt: item.endAt,
     };
     
     return (

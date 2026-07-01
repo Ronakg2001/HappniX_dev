@@ -186,13 +186,34 @@ interface EventCardProps {
     trending: boolean;
     friendsAttending?: number;
     price: string;
+    status?: string;
+    startAt?: string;
+    endAt?: string;
   };
   onBookNow: (e?: React.MouseEvent) => void;
+}
+
+function checkIsEventClosed(event: any): boolean {
+  if (!event) return false;
+  if (event.status === "Completed" || event.status === "Archived" || event.status === "Cancelled" || event.status === "Closed") {
+    return true;
+  }
+  if (event.endAt) {
+    try {
+      if (new Date(event.endAt).getTime() < Date.now()) return true;
+    } catch {}
+  } else if (event.startAt) {
+    try {
+      if (new Date(event.startAt).getTime() + 18 * 3600 * 1000 < Date.now()) return true;
+    } catch {}
+  }
+  return false;
 }
 
 export function EventCard({ event, onBookNow }: EventCardProps) {
   const [interested, setInterested] = useState(false);
   const [saved, setSaved] = useState(false);
+  const isClosed = checkIsEventClosed(event);
 
   return (
     <div className="liquid-glass liquid-edge rounded-lg overflow-hidden mb-4 hover:scale-[1.005] transition-all duration-300">
@@ -273,10 +294,18 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
           <button 
-            onClick={onBookNow}
-            className="flex-1 py-3 px-4 rounded-2xl bg-brand-gradient text-white text-xs sm:text-sm font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-glow text-center"
+            onClick={(e) => {
+              if (isClosed) return;
+              onBookNow(e);
+            }}
+            disabled={isClosed}
+            className={`flex-1 py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition-all text-center ${
+              isClosed
+                ? "bg-white/5 border border-white/10 text-white/50 opacity-60 cursor-not-allowed"
+                : "bg-brand-gradient text-white hover:scale-[1.02] active:scale-[0.98] shadow-glow"
+            }`}
           >
-            Book Now • {event.price}
+            {isClosed ? "Event Closed" : `Book Now • ${event.price}`}
           </button>
 
           <button 
@@ -307,6 +336,7 @@ export function EventCard({ event, onBookNow }: EventCardProps) {
 
 // --- SPONSORED / FEATURED EVENT CARD ---
 export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
+  const isClosed = checkIsEventClosed(event);
   return (
     <div 
       className="relative rounded-lg overflow-hidden bg-black shadow-[0_0_30px_rgba(212,175,55,0.15)] hover:scale-[1.005] transition-all duration-300"
@@ -320,7 +350,6 @@ export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
     >
       {/* Promoter tag */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-[var(--brand-4)] via-[#FCF6BA] to-[#BF953F] text-black text-[10px] font-black uppercase tracking-wider shadow-[0_0_15px_rgba(212,175,55,0.45)]">
-        {/* <Sparkles className="h-3 w-3 text-black" /> */}
         Promoted
       </div>
 
@@ -369,11 +398,19 @@ export function SponsoredEventCard({ event, onBookNow }: EventCardProps) {
               <p className="text-base font-black text-[#D4AF37]">{event.price}</p>
             </div>
             <button 
-              onClick={onBookNow}
-              className="py-2.5 px-5 rounded-2xl bg-brand-gradient text-white text-xs font-bold hover:scale-[1.03] active:scale-[0.97] transition-all shadow-glow flex items-center gap-1"
+              onClick={(e) => {
+                if (isClosed) return;
+                onBookNow(e);
+              }}
+              disabled={isClosed}
+              className={`py-2.5 px-5 rounded-2xl text-xs font-bold transition-all flex items-center gap-1 ${
+                isClosed
+                  ? "bg-white/5 border border-white/10 text-white/50 opacity-60 cursor-not-allowed"
+                  : "bg-brand-gradient text-white hover:scale-[1.03] active:scale-[0.97] shadow-glow"
+              }`}
             >
-              Get Tickets
-              <ChevronRight className="h-3.5 w-3.5" />
+              {isClosed ? "Event Closed" : "Get Tickets"}
+              {!isClosed && <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>

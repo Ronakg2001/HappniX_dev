@@ -93,8 +93,28 @@ function formatRealEventToDetail(raw: any, fallbackId: string): EventDetail {
     banner: raw.coverImageUrl || raw.bannerUrl || gallery[0],
     lat: raw.latitude ? parseFloat(raw.latitude) : (raw.location?.lat || 19.076),
     lng: raw.longitude ? parseFloat(raw.longitude) : (raw.location?.lng || 72.877),
-    gallery
+    gallery,
+    status: raw.status,
+    startAt: raw.startAt,
+    endAt: raw.endAt
   };
+}
+
+function checkIsEventClosed(event: any): boolean {
+  if (!event) return false;
+  if (event.status === "Completed" || event.status === "Archived" || event.status === "Cancelled" || event.status === "Closed") {
+    return true;
+  }
+  if (event.endAt) {
+    try {
+      if (new Date(event.endAt).getTime() < Date.now()) return true;
+    } catch {}
+  } else if (event.startAt) {
+    try {
+      if (new Date(event.startAt).getTime() + 18 * 3600 * 1000 < Date.now()) return true;
+    } catch {}
+  }
+  return false;
 }
 
 export default function EventDetailPageClient({ params }: { params: { id: string } }) {
@@ -121,6 +141,8 @@ export default function EventDetailPageClient({ params }: { params: { id: string
     } catch {}
     return fallback;
   });
+
+  const isClosed = checkIsEventClosed(event);
 
   useEffect(() => {
     if (!eventId) return;
@@ -265,12 +287,17 @@ export default function EventDetailPageClient({ params }: { params: { id: string
                 <span className="text-sm font-black text-white leading-tight mt-0.5">{event.price}</span>
               </div>
               <Button
-                onClick={() => openBooking(event.title, event.price, event.id)}
-                variant="brand"
+                onClick={() => !isClosed && openBooking(event.title, event.price, event.id)}
+                variant={isClosed ? "outline" : "brand"}
                 size="sm"
-                className="px-4 rounded-lg text-[11px] font-black uppercase tracking-wider hover:scale-105 active:scale-95 transition-all duration-200"
+                disabled={isClosed}
+                className={`px-4 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all duration-200 ${
+                  isClosed
+                    ? "opacity-60 cursor-not-allowed bg-white/5 border-white/10 text-white/50"
+                    : "hover:scale-105 active:scale-95"
+                }`}
               >
-                <Ticket className="h-3.5 w-3.5 mr-1" /> Book Now
+                <Ticket className="h-3.5 w-3.5 mr-1" /> {isClosed ? "Event Closed" : "Book Now"}
               </Button>
             </div>
           </div>
