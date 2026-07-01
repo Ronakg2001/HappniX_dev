@@ -244,7 +244,8 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
     setStage("processing");
     setProcessMsg("Securing spot with venue hosts...");
 
-    if (isRealEvent && selectedTierID && eventID) {
+    const isBackendEvent = Boolean(eventID && !eventID.startsWith("e") && !eventID.startsWith("c_"));
+    if (isBackendEvent && selectedTierID && eventID) {
       try {
         setTimeout(() => setProcessMsg("Generating secure gate QR keys..."), 800);
 
