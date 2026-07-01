@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api';
 
-const fetchFeed = async (cursor?: string, location?: {lat: number, lng: number}) => {
+const fetchFeed = async (cursor?: string, location?: {lat?: number; lng?: number}) => {
   const params: any = {};
   if (cursor) params.cursor = cursor;
   if (location && location.lat !== undefined && location.lng !== undefined) {
