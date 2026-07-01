@@ -152,6 +152,51 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           }
         } catch {}
 
+        try {
+          const cachedRaw = localStorage.getItem("happnix_cached_feed_events");
+          if (cachedRaw) {
+            const parsed = JSON.parse(cachedRaw);
+            if (Array.isArray(parsed)) {
+              const cachedMapped: DiscoverItem[] = parsed
+                .filter((e: any) => {
+                  if (!debouncedQuery) return true;
+                  const q = debouncedQuery.toLowerCase();
+                  return (
+                    (e.title || "").toLowerCase().includes(q) ||
+                    (e.eventCategory || e.category || "").toLowerCase().includes(q) ||
+                    (e.description || "").toLowerCase().includes(q) ||
+                    (e.hostUserName || e.hostName || "").toLowerCase().includes(q)
+                  );
+                })
+                .map((e: any) => ({
+                  id: String(e.id || e.eventID),
+                  type: "event",
+                  title: e.title || "Untitled Event",
+                  category: e.eventCategory || e.category || "General",
+                  genre: e.eventCategory || e.category || "",
+                  image: fixAvatarUrl(e.coverImageUrl || e.image) || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
+                  hype: "HOT",
+                  attending: "0",
+                  host: e.hostUserName || e.hostName || e.host_username || "Host",
+                  host_avatar: fixAvatarUrl(e.hostAvatar || e.host_profilePictureUrl),
+                  verified: !!e.hostVerified,
+                  price: e.basePrice ? `₹${e.basePrice}` : e.price || "Free",
+                  venue: e.locationName || e.venue || "TBA",
+                }));
+              const seenIds = new Set(mappedEvents.map((m) => m.id));
+              const seenTitles = new Set(mappedEvents.map((m) => (m.title || "").toLowerCase().trim()));
+              cachedMapped.forEach((ce) => {
+                const t = (ce.title || "").toLowerCase().trim();
+                if (!seenIds.has(ce.id) && (!t || !seenTitles.has(t))) {
+                  mappedEvents.push(ce);
+                  seenIds.add(ce.id);
+                  if (t) seenTitles.add(t);
+                }
+              });
+            }
+          }
+        } catch {}
+
         setAllUsers(mappedUsers);
         setAllEvents(mappedEvents);
         setStatus("success");

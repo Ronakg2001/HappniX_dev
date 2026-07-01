@@ -313,10 +313,10 @@ def search_public_events(query: str, limit: int = 20) -> dict:
             e."eventID", e."title", e."eventCategory", e."coverImageUrl", e."startAt", e."ticketType", e."basePrice", e."currency", e."locationName", e."engagementScore", e."status", e."visibility",
             u."userName" as host_userName, u."profilePictureUrl" as host_profilePictureUrl, u."status" as host_status
         FROM events e
-        JOIN users u ON e."hostUserID" = u."userID"
+        LEFT JOIN users u ON e."hostUserID" = u."userID"
         WHERE (COALESCE(e."title", '') ILIKE %s OR COALESCE(e."eventCategory", '') ILIKE %s OR COALESCE(e."description", '') ILIKE %s)
-          AND e."visibility" != 'Private'
-          AND e."status" IN ('Published', 'Upcoming', 'Live')
+          AND (e."visibility" IS NULL OR e."visibility" ILIKE 'Public' OR e."visibility" != 'Private')
+          AND (e."status" IS NULL OR e."status" ILIKE 'Published' OR e."status" ILIKE 'Upcoming' OR e."status" ILIKE 'Live' OR e."status" ILIKE 'Active')
           AND (u."privacyMode" IS NULL OR u."privacyMode" != 'private')
           AND (u."status" IS NULL OR u."status" ILIKE 'active')
         ORDER BY COALESCE(e."engagementScore", 0) DESC, e."createdAt" DESC
