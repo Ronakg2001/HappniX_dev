@@ -5,16 +5,8 @@ def search_discover_content(query: str, limit_users: int = 50, limit_events: int
     """
     Orchestrates the unified discover search for users and events.
     """
-    if not query or len(query.strip()) < 2:
-        return {
-            "success": True,
-            "data": {
-                "users": [],
-                "events": []
-            }
-        }
-        
-    query = query.strip()
+    query = (query or "").strip()
+
     
     # 1. Search Users
     users_res = rds.search_users_by_name(query, limit_users)

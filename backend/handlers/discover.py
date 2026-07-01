@@ -34,9 +34,6 @@ def handle_discover_search(event):
     query = query_params.get("q", "").strip()
     limit = int(query_params.get("limit", 50))
     
-    if len(query) < 2:
-        return success_response({"success": True, "users": [], "events": []})
-        
     search_res = discover_services.search_discover_content(query, limit_users=limit, limit_events=limit)
     if not search_res.get("success"):
         return error_response("Discover search failed.", 500)

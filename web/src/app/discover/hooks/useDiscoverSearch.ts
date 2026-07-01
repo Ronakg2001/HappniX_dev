@@ -47,21 +47,13 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
   // Sync debounced query
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    if (!query.trim()) {
-      setDebouncedQuery("");
-      setStatus("idle");
-      setAllUsers([]);
-      setAllEvents([]);
-      return;
-    }
-    
     setIsTyping(true);
     setStatus("loading");
     
     debounceTimer.current = setTimeout(() => {
       setDebouncedQuery(query.trim());
-      setIsTyping(false); // Finished typing
-      setShowAll(false); // Reset to sliced view
+      setIsTyping(false);
+      setShowAll(false);
     }, DEBOUNCE_MS);
     
     return () => {
@@ -71,7 +63,7 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
 
   // Fetch from Discover API
   useEffect(() => {
-    if (!debouncedQuery) return;
+    if (debouncedQuery === null || debouncedQuery === undefined) return;
     setStatus("loading");
     setError(null);
 
@@ -100,21 +92,65 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
         });
         setFollowedIds(initialFollowed);
         
-        const mappedEvents: DiscoverItem[] = (response.events || []).map((e: any) => ({
-          id: String(e.id),
+        let mappedEvents: DiscoverItem[] = (response.events || []).map((e: any) => ({
+          id: String(e.id || e.eventID),
           type: "event",
           title: e.title || "",
-          category: e.category || "",
-          genre: "", // Missing from backend payload currently
+          category: e.category || "General",
+          genre: e.category || "",
           image: fixAvatarUrl(e.image || e.coverImageUrl || e.cover_image) || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
-          hype: "HOT", // Static for now
+          hype: "HOT",
           attending: "0",
-          host: e.host_username || "Unknown",
+          host: e.host_username || e.hostName || "Host",
           host_avatar: fixAvatarUrl(e.host_avatar || e.host_profilePictureUrl),
           verified: false,
           price: e.price || "Free",
-          venue: e.venue || "TBA",
+          venue: e.venue || e.locationName || "TBA",
         }));
+
+        try {
+          const localEventsRaw = localStorage.getItem("happnix_created_events_v4");
+          if (localEventsRaw) {
+            const parsed = JSON.parse(localEventsRaw);
+            if (Array.isArray(parsed)) {
+              const localMapped: DiscoverItem[] = parsed
+                .filter((e: any) => {
+                  if (!debouncedQuery) return true;
+                  const q = debouncedQuery.toLowerCase();
+                  return (
+                    (e.title || "").toLowerCase().includes(q) ||
+                    (e.category || "").toLowerCase().includes(q) ||
+                    (e.description || "").toLowerCase().includes(q)
+                  );
+                })
+                .map((e: any) => ({
+                  id: String(e.id || e.eventID),
+                  type: "event",
+                  title: e.title || "Untitled Event",
+                  category: e.category || "General",
+                  genre: e.category || "",
+                  image: fixAvatarUrl(e.coverImageUrl || e.image) || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
+                  hype: "NEW",
+                  attending: "1",
+                  host: e.hostName || e.host_username || "You",
+                  host_avatar: fixAvatarUrl(e.hostAvatar || e.host_profilePictureUrl),
+                  verified: true,
+                  price: e.basePrice ? `₹${e.basePrice}` : "Free",
+                  venue: e.locationName || e.venue || "TBA",
+                }));
+              const seenIds = new Set(mappedEvents.map((m) => m.id));
+              const seenTitles = new Set(mappedEvents.map((m) => (m.title || "").toLowerCase().trim()));
+              localMapped.forEach((le) => {
+                const t = (le.title || "").toLowerCase().trim();
+                if (!seenIds.has(le.id) && (!t || !seenTitles.has(t))) {
+                  mappedEvents.unshift(le);
+                  seenIds.add(le.id);
+                  if (t) seenTitles.add(t);
+                }
+              });
+            }
+          }
+        } catch {}
 
         setAllUsers(mappedUsers);
         setAllEvents(mappedEvents);

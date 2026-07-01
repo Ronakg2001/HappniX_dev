@@ -279,8 +279,8 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
     sql = '''
         SELECT "userID", "userName", "fullName", "profilePictureUrl", "privacyMode", "status"
         FROM users
-        WHERE ("userName" ILIKE %s OR "fullName" ILIKE %s)
-          AND "status" = 'Active'
+        WHERE (COALESCE("userName", '') ILIKE %s OR COALESCE("fullName", '') ILIKE %s)
+          AND ("status" IS NULL OR "status" ILIKE 'active')
           AND ("privacyMode" IS NULL OR "privacyMode" != 'private')
         LIMIT %s;
     '''
@@ -314,18 +314,18 @@ def search_public_events(query: str, limit: int = 20) -> dict:
             u."userName" as host_userName, u."profilePictureUrl" as host_profilePictureUrl, u."status" as host_status
         FROM events e
         JOIN users u ON e."hostUserID" = u."userID"
-        WHERE (e."title" ILIKE %s OR e."eventCategory" ILIKE %s)
+        WHERE (COALESCE(e."title", '') ILIKE %s OR COALESCE(e."eventCategory", '') ILIKE %s OR COALESCE(e."description", '') ILIKE %s)
           AND e."visibility" != 'Private'
-          AND e."status" = 'Published'
+          AND e."status" IN ('Published', 'Upcoming', 'Live')
           AND (u."privacyMode" IS NULL OR u."privacyMode" != 'private')
-          AND u."status" = 'Active'
+          AND (u."status" IS NULL OR u."status" ILIKE 'active')
         ORDER BY COALESCE(e."engagementScore", 0) DESC, e."createdAt" DESC
         LIMIT %s;
     '''
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(sql, (search_pattern, search_pattern, limit))
+            cur.execute(sql, (search_pattern, search_pattern, search_pattern, limit))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
             return {"success": True, "data": data}

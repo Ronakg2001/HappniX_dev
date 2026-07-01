@@ -14,38 +14,52 @@ const fetchFeed = async (cursor?: string, location?: {lat: number, lng: number})
   return payload.data || payload;
 };
 
+const getLocalFeedEvents = () => {
+  try {
+    const raw = localStorage.getItem("happnix_created_events_v4");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((e: any) => ({
+      entityType: "EVENT_CARD",
+      source: "OWN_CONTENT",
+      eventID: String(e.id || e.eventID),
+      id: String(e.id || e.eventID),
+      title: e.title || "Untitled Event",
+      eventCategory: e.category || "General",
+      coverImageUrl: e.coverImageUrl || e.image || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
+      startAt: e.startAt || new Date(Date.now() + 86400000).toISOString(),
+      endAt: e.endAt,
+      ticketType: e.ticketType || "Free",
+      basePrice: e.basePrice || 0,
+      currency: "₹",
+      locationName: e.locationName || e.venue || "TBA",
+      hostUserName: e.hostName || e.host_username || "You",
+      hostFullName: e.hostName || "You",
+      hostAvatar: e.hostAvatar || "",
+      engagementScore: 100,
+      status: e.status || "Published",
+    }));
+  } catch {
+    return [];
+  }
+};
+
 export function useFeed() {
   const [feedItems, setFeedItems] = useState<any[]>([]);
   const [liveNow, setLiveNow] = useState<any[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingNext, setIsFetchingNext] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  
-  // New posts polling state
   const [hasNewPosts, setHasNewPosts] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat?: number; lng?: number}>({});
+
   const lastFetchedAt = useRef<string>(new Date().toISOString());
 
-  // Determine user location from localStorage (locationStore) or GPS
+  // Try to grab geolocation if available
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    let foundLocation = false;
-    try {
-      const stored = localStorage.getItem('userLocation');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') {
-          setUserLocation({ lat: parsed.latitude, lng: parsed.longitude });
-          foundLocation = true;
-        }
-      }
-    } catch {
-      // ignore parse error
-    }
-
-    if (!foundLocation && navigator.geolocation) {
+    if (typeof window !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         (err) => console.warn("Location access denied or unavailable", err),
@@ -59,31 +73,80 @@ export function useFeed() {
       if (isInitial) setIsLoading(true);
       else setIsFetchingNext(true);
 
-      const data = await fetchFeed(
-        isInitial ? undefined : (nextCursor || undefined),
-        userLocation
-      );
+      const localEvs = getLocalFeedEvents();
+      let data: any = null;
+      try {
+        data = await fetchFeed(
+          isInitial ? undefined : (nextCursor || undefined),
+          userLocation
+        );
+      } catch (e) {
+        if (isInitial && localEvs.length > 0) {
+          data = { success: true, feed_items: [], live_now: [] };
+        } else {
+          throw e;
+        }
+      }
       
       if (data && data.success) {
-        const newFeed = data.feed_items || [];
-        const newLive = data.live_now || [];
+        const apiFeed = data.feed_items || [];
+        const apiLive = data.live_now || [];
+
+        const seenIds = new Set();
+        const seenTitles = new Set();
+        const mergedFeed: any[] = [];
+        [...localEvs, ...apiFeed].forEach((item: any) => {
+          const id = item.eventID || item.postID || item.id;
+          const t = (item.title || "").toLowerCase().trim();
+          if (id && seenIds.has(id)) return;
+          if (item.entityType === "EVENT_CARD" && t && seenTitles.has(t)) return;
+          if (id) seenIds.add(id);
+          if (item.entityType === "EVENT_CARD" && t) seenTitles.add(t);
+          mergedFeed.push(item);
+        });
+
+        const seenLiveIds = new Set();
+        const seenLiveTitles = new Set();
+        const mergedLive: any[] = [];
+        [...localEvs, ...apiLive].forEach((item: any) => {
+          const id = item.eventID || item.id;
+          const t = (item.title || "").toLowerCase().trim();
+          if (id && seenLiveIds.has(id)) return;
+          if (t && seenLiveTitles.has(t)) return;
+          if (id) seenLiveIds.add(id);
+          if (t) seenLiveTitles.add(t);
+          mergedLive.push(item);
+        });
+
         if (isInitial) {
-          setFeedItems(newFeed);
-          setLiveNow(newLive);
+          setFeedItems(mergedFeed);
+          setLiveNow(mergedLive);
           setHasNewPosts(false);
           lastFetchedAt.current = new Date().toISOString();
           try {
-            const evs = [...newLive, ...newFeed].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
+            const evs = [...mergedLive, ...mergedFeed].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
             localStorage.setItem("happnix_cached_feed_events", JSON.stringify(evs));
           } catch {}
         } else {
           setFeedItems(prev => {
-            const merged = [...prev, ...newFeed];
+            const seen = new Set(prev.map((x: any) => x.eventID || x.postID || x.id));
+            const seenT = new Set(prev.filter((x: any) => x.entityType === "EVENT_CARD").map((x: any) => (x.title || "").toLowerCase().trim()));
+            const added: any[] = [];
+            mergedFeed.forEach((item: any) => {
+              const id = item.eventID || item.postID || item.id;
+              const t = (item.title || "").toLowerCase().trim();
+              if (!id || seen.has(id)) return;
+              if (item.entityType === "EVENT_CARD" && t && seenT.has(t)) return;
+              added.push(item);
+              seen.add(id);
+              if (t) seenT.add(t);
+            });
+            const finalMerged = [...prev, ...added];
             try {
-              const evs = [...newLive, ...merged].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
+              const evs = [...mergedLive, ...finalMerged].filter((x: any) => x.entityType === "EVENT_CARD" || x.eventID);
               localStorage.setItem("happnix_cached_feed_events", JSON.stringify(evs));
             } catch {}
-            return merged;
+            return finalMerged;
           });
         }
         setNextCursor(data.next_cursor || null);

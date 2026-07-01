@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, Flame, TrendingUp, Clock, X, ArrowLeft, ShieldCheck, Compass, Play, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ function DiscoverPageInner() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [localCreatedEvents, setLocalCreatedEvents] = useState<any[]>([]);
   const [activeSearchTab, setActiveSearchTab] = useState<SearchTab>(
     (searchParams.get("tab") as SearchTab) ?? "Top"
   );
@@ -47,11 +48,32 @@ function DiscoverPageInner() {
     if (history) {
       setSearchHistory(JSON.parse(history));
     } else {
-      // only for mock, remove later
       const defaultHistory = ["Techno nights", "Jaipur Gigs", "DJ Shadow", "Acoustic Cover"];
       setSearchHistory(defaultHistory);
       localStorage.setItem("happnix_search_history", JSON.stringify(defaultHistory));
     }
+
+    try {
+      const raw = localStorage.getItem("happnix_created_events_v4");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setLocalCreatedEvents(parsed.map((e: any) => ({
+            id: String(e.id || e.eventID),
+            type: "event",
+            title: e.title || "Untitled Event",
+            genre: e.category || "General",
+            category: e.category || "General",
+            image: e.coverImageUrl || e.image || "https://images.unsplash.com/photo-1540039155732-684735035727?w=800",
+            hype: "NEW",
+            price: e.basePrice ? `₹${e.basePrice}` : "Free",
+            venue: e.locationName || e.venue || "TBA",
+            host: e.hostName || e.host_username || "You",
+            verified: true,
+          })));
+        }
+      }
+    } catch {}
   }, []);
 
   const handleSearchSubmit = useCallback((query: string) => {
@@ -87,7 +109,22 @@ function DiscoverPageInner() {
     }, [searchQuery, syncURL]
   );
 
-  const filteredItems = DISCOVER_ITEMS.filter((item) => {
+  const combinedItems = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    const res: any[] = [];
+    [...localCreatedEvents, ...DISCOVER_ITEMS].forEach((item) => {
+      const t = (item.title || "").toLowerCase().trim();
+      if (!seenIds.has(item.id) && (!t || !seenTitles.has(t))) {
+        seenIds.add(item.id);
+        if (t) seenTitles.add(t);
+        res.push(item);
+      }
+    });
+    return res;
+  }, [localCreatedEvents]);
+
+  const filteredItems = combinedItems.filter((item) => {
     if (activeCategory !== "All" && item.genre !== activeCategory) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
