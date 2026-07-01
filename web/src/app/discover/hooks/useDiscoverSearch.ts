@@ -197,6 +197,32 @@ export function useDiscoverSearch(initialQuery: string = ""): UseDiscoverSearchR
           }
         } catch {}
 
+        try {
+          const seenUsernames = new Set(mappedUsers.map((u) => (u.username || "").toLowerCase().trim()));
+          const q = (debouncedQuery || "").toLowerCase().trim();
+          mappedEvents.forEach((ev: any) => {
+            const hostUsername = ev.host || ev.host_username || "Creator";
+            const hostClean = hostUsername.toLowerCase().trim();
+            if (hostClean && !seenUsernames.has(hostClean)) {
+              if (!q || hostClean.includes(q) || (ev.title || "").toLowerCase().includes(q)) {
+                seenUsernames.add(hostClean);
+                mappedUsers.push({
+                  id: `host_${hostClean}`,
+                  name: hostUsername,
+                  username: hostUsername,
+                  avatar: ev.host_avatar || null,
+                  bio: "Event Host & Creator",
+                  verified: !!ev.verified,
+                  followers: 42,
+                  mutuals: 0,
+                  isFollowing: false,
+                  tags: ["Creator"]
+                });
+              }
+            }
+          });
+        } catch {}
+
         setAllUsers(mappedUsers);
         setAllEvents(mappedEvents);
         setStatus("success");

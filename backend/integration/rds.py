@@ -279,15 +279,15 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
     sql = '''
         SELECT "userID", "userName", "fullName", "profilePictureUrl", "privacyMode", "status"
         FROM users
-        WHERE (COALESCE("userName", '') ILIKE %s OR COALESCE("fullName", '') ILIKE %s)
-          AND ("status" IS NULL OR "status" ILIKE 'active')
+        WHERE (COALESCE("userName", '') ILIKE %s OR COALESCE("fullName", '') ILIKE %s OR COALESCE("userID", '') ILIKE %s OR COALESCE("emailAddress", '') ILIKE %s)
+          AND ("status" IS NULL OR "status" != 'Deleted')
           AND ("privacyMode" IS NULL OR "privacyMode" != 'private')
         LIMIT %s;
     '''
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(sql, (search_pattern, search_pattern, limit))
+            cur.execute(sql, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
             data = _enrich_users_with_dynamo_avatar(data)
