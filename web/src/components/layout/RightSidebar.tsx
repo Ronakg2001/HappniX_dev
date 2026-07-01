@@ -7,7 +7,7 @@ import { apiClient } from "@/lib/api";
 import { useLayout } from "@/components/layout/AppLayout";
 
 interface RightSidebarProps {
-  onBookNow: (title: string, price: string) => void;
+  onBookNow: (title: string, price: string, e?: React.MouseEvent, eventID?: string) => void;
 }
 
 export default function RightSidebar({ onBookNow }: RightSidebarProps) {
@@ -103,7 +103,7 @@ export default function RightSidebar({ onBookNow }: RightSidebarProps) {
                 <p className="text-xs font-extrabold text-[var(--brand-1)] mt-1.5">{e.price}</p>
               </div>
               <button 
-                onClick={() => onBookNow(e.title, e.price)}
+                onClick={() => onBookNow(e.title, e.price, undefined, e.id)}
                 className="py-2 px-3 rounded-xl bg-brand-gradient text-white text-[11px] font-bold shrink-0 shadow-glow hover:scale-102 transition-transform"
               >
                 Book

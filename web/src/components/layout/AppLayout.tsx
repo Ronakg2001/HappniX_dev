@@ -18,7 +18,7 @@ interface LayoutContextType {
   currentLocation: string;
   radius: number;
   bookedTickets: TicketType[];
-  addTicket: (title: string, price: string) => void;
+  addTicket: (title: string, price: string, eventID?: string) => void;
   refreshBookings: () => Promise<void>;
 }
 
@@ -100,14 +100,16 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [refreshBookings]);
 
-  const addTicket = (title: string, price: string) => {
+  const addTicket = (title: string, price: string, eventID?: string) => {
     // Local fallback for mock flow — used when eventID is not a real UUID
-    const newTicket: TicketType = {
+    const newTicket: any = {
       id: `t_${Date.now()}`,
       eventTitle: title,
+      eventID: eventID || `mock_${Date.now()}`,
       date: "Jun 06",
       time: "9:00 PM",
-      seat: "General Entry"
+      seat: "General Entry",
+      status: "Confirmed"
     };
     const updated = [newTicket, ...bookedTickets];
     setBookedTickets(updated);

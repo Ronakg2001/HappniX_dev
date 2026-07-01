@@ -6,7 +6,7 @@ interface FeedItemProps {
   item: any;
   onProfileClick: (username: string) => void;
   onEventClick: (eventId: string) => void;
-  onBookNow: (title: string, price: string, e?: React.MouseEvent) => void;
+  onBookNow: (title: string, price: string, e?: React.MouseEvent, eventID?: string) => void;
 }
 
 /**
@@ -106,7 +106,7 @@ export function FeedItem({ item, onProfileClick, onEventClick, onBookNow }: Feed
       <div onClick={() => onEventClick(eventData.id)} className="cursor-pointer mb-6">
         <EventCard 
           event={eventData} 
-          onBookNow={(e) => onBookNow(eventData.title, eventData.price, e)} 
+          onBookNow={(e) => onBookNow(eventData.title, eventData.price, e, eventData.id)} 
         />
       </div>
     );

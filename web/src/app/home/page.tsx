@@ -66,9 +66,9 @@ export default function HomePage() {
   // Mock Sponsored Event
   const mockSponsoredEvent = MOCK_SPONSORED_EVENT;
 
-  const handleBookNow = (title: string, price: string, e?: React.MouseEvent) => {
+  const handleBookNow = (title: string, price: string, e?: React.MouseEvent, eventID?: string) => {
     e?.stopPropagation();
-    openBooking(title, price);
+    openBooking(title, price, eventID);
   };
 
   return (
@@ -101,7 +101,7 @@ export default function HomePage() {
           <div onClick={() => router.push(`/event?id=${mockSponsoredEvent.id}`)} className="cursor-pointer">
             <SponsoredEventCard
               event={mockSponsoredEvent}
-              onBookNow={(e) => handleBookNow(mockSponsoredEvent.title, mockSponsoredEvent.price, e)}
+              onBookNow={(e) => handleBookNow(mockSponsoredEvent.title, mockSponsoredEvent.price, e, mockSponsoredEvent.id)}
             />
           </div>
         )}

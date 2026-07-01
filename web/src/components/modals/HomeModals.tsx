@@ -5,6 +5,7 @@ import { X, Bell, Ticket, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLayout } from "@/components/layout/AppLayout";
 import { bookingApi } from "@/lib/api";
+import { MOCK_EVENTS } from "@/constants/mockData";
 
 // --- QUICK NOTIFICATIONS MODAL ---
 export function NotificationsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -96,7 +97,7 @@ export function ProfilePreviewModal({ isOpen, onClose, username }: { isOpen: boo
 }
 
 // --- QUICK EVENT PREVIEW ---
-export function EventPreviewModal({ isOpen, onClose, eventTitle }: { isOpen: boolean; onClose: () => void; eventTitle: string }) {
+export function EventPreviewModal({ isOpen, onClose, eventTitle, eventID }: { isOpen: boolean; onClose: () => void; eventTitle: string; eventID?: string }) {
   const { openBooking } = useLayout();
   if (!isOpen) return null;
   return (
@@ -114,7 +115,7 @@ export function EventPreviewModal({ isOpen, onClose, eventTitle }: { isOpen: boo
         <button 
           onClick={() => {
             onClose();
-            openBooking(eventTitle, "₹999");
+            openBooking(eventTitle, "₹999", eventID);
           }}
           className="w-full py-3 rounded-2xl bg-brand-gradient text-white text-xs font-bold shadow-glow hover:scale-102 cursor-pointer"
         >
@@ -129,8 +130,6 @@ export function EventPreviewModal({ isOpen, onClose, eventTitle }: { isOpen: boo
 export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { isOpen: boolean; onClose: () => void; eventTitle: string; price: string; eventID?: string }) {
   const router = useRouter();
   const { addTicket, refreshBookings, bookedTickets } = useLayout();
-  const isRealEvent = Boolean(eventID && !eventID.startsWith("e") && !eventID.startsWith("c_"));
-
   // Check if user already has an active pass for this event
   const hasActiveTicket = Boolean(
     eventID &&
@@ -141,7 +140,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
 
   // Booking States (1 ticket per user strictly enforced)
   const qty = 1;
-  const [category, setCategory] = useState<"general" | "vip" | "squad">("general");
+  const [category, setCategory] = useState<"general" | "vip" | "backstage">("general");
   const [promoCode, setPromoCode] = useState("");
   const [discountApplied, setDiscountApplied] = useState(false);
   const [promoError, setPromoError] = useState("");
@@ -149,23 +148,58 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
   const [processMsg, setProcessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Real tiers fetched from backend
+  // Real tiers fetched from backend or local storage
   const [realTiers, setRealTiers] = useState<any[]>([]);
   const [selectedTierID, setSelectedTierID] = useState<string | null>(null);
 
-  // Fetch real tiers when modal opens for a real event
+  // Fetch real tiers when modal opens
   useEffect(() => {
-    if (isOpen && isRealEvent && eventID) {
+    if (!isOpen || !eventID) {
+      setRealTiers([]);
+      setSelectedTierID(null);
+      return;
+    }
+
+    const loadLocalTiers = () => {
+      try {
+        const created = JSON.parse(localStorage.getItem("happnix_created_events_v4") || "[]");
+        const cached = JSON.parse(localStorage.getItem("happnix_cached_feed_events") || "[]");
+        const match = [...created, ...cached, ...MOCK_EVENTS].find((e: any) => (e.eventID || e.id) === eventID);
+        const tiers = match?.ticketing?.tiers || match?.ticketTiers || [];
+        if (Array.isArray(tiers) && tiers.length > 0) {
+          const mapped = tiers.map((t: any) => ({
+            tierID: t.id || t.tierID || `tier_${Math.random()}`,
+            name: t.name || "General Admission",
+            price: Number(t.price) || 0,
+            description: t.promoText || t.description || ""
+          }));
+          setRealTiers(mapped);
+          setSelectedTierID(mapped[0].tierID);
+          return true;
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return false;
+    };
+
+    // First check local/mock storage so tiers load immediately
+    const foundLocal = loadLocalTiers();
+
+    // Also attempt backend API if UUID
+    if (!eventID.startsWith("e") && !eventID.startsWith("c_")) {
       bookingApi.getEventTiers(eventID).then((res: any) => {
         if (res.success && res.tiers?.length > 0) {
           setRealTiers(res.tiers);
           setSelectedTierID(res.tiers[0].tierID);
+        } else if (!foundLocal) {
+          setRealTiers([]);
         }
       }).catch(() => {
-        setRealTiers([]);
+        if (!foundLocal) setRealTiers([]);
       });
     }
-  }, [isOpen, isRealEvent, eventID]);
+  }, [isOpen, eventID]);
 
   if (!isOpen) return null;
 
@@ -175,7 +209,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
   let basePrice = rawBase;
   let categoryLabel = "General Admission";
 
-  if (isRealEvent && realTiers.length > 0) {
+  if (realTiers.length > 0) {
     const selectedTier = realTiers.find(t => t.tierID === selectedTierID) || realTiers[0];
     basePrice = selectedTier ? Number(selectedTier.price) || 0 : rawBase;
     categoryLabel = selectedTier ? selectedTier.name : "General Admission";
@@ -183,9 +217,9 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
     if (category === "vip") {
       basePrice = rawBase + 500;
       categoryLabel = "VIP Access Pass";
-    } else if (category === "squad") {
-      basePrice = Math.round(rawBase * 3.2);
-      categoryLabel = "Squad Package (4 Entries)";
+    } else if (category === "backstage") {
+      basePrice = rawBase + 1200;
+      categoryLabel = "Backstage Pass";
     }
   }
 
@@ -237,7 +271,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
       setTimeout(() => setProcessMsg("Generating secure gate QR keys..."), 800);
       setTimeout(() => setProcessMsg("Authorizing secure check-out transaction..."), 1600);
       setTimeout(() => {
-        addTicket(`${eventTitle} (${categoryLabel})`, isFree ? "FREE" : `₹${total}`);
+        addTicket(`${eventTitle} (${categoryLabel})`, isFree ? "FREE" : `₹${total}`, eventID);
         setStage("confirmed");
       }, 2400);
     }
@@ -298,7 +332,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
                 <div className="flex flex-col gap-2 mb-4">
                   <label className="text-[10px] font-black uppercase tracking-wider text-white/40">Select Ticket Class</label>
                   
-                  {isRealEvent && realTiers.length > 0 ? (
+                  {realTiers.length > 0 ? (
                     <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
                       {realTiers.map((tier) => {
                         const tierPrice = Number(tier.price) || 0;
@@ -333,7 +367,7 @@ export function BookingModal({ isOpen, onClose, eventTitle, price, eventID }: { 
                       {[
                         { id: "general", label: "General", desc: `₹${rawBase}` },
                         { id: "vip", label: "VIP Pass", desc: `₹${rawBase + 500}` },
-                        { id: "squad", label: "Squad x4", desc: `₹${Math.round(rawBase * 3.2)}` }
+                        { id: "backstage", label: "Backstage", desc: `₹${rawBase + 1200}` }
                       ].map((t) => (
                         <button
                           key={t.id}

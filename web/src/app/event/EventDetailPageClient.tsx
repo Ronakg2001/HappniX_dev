@@ -265,7 +265,7 @@ export default function EventDetailPageClient({ params }: { params: { id: string
                 <span className="text-sm font-black text-white leading-tight mt-0.5">{event.price}</span>
               </div>
               <Button
-                onClick={() => openBooking(event.title, event.price)}
+                onClick={() => openBooking(event.title, event.price, event.id)}
                 variant="brand"
                 size="sm"
                 className="px-4 rounded-lg text-[11px] font-black uppercase tracking-wider hover:scale-105 active:scale-95 transition-all duration-200"
