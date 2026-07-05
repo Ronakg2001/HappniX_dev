@@ -27,8 +27,8 @@ enviroment_variable = {
     "R2_STATIC_MEDIA_BUCKET": os.environ.get("R2_STATIC_MEDIA_BUCKET", ""),
     "R2_USERMEDIA_BUCKET_PUBID": os.environ.get("NEXT_PUBLIC_R2_USERMEDIA_BUCKET_PUBID", ""),
     "R2_STATIC_MEDIA_BUCKET_PUBID": os.environ.get("NEXT_PUBLIC_R2_STATIC_MEDIA_BUCKET_PUBID", ""),
-    "TEST_OTP_MODE": "true",
-    "APP_ENVIRONMENT": "dev",
+    "TEST_OTP_MODE": os.environ.get("TEST_OTP_MODE", "false"),
+    "APP_ENVIRONMENT": os.environ.get("APP_ENVIRONMENT", "prod"),
     "EXPO_TOKEN": os.environ.get("EXPO_TOKEN", "")
 }
 

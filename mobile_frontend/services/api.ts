@@ -123,6 +123,12 @@ export const authApi = {
   completeProfile: (data: { bio?: string; profilePictureUrl?: string; skip?: boolean }) =>
     api.post('/api/signup/profile', data),
   logout: async () => {
+    try {
+      // Fire backend logout to revoke Cognito tokens globally
+      await api.post('/api/home/logout', { actionItem: 'Logout' });
+    } catch (_) {
+      // Backend logout failure is non-fatal — still clear local session
+    }
     await clearSession();
     return { success: true };
   },
@@ -131,108 +137,80 @@ export const authApi = {
 
 export const profileApi = {
   me: () => api.get('/api/profile/me'),
-  updateProfile: (data: any) => api.post('/api/profile/update', data),
+  updateProfile: (data: any) =>
+    api.post('/api/profile/me', { actionItem: 'update_user_profile', ...data }),
   completeProfile: (data: any) => api.post('/api/signup/profile', data),
   getFollowers: () => api.get('/api/profile/followers'),
   getFollowing: () => api.get('/api/profile/following'),
+  checkUsername: (username: string) =>
+    api.post('/api/profile/me', { actionItem: 'check_username', target_username: username }),
+  deleteAccount: () => api.post('/api/profile/me', { actionItem: 'deleteAccount' }),
+  // @NOT_IMPLEMENTED — Backend stubs (501). Keep for future wiring.
   getFollowRequests: () => api.get('/api/profile/follow-requests'),
   handleFollowRequest: (requesterUserId: number, action: 'approve' | 'deny') =>
     api.post('/api/profile/follow-requests', { requesterUserId, action }),
-  getPrivacy: () => api.get('/api/profile/privacy'),
-  setPrivacy: (isPrivate: boolean) => api.post('/api/profile/privacy', { isPrivate }),
   sendAadhaarOtp: (aadhaarNumber: string) =>
     api.post('/api/auth/aadhaar/send-otp', { aadhaarNumber }),
   verifyAadhaarOtp: (otp: string) => api.post('/api/auth/aadhaar/verify-otp', { otp }),
-  deleteAccount: () => api.post('/api/profile/me', { actionItem: 'deleteAccount' }),
 };
 
 export const eventApi = {
-  nearby: (latitude = 26.9124, longitude = 75.7873, radiusKm = 50) =>
-    api.get('/api/events/nearby', { params: { latitude, longitude, radiusKm } }),
-  live: () => api.get('/api/events/live'),
-  mine: () => api.get('/api/events/mine'),
-  getById: (eventId: number | string) => api.get(`/api/events/${eventId}`),
-  create: (formData: FormData) =>
-    api.post('/api/events/create', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  delete: (eventId: number | string) => api.delete(`/api/events/${eventId}`),
+  // GET /api/events → GetMyEvents (backend reads GET as implicit action)
+  mine: () => api.get('/api/events'),
+  // POST /api/events with actionItem body
+  createDraft: (eventData: any) =>
+    api.post('/api/events', { actionItem: 'CreateEventDraft', eventData, ...eventData }),
+  publish: (eventData: any) =>
+    api.post('/api/events', { actionItem: 'PublishEvent', eventData, ...eventData }),
+  delete: (eventID: string) =>
+    api.post('/api/events', { actionItem: 'DeleteEvent', eventID }),
+  getMediaUploadUrl: (fileName: string, contentType: string, eventId: string) =>
+    api.post('/api/events', { actionItem: 'GetMediaUploadUrl', fileName, contentType, eventId }),
+  deleteMedia: (objectKey: string) =>
+    api.post('/api/events', { actionItem: 'DeleteMedia', objectKey }),
 };
 
-export const ticketApi = {
-  getAll: () => api.get('/api/tickets'),
-  book: (eventId: number | string, passType: string, quantity: number) =>
-    api.post('/api/tickets/book', { event_id: eventId, pass_type: passType, quantity }),
-  pay: (ticketId: number | string, paymentMethod: string) =>
-    api.post(`/api/tickets/${ticketId}/pay`, { payment_method: paymentMethod }),
-  updateGroup: (ticketId: number | string, groupInfo: any) =>
-    api.post(`/api/tickets/${ticketId}/group`, groupInfo),
-  cancel: (ticketId: number | string) => api.post(`/api/tickets/${ticketId}/cancel`),
-  archive: (ticketId: number | string) => api.post(`/api/tickets/${ticketId}/archive`),
-  delete: (ticketId: number | string) => api.delete(`/api/tickets/${ticketId}/delete`),
+export const bookingApi = {
+  // GET /api/booking → user's bookings
+  getMyBookings: () => api.get('/api/booking'),
+  // GET /api/booking?eventID=xxx → event tiers for booking modal
+  getEventTiers: (eventID: string) =>
+    api.get('/api/booking', { params: { eventID } }),
+  // POST /api/booking with actionItem
+  bookTicket: (data: { eventID: string; tierID: string; quantity: number }) =>
+    api.post('/api/booking', { actionItem: 'BookTicket', ...data }),
+  cancelTicket: (ticketID: string) =>
+    api.post('/api/booking', { actionItem: 'CancelTicket', ticketID }),
 };
 
 export const userApi = {
-  search: (query: string, limit = 20) => api.get('/api/users/search', { params: { q: query, limit } }),
-  publicProfile: (userId: number | string) => api.get(`/api/users/${userId}/profile`),
-  follow: (targetUserId: number | string) => api.post('/api/users/follow', { target_user_id: targetUserId }),
-  unfollow: (targetUserId: number | string) => api.post('/api/users/unfollow', { target_user_id: targetUserId }),
+  search: (query: string, limit = 20) =>
+    api.get('/api/discover/search', { params: { q: query, limit } }),
+  publicProfile: (userId: number | string) =>
+    api.get(`/api/users/${userId}/profile`),
+  // Follow/unfollow is a toggle via the profile handler
+  toggleFollow: (targetUserId: number | string) =>
+    api.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// @NOT_IMPLEMENTED — These features have no backend handler yet.
+// Keep the interfaces for future wiring; calls will return 501.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const notificationApi = {
-  getAll: () => api.get('/api/notifications'),
-  markRead: () => api.post('/api/notifications'),
+  /** @NOT_IMPLEMENTED */ getAll: () => api.get('/api/notifications'),
+  /** @NOT_IMPLEMENTED */ markRead: () => api.post('/api/notifications'),
 };
 
 export const messagingApi = {
-  getConversations: () => api.get('/api/messages/conversations'),
-  startConversation: (targetUserId: number | string) =>
+  /** @NOT_IMPLEMENTED */ getConversations: () => api.get('/api/messages/conversations'),
+  /** @NOT_IMPLEMENTED */ startConversation: (targetUserId: number | string) =>
     api.post('/api/messages/conversations/start', { target_user_id: targetUserId }),
-  getMessages: (conversationId: number | string) =>
+  /** @NOT_IMPLEMENTED */ getMessages: (conversationId: number | string) =>
     api.get(`/api/messages/conversations/${conversationId}/messages`),
-  markRead: (conversationId: number | string) =>
-    api.post(`/api/messages/conversations/${conversationId}/read`),
-  sendMessage: (conversationId: number | string, body: string, repliedToId?: number | string) =>
-    api.post(`/api/messages/conversations/${conversationId}/messages`, {
-      body,
-      ...(repliedToId ? { repliedToId } : {}),
-    }),
-  sendMessageWithAttachments: (
-    conversationId: number | string,
-    body: string,
-    files: { uri: string; name: string; type: string }[],
-    attachmentMeta?: { durationSeconds?: number | null }[],
-  ) => {
-    const formData = new FormData();
-    formData.append('body', body);
-    files.forEach((file) => {
-      formData.append('attachments', file as any);
-    });
-    if (attachmentMeta) formData.append('attachmentMeta', JSON.stringify(attachmentMeta));
-    return api.post(`/api/messages/conversations/${conversationId}/messages`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  editMessage: (messageId: number | string, content: string) =>
-    api.post(`/api/messages/messages/${messageId}/edit`, { content }),
-  forwardMessage: (messageId: number | string, targetUserId: number | string) =>
-    api.post(`/api/messages/messages/${messageId}/forward`, { target_user_id: targetUserId }),
-  deleteMessage: (messageId: number | string) => api.post(`/api/messages/messages/${messageId}/delete`),
-  unsendMessage: (messageId: number | string) => api.post(`/api/messages/messages/${messageId}/unsend`),
-  clearConversation: (conversationId: number | string) =>
-    api.post(`/api/messages/conversations/${conversationId}/clear`),
-  deleteConversation: (conversationId: number | string) =>
-    api.delete(`/api/messages/conversations/${conversationId}`),
-};
-
-export const groupTicketApi = {
-  getGroup: (ticketId: number | string) => api.get(`/api/tickets/${ticketId}/group`),
-  updateGroup: (
-    ticketId: number | string,
-    data: { inviteeUserIds?: number[]; removeUserIds?: number[]; paidForUserIds?: number[] },
-  ) => api.post(`/api/tickets/${ticketId}/group`, data),
-  generateInvite: (ticketId: number | string) => api.post(`/api/tickets/${ticketId}/invite/generate`),
-  acceptInvite: (uuid: string) => api.post('/api/tickets/invite/accept', { uuid }),
+  /** @NOT_IMPLEMENTED */ sendMessage: (conversationId: number | string, body: string) =>
+    api.post(`/api/messages/conversations/${conversationId}/messages`, { body }),
 };
 
 export const EVENT_CATEGORIES = [

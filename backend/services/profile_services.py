@@ -109,8 +109,8 @@ def delete_user_data(user_id: str, username: str, access_token: str) -> dict:
     results = {"success": True, "details": {}}
 
     # 1. Delete from R2 Storage (Public and Private)
-    public_res = r2_bucket.delete_folder_contents(f"public/{user_id}/")
-    private_res = r2_bucket.delete_folder_contents(f"private/{user_id}/")
+    public_res = r2_bucket.delete_folder_contents(prefix=f"public/{user_id}/")
+    private_res = r2_bucket.delete_folder_contents(prefix=f"private/{user_id}/")
     results["details"]["r2_public"] = public_res
     results["details"]["r2_private"] = private_res
 

@@ -4,6 +4,7 @@ services/post_services.py — Social post and reel creation, feed retrieval.
 Posts are saved to RDS (source of truth) and fanned out to DynamoDB
 for the polymorphic home feed.
 """
+import json
 import uuid
 from utils import utilities as util
 from integration import rds, dynamo_db
@@ -42,7 +43,7 @@ def create_post(user_id: str, post_data: dict) -> dict:
         "postID": post_id,
         "authorUserID": user_id,
         "postType": rds_payload["postType"],
-        "mediaItems": str(rds_payload["mediaItems"]),
+        "mediaItems": json.dumps(rds_payload["mediaItems"]) if isinstance(rds_payload["mediaItems"], (list, dict)) else rds_payload["mediaItems"],
         "caption": rds_payload.get("caption", ""),
         "createdAt": util.now_iso(),
     }

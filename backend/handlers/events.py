@@ -4,7 +4,6 @@ handlers/events.py — Party/event management endpoints for HappniX.
 
 from utils.Response import success_response, error_response
 from utils import utilities as util
-from integration import cognito_auth as cognito
 from integration import r2_bucket
 from services import event_services
 
@@ -111,14 +110,14 @@ def media_upload_url(**kwargs):
 def delete_media(**kwargs):
     """Deletes an image from R2."""
     try:
-        username = kwargs.get("username")
+        user_id = kwargs.get("user_id")
         
         object_key = kwargs.get("objectKey")
         if not object_key:
             return error_response("Missing objectKey", 400)
             
         # Security check: ensure user is deleting their own media
-        if not object_key.startswith(f"events/{username}/"):
+        if not object_key.startswith(f"private/{user_id}/") and not object_key.startswith(f"public/{user_id}/"):
             return error_response("Unauthorized to delete this media", 403)
             
         # Calling integration layer using strictly **kwargs
@@ -171,21 +170,12 @@ def lambda_handler(event, context):
         if http_method == "OPTIONS":
             return success_response({"success": True, "message": "CORS preflight successful"})
             
-        headers = event.get("headers", {})
-        auth_header = headers.get("Authorization") or headers.get("authorization")
-        
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return error_response("Missing or invalid Authorization header.", 401)
-            
-        access_token = auth_header.split(" ")[1]
-        cognito_user = cognito.get_user(access_token)
-        if not cognito_user:
-            return error_response("Unauthorized. User may be deleted.", 401)
-            
-        username = cognito_user.get("Username")
-        if not username:
-            return error_response("Unauthorized. Invalid Cognito user.", 401)
-            
+        auth = util.authenticate_request(event)
+        if not auth.get("success"):
+            return error_response(auth["error"], auth.get("status_code", 401))
+
+        user_id = auth["user_id"]
+
         if http_method == "GET":
             action_item = "GetMyEvents"
             qs = event.get("queryStringParameters") or {}
@@ -204,20 +194,7 @@ def lambda_handler(event, context):
         handler = ACTION_HANDLERS.get(action_item)
         if not handler:
             return error_response(f"Action '{action_item}' not implemented.", 501)
-            
-        # Extract user_id from Cognito attributes for service calls
-        user_attrs = cognito_user.get("UserAttributes", [])
-        user_id = None
-        for attr in user_attrs:
-            if attr.get("Name") == "custom:userId":
-                user_id = attr.get("Value")
-                break
 
-        if not user_id:
-            user_id = username
-
-        payload["event"] = event
-        payload["username"] = username
         payload["user_id"] = user_id
         
         return handler(**payload)

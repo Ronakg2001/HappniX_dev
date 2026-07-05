@@ -47,21 +47,10 @@ def handle_discover_search(event):
     if pub_id and not pub_id.endswith('/'):
         pub_id += '/'
         
-    headers = event.get("headers", {})
-    auth_header = headers.get("Authorization") or headers.get("authorization", "")
     current_user_id = None
-    if auth_header.startswith("Bearer "):
-        from integration import cognito_auth as cognito
-        from integration import rds
-        access_token = auth_header.split(" ")[1]
-        cognito_user = cognito.get_user(access_token)
-        if cognito_user:
-            username = cognito_user.get("Username")
-            rds_result = rds.get_record("users", userID=username)
-            if not rds_result.get("success"):
-                rds_result = rds.get_record("users", userName=username)
-            if rds_result.get("success"):
-                current_user_id = rds_result.get("data", {}).get("userID")
+    auth = util.authenticate_request(event)
+    if auth.get("success"):
+        current_user_id = auth["user_id"]
 
     formatted_users = []
     for u in users:

@@ -201,3 +201,61 @@ def fix_media_url(url: str | None) -> str | None:
         
     return f"{clean_pub_id}{url.lstrip('/')}"
 
+
+def authenticate_request(event: dict) -> dict:
+    """
+    Extract and validate the Bearer token from a Lambda event.
+    
+    Centralizes the auth pattern duplicated across events.py, booking.py,
+    profile.py, and home_page.py.
+    
+    Returns:
+        On success: {"success": True, "user_id": str, "username": str,
+                     "full_name": str, "cognito_sub": str, "access_token": str,
+                     "user_data": dict}
+        On failure: {"success": False, "error": str, "status_code": int}
+    """
+    from integration import cognito_auth as cognito
+    from integration import rds
+
+    headers = event.get("headers", {})
+    auth_header = headers.get("Authorization") or headers.get("authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return {"success": False, "error": "Missing or invalid Authorization header.", "status_code": 401}
+
+    access_token = auth_header.split(" ")[1]
+
+    cognito_user = cognito.get_user(access_token)
+    if not cognito_user:
+        return {"success": False, "error": "Unauthorized. Invalid or expired token.", "status_code": 401}
+
+    cognito_username = cognito_user.get("Username")
+    if not cognito_username:
+        return {"success": False, "error": "Unauthorized. Invalid Cognito user data.", "status_code": 401}
+
+    # Try lookup by userID first (modern users), fallback to userName (legacy)
+    rds_result = rds.get_record("users", userID=cognito_username)
+    if not rds_result.get("success"):
+        rds_result = rds.get_record("users", userName=cognito_username)
+
+    if not rds_result.get("success"):
+        return {"success": False, "error": "User not found in database.", "status_code": 404}
+
+    user_data = rds_result.get("data", {})
+    user_id = user_data.get("userID")
+
+    if not user_id:
+        return {"success": False, "error": "User ID not found in database.", "status_code": 500}
+
+    return {
+        "success": True,
+        "user_id": user_id,
+        "username": user_data.get("userName", ""),
+        "full_name": user_data.get("fullName", ""),
+        "cognito_sub": user_data.get("cognitoSub", ""),
+        "dob": user_data.get("dateOfBirth", ""),
+        "gender": user_data.get("gender", ""),
+        "access_token": access_token,
+        "user_data": user_data,
+    }

@@ -13,6 +13,20 @@ except Exception as e:
     util.log("error", "rds.init", f"Failed to load manifest.json: {e}")
     _MANIFEST = {}
 
+# ── Allowed table names from manifest (SQL injection prevention) ──────────────
+_ALLOWED_TABLES = set(_MANIFEST.get("rds", {}).get("tables", {}).keys())
+
+def _validate_table_name(table_name: str) -> bool:
+    """Return True if the table name is defined in the manifest (safe to use in SQL)."""
+    return table_name in _ALLOWED_TABLES
+
+def _validate_column_names(table_name: str, column_names: list) -> bool:
+    """Return True if all column names are defined in the manifest for the given table."""
+    allowed_cols = set(_MANIFEST.get("rds", {}).get("tables", {}).get(table_name, {}).get("columns", []))
+    if not allowed_cols:
+        return False
+    return all(col in allowed_cols for col in column_names)
+
 def get_connection():
     """Establish a connection to the RDS PostgreSQL database."""
     try:
@@ -57,11 +71,15 @@ def get_record(table_name: str, **kwargs) -> dict:
     Retrieve a single record based on matching kwargs conditions.
     Example: get_record("users", userName="john_doe")
     """
+    if not _validate_table_name(table_name):
+        return {"success": False, "error": f"Unknown table: {table_name}"}
+
     conn = get_connection()
     if not conn:
         return {"success": False, "error": "Database connection failed."}
         
     if not kwargs:
+        conn.close()
         return {"success": False, "error": "No query conditions provided."}
         
     where_clauses = []
@@ -92,9 +110,12 @@ def record_exists(table_name: str, **kwargs) -> bool:
     """
     Ultra-fast check to see if a record exists based on kwargs.
     """
+    if not _validate_table_name(table_name):
+        return True  # fail-safe
+
     conn = get_connection()
     if not conn:
-        return True # fail-safe
+        return True  # fail-safe
         
     if not kwargs:
         return True
@@ -124,15 +145,18 @@ def insert_record(table_name: str, **kwargs) -> dict:
     Uses manifest.json to pull allowed columns and default statuses.
     Handles PostgreSQL TEXT[] and JSONB types automatically.
     """
-    conn = get_connection()
-    if not conn:
-        return {"success": False, "error": "Database connection failed."}
-        
+    if not _validate_table_name(table_name):
+        return {"success": False, "error": f"Unknown table: {table_name}"}
+
     table_config = _MANIFEST.get("rds", {}).get("tables", {}).get(table_name, {})
     columns = table_config.get("columns", [])
     
     if not columns:
         return {"success": False, "error": f"Table {table_name} not configured in manifest."}
+
+    conn = get_connection()
+    if not conn:
+        return {"success": False, "error": "Database connection failed."}
         
     insert_data = {}
     for col in columns:
@@ -148,6 +172,7 @@ def insert_record(table_name: str, **kwargs) -> dict:
         # Skip None values — let the database use its own DEFAULT
     
     if not insert_data:
+        conn.close()
         return {"success": False, "error": "No data to insert."}
             
     cols_str = ", ".join([f'"{k}"' for k in insert_data.keys()])
@@ -179,11 +204,15 @@ def delete_record(table_name: str, **kwargs) -> dict:
     """
     Delete records from the table based on kwargs conditions.
     """
+    if not _validate_table_name(table_name):
+        return {"success": False, "error": f"Unknown table: {table_name}"}
+
     conn = get_connection()
     if not conn:
         return {"success": False, "error": "Database connection failed."}
 
     if not kwargs:
+        conn.close()
         return {"success": False, "error": "No query conditions provided for deletion."}
 
     where_clauses = []
@@ -215,6 +244,9 @@ def update_record(table_name: str, pk_name: str, pk_value: str, updates: dict) -
     Update a record in the RDS table based on its primary key.
     Only updates columns that are defined in the manifest for the table.
     """
+    if not _validate_table_name(table_name):
+        return {"success": False, "error": f"Unknown table: {table_name}"}
+
     if not updates:
         return {"success": False, "error": "No updates provided."}
 
@@ -279,7 +311,7 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
     sql = '''
         SELECT "userID", "userName", "fullName", "profilePictureUrl", "privacyMode", "status"
         FROM users
-        WHERE (COALESCE("userName", '') ILIKE %s OR COALESCE("fullName", '') ILIKE %s OR COALESCE("userID", '') ILIKE %s OR COALESCE("emailAddress", '') ILIKE %s)
+        WHERE (COALESCE("userName", '') ILIKE %s OR COALESCE("fullName", '') ILIKE %s)
           AND ("status" IS NULL OR "status" != 'Deleted')
           AND ("privacyMode" IS NULL OR "privacyMode" != 'private')
         LIMIT %s;
@@ -287,7 +319,7 @@ def search_users_by_name(query: str, limit: int = 20) -> dict:
     
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(sql, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
+            cur.execute(sql, (search_pattern, search_pattern, limit))
             rows = cur.fetchall()
             data = [util.format_rds_row(r) for r in rows]
             data = _enrich_users_with_dynamo_avatar(data)
@@ -315,8 +347,8 @@ def search_public_events(query: str, limit: int = 20) -> dict:
         FROM events e
         LEFT JOIN users u ON e."hostUserID" = u."userID"
         WHERE (COALESCE(e."title", '') ILIKE %s OR COALESCE(e."eventCategory", '') ILIKE %s OR COALESCE(e."description", '') ILIKE %s)
-          AND (e."visibility" IS NULL OR e."visibility" ILIKE 'Public' OR e."visibility" != 'Private')
-          AND (e."status" IS NULL OR e."status" ILIKE 'Published' OR e."status" ILIKE 'Upcoming' OR e."status" ILIKE 'Live' OR e."status" ILIKE 'Active')
+          AND e."visibility" = 'Public'
+          AND e."status" IN ('Published', 'Upcoming', 'Live', 'Active')
           AND (u."privacyMode" IS NULL OR u."privacyMode" != 'private')
           AND (u."status" IS NULL OR u."status" ILIKE 'active')
         ORDER BY COALESCE(e."engagementScore", 0) DESC, e."createdAt" DESC

@@ -198,5 +198,45 @@ CREATE TABLE IF NOT EXISTS event_waitlist (
 
 
 -- ============================================================================
+-- Auto-update "updatedAt" triggers (uses shared function from auth schema)
+-- ============================================================================
+
+-- events
+DROP TRIGGER IF EXISTS trg_events_updated_at ON events;
+CREATE TRIGGER trg_events_updated_at
+    BEFORE UPDATE ON events
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+-- event_ticket_tiers
+DROP TRIGGER IF EXISTS trg_event_ticket_tiers_updated_at ON event_ticket_tiers;
+CREATE TRIGGER trg_event_ticket_tiers_updated_at
+    BEFORE UPDATE ON event_ticket_tiers
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+-- event_orders
+DROP TRIGGER IF EXISTS trg_event_orders_updated_at ON event_orders;
+CREATE TRIGGER trg_event_orders_updated_at
+    BEFORE UPDATE ON event_orders
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+-- event_tickets
+DROP TRIGGER IF EXISTS trg_event_tickets_updated_at ON event_tickets;
+CREATE TRIGGER trg_event_tickets_updated_at
+    BEFORE UPDATE ON event_tickets
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================================
+-- Performance indexes for common query patterns
+-- ============================================================================
+
+-- SA-04: Composite index for has_active_ticket() lookups
+CREATE INDEX IF NOT EXISTS idx_event_tickets_attendee_event_status
+    ON event_tickets ("attendeeUserID", "eventID", "status");
+
+-- ============================================================================
 -- Schema creation complete. All tables use IF NOT EXISTS for idempotency.
 -- ============================================================================

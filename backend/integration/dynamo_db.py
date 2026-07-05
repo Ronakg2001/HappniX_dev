@@ -275,7 +275,7 @@ def increment_counter(table_key: str, pk_value: str, sk_value: str, attr_name: s
         if isinstance(updated_val, (int, float)) and updated_val < 0:
             table.update_item(
                 Key={pk_name: pk_value, sk_name: sk_value},
-                UpdateExpression=f"SET #{attr_name} :zero",
+                UpdateExpression=f"SET #{attr_name} = :zero",
                 ExpressionAttributeNames={f"#{attr_name}": attr_name},
                 ExpressionAttributeValues={":zero": 0}
             )
@@ -287,3 +287,34 @@ def increment_counter(table_key: str, pk_value: str, sk_value: str, attr_name: s
                  table_key=table_key, pk_value=pk_value, sk_value=sk_value)
         return {"success": False, "error": str(exc)}
 
+
+def update_item(table_key: str, pk_value: str, sk_value: str, update_expression: str,
+                expression_attribute_values: dict, expression_attribute_names: dict = None) -> dict:
+    """
+    Generic DynamoDB UpdateItem wrapper.
+    Allows services to perform partial attribute updates without calling _get_table() directly.
+    """
+    table = _get_table(table_key)
+    if not table:
+        return {"success": False, "error": f"DynamoDB table {table_key} not available."}
+
+    table_config = _MANIFEST.get("dynamodb", {}).get("tables", {}).get(table_key, {})
+    pk_name = table_config.get("keys", {}).get("pk", "PK")
+    sk_name = table_config.get("keys", {}).get("sk", "SK")
+
+    try:
+        update_kwargs = {
+            "Key": {pk_name: pk_value, sk_name: sk_value},
+            "UpdateExpression": update_expression,
+            "ExpressionAttributeValues": expression_attribute_values,
+        }
+        if expression_attribute_names:
+            update_kwargs["ExpressionAttributeNames"] = expression_attribute_names
+
+        table.update_item(**update_kwargs)
+        return {"success": True}
+    except ClientError as exc:
+        util.log("error", "dynamo_db.update_item",
+                 f"DynamoDB update_item failed: {exc}",
+                 table_key=table_key, pk_value=pk_value, sk_value=sk_value)
+        return {"success": False, "error": str(exc)}

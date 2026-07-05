@@ -75,6 +75,7 @@
   "rds": {
     "tables": {
       "users": {
+        "pk": "userID",
         "columns": [
           "userID", "cognitoSub", "userName", "fullName", "emailAddress",
           "phoneNumber", "dateOfBirth", "gender", "region", "emailVerified", "status",

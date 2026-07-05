@@ -1,5 +1,13 @@
 import json
+import os
 from decimal import Decimal
+
+# ── CORS Configuration ─────────────────────────────────────────────────────────
+# Set ALLOWED_ORIGINS env var as comma-separated list in production:
+#   e.g. "https://happnix.com,https://www.happnix.com,https://app.happnix.com"
+# Falls back to "*" ONLY when unset (local dev).
+_ALLOWED_ORIGINS_RAW = os.environ.get("ALLOWED_ORIGINS", "*")
+_ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS_RAW.split(",") if o.strip()]
 
 
 class _DecimalEncoder(json.JSONEncoder):
@@ -12,15 +20,27 @@ class _DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super().default(obj)
 
-def _cors_headers() -> dict:
+def _cors_headers(origin: str = None) -> dict:
     """Standard CORS + content-type headers for all API responses."""
+    # If ALLOWED_ORIGINS is "*", allow everything (dev mode)
+    if _ALLOWED_ORIGINS == ["*"]:
+        allowed_origin = "*"
+    elif origin and origin in _ALLOWED_ORIGINS:
+        allowed_origin = origin
+    elif _ALLOWED_ORIGINS:
+        # Default to first allowed origin if request origin not matched
+        allowed_origin = _ALLOWED_ORIGINS[0]
+    else:
+        allowed_origin = "*"
+
     return {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": allowed_origin,
         # X-HappniX-PreAuth — carries pre-auth token during OTP/signup flow
         # Authorization    — carries Cognito JWT Bearer token for authenticated calls
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRFToken,X-HappniX-PreAuth",
         "Access-Control-Expose-Headers": "X-Happnix-Trace-Id",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     }
 
 

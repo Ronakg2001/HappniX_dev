@@ -134,7 +134,7 @@ def create_user_entities(**kwargs) -> dict:
     Create both PROFILE and SETTINGS rows for a new user in a single batch_write call.
     Uses the generic dynamo_db batch_write_items method.
     """
-    user_id = kwargs.pop("user_id", None)
+    user_id = kwargs.get("user_id", None)
     username = kwargs.get("username")
     
     if not user_id:

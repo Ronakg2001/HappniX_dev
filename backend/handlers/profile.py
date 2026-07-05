@@ -145,26 +145,14 @@ def update_user_profile(**kwargs):
 def check_username(**kwargs):
     """
     Checks if a username is available for profile updates.
-    Frontend should pass 'target_username' or 'new_username' to avoid clashing with the authenticated user's 'username'.
+    Delegates to the shared signup_signin handler's check_username.
+    Accepts 'target_username' or 'new_username' to avoid colliding
+    with the authenticated user's own 'username' in kwargs.
     """
-    try:
-        target_username = str(kwargs.get("target_username") or kwargs.get("new_username") or kwargs.get("username", "")).strip()
-        
-        if not target_username:
-            return success_response({"success": True, "available": False, "message": "Username is required."})
-
-        if not re.match(r"^(?!.*\.\.)(?!^\.)(?!.*\.$)[a-zA-Z0-9_.]{1,30}$", target_username):
-            return success_response({"success": True, "available": False, "message": "Invalid username format."})
-
-        available = signup_signin_services.is_username_available(target_username)
-        
-        return success_response({
-            "success": True,
-            "available": available
-        })
-    except Exception as exc:
-        util.log("error", "profile.check_username", f"Action failed: {exc}")
-        return error_response(f"Action error: {str(exc)}", 500)
+    from handlers.signup_signin import check_username as _shared_check_username
+    # Map the profile-specific kwarg names to the shared handler's expected 'username'
+    target = kwargs.get("target_username") or kwargs.get("new_username") or kwargs.get("username", "")
+    return _shared_check_username(username=target)
 
 
 def delete_account(**kwargs):

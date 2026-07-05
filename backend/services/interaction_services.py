@@ -89,17 +89,19 @@ def recalculate_engagement(entity_id: str, entity_type: str) -> dict:
         shard_key = f"DISCOVER#SHARD_{shard_index}"
         engagement_sort_key = f"{score:012.2f}#{util.now_iso()}"
 
-        table = dynamo_db._get_table("events")
-        if table:
-            table.update_item(
-                Key={"PK": f"EVENT#{entity_id}" if entity_type == "event" else f"POST#{entity_id}", "SK": "CARD"},
-                UpdateExpression="SET discoverShard = :ds, engagementSortKey = :esk, engagementScore = :es",
-                ExpressionAttributeValues={
-                    ":ds": shard_key,
-                    ":esk": engagement_sort_key,
-                    ":es": str(score),
-                },
-            )
+        table_key = "events"
+        pk = f"EVENT#{entity_id}" if entity_type == "event" else f"POST#{entity_id}"
+        dynamo_db.update_item(
+            table_key=table_key,
+            pk_value=pk,
+            sk_value="CARD",
+            update_expression="SET discoverShard = :ds, engagementSortKey = :esk, engagementScore = :es",
+            expression_attribute_values={
+                ":ds": shard_key,
+                ":esk": engagement_sort_key,
+                ":es": str(score),
+            },
+        )
 
         util.log("info", "interaction_services.recalculate_engagement",
                  f"Engagement recalculated", entity_id=entity_id, score=score, shard=shard_key)
