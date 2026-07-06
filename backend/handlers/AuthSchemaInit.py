@@ -75,7 +75,7 @@ def lambda_handler(event, context):
                 sql = f.read()
                 
             # Execute SQL
-            result = rds.execute_raw_sql(sql)
+            result = rds.execute_raw_sql(sql, _caller="AuthSchemaInit")
             if not result.get("success"):
                 error = result.get("error", "Unknown RDS error")
                 msg = f"Schema apply failed for {schema_file}: {error}"

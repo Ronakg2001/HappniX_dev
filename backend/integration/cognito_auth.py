@@ -275,7 +275,25 @@ def update_user_attributes(username: str, attributes: dict) -> dict:
         )
         util.log("info", "cognito_auth.update_user_attributes", "Successfully updated attributes", username=username)
         return {"success": True}
-    except Exception as exc:
         util.log("error", "cognito_auth.update_user_attributes", f"Failed to update attributes: {exc}", username=username)
         return {"success": False, "error": str(exc)}
+
+
+def forgot_password(username: str) -> dict:
+    """
+    Initiate Cognito forgot password flow for a user.
+    """
+    if not _client or not CLIENT_ID:
+        return {"success": False, "error": "Cognito client not initialized"}
+    try:
+        resp = _client.forgot_password(
+            ClientId=CLIENT_ID,
+            Username=username
+        )
+        util.log("info", "cognito_auth.forgot_password", "Initiated forgot password flow", username=username)
+        return {"success": True, "data": resp}
+    except Exception as exc:
+        util.log("error", "cognito_auth.forgot_password", f"Forgot password failed: {exc}", username=username)
+        return {"success": False, "error": str(exc)}
+
 

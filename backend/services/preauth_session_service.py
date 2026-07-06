@@ -30,7 +30,12 @@ def get_session(token):
 
 def save_session(token, session_dict):
     """Persist the updated session dict back to the store."""
-    sessions.replace_session(token, session_dict)
+    result = sessions.replace_session(token, session_dict)
+    if not result.get("success"):
+        from utils import utilities as util
+        util.log("warning", "preauth_session_service.save_session",
+                 f"Session save failed: {result.get('error', 'unknown')}", token=token[:8])
+    return result
 
 
 def delete_session(token):

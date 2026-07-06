@@ -20,8 +20,6 @@ Self-healing:
 
 from utils.Response import success_response, error_response
 from utils import utilities as util
-from integration import cognito_auth as cognito
-from integration import rds
 from integration import r2_bucket
 from services import profile_services
 from services import signup_signin_services
@@ -281,46 +279,18 @@ def lambda_handler(event, context):
         E. Call the matching action handler with **kwargs.
     """
     try:
-        # ── A. Validate Bearer token ───────────────────────────────────────────
-        headers = event.get("headers", {})
-        auth_header = headers.get("Authorization") or headers.get("authorization")
+        # ── A+B. Authenticate and resolve user from Cognito + RDS ─────────────
+        auth = util.authenticate_request(event)
+        if not auth.get("success"):
+            return error_response(auth["error"], auth.get("status_code", 401))
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return error_response("Missing or invalid Authorization header.", 401)
-
-        access_token = auth_header.split(" ")[1]
-
-        cognito_user = cognito.get_user(access_token)
-        if not cognito_user:
-            return error_response("Unauthorized. Invalid or expired token.", 401)
-
-        cognito_username = cognito_user.get("Username")
-        if not cognito_username:
-            return error_response("Unauthorized. Invalid Cognito user data.", 401)
-
-        # ── B. Look up the user in RDS ─────────────────────────────────────────
-        # Try to look up by userID first (for modern users where Cognito username == UUID)
-        rds_result = rds.get_record("users", userID=cognito_username)
-        
-        if not rds_result.get("success"):
-            # Fallback for legacy users (where Cognito username == display userName)
-            rds_result = rds.get_record("users", userName=cognito_username)
-
-        if not rds_result.get("success"):
-            util.log("warning", "profile.lambda_handler",
-                     "User not found in RDS.", cognito_username=cognito_username)
-            return error_response("User not found in database.", 404)
-
-        user_data   = rds_result.get("data", {})
-        user_id     = user_data.get("userID")
-        username    = user_data.get("userName")  # Use the real username from RDS
-        full_name   = user_data.get("fullName", "")
-        cognito_sub = user_data.get("cognitoSub", "")
-        dob         = user_data.get("dateOfBirth", "")
-        gender      = user_data.get("gender", "")
-
-        if not user_id:
-            return error_response("User ID not found in database.", 500)
+        user_id      = auth["user_id"]
+        username     = auth["username"]
+        full_name    = auth["full_name"]
+        cognito_sub  = auth["cognito_sub"]
+        dob          = auth["dob"]
+        gender       = auth["gender"]
+        access_token = auth["access_token"]
 
         # ── C. Determine the action ───────────────────────────────────────────
         http_method = event.get("httpMethod", "")
@@ -334,7 +304,6 @@ def lambda_handler(event, context):
                     action_name = act_name
                     break
         elif http_method == "POST":
-            # Extract actionItem from the POST body
             body = util.parse_body(event)
             if body == "400":
                 return error_response("Malformed JSON in request body.", 400)
@@ -349,7 +318,7 @@ def lambda_handler(event, context):
         if not handler:
             return error_response(f"Action '{action_name}' not implemented.", 501)
 
-        # ── D. Build kwargs with user context ──────────────────────────────────
+        # ── D. Build kwargs with user context ────────────────────────────────
         kwargs = {
             "user_id":      user_id,
             "username":     username,

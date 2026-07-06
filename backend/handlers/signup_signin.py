@@ -95,7 +95,7 @@ def send_mobile_otp(**kwargs):
             "message": f"OTP sent to {mobile}.",
         }
         if util.is_test_otp_mode() and util.app_env() in {"dev", "qa"}:
-            body["debugOtp"] = otp
+            util.log("debug", "send_mobile_otp", f"TEST MODE OTP: {otp}", mobile=mobile)
 
         return preauth.preauth_response(200, body, token)
     except Exception as exc:
@@ -341,6 +341,35 @@ def refresh_token_action(**kwargs):
         return error_response(f"Action error: {str(exc)}", 500)
 
 
+def forgot_password_action(**kwargs):
+    """
+    Initiates Cognito password reset flow for a user by email or username.
+    """
+    try:
+        identifier = str(kwargs.get("email") or kwargs.get("identifier") or "").strip()
+        if not identifier:
+            return error_response("Email or username is required.", 400)
+        
+        # Look up username in RDS if email was provided
+        username = identifier
+        if "@" in identifier:
+            rds_result = rds.get_record("users", emailAddress=identifier)
+            if rds_result.get("success"):
+                username = rds_result.get("data", {}).get("userID") or rds_result.get("data", {}).get("userName") or identifier
+        
+        result = cognito.forgot_password(username=username)
+        if not result.get("success"):
+            return error_response(result.get("error", "Failed to initiate password reset."), 400)
+            
+        return success_response({
+            "success": True,
+            "message": "Password reset code sent to your registered contact."
+        })
+    except Exception as exc:
+        util.log("error", "forgot_password_action", f"Action failed: {exc}")
+        return error_response("Failed to initiate password reset.", 500)
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ACTION REGISTRY
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -354,6 +383,7 @@ ACTION_HANDLERS = {
     "RegisterUserDetails":  register_user_details,
     "LoginWithPassword":    login_with_password,
     "RefreshToken":         refresh_token_action,
+    "ForgotPassword":       forgot_password_action,
 }
 
 
@@ -397,7 +427,7 @@ def lambda_handler(event, context):
         if action_item == "SendMobileOtp":
             # Always create / retrieve a session — no prior token required
             token, session = preauth.get_or_create_session(incoming_token)
-        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername", "RefreshToken"}:
+        elif action_item in {"LoginWithPassword", "GetCountryCodes", "CheckUsername", "RefreshToken", "ForgotPassword"}:
             # These actions do not use a preauth session
             pass
         else:

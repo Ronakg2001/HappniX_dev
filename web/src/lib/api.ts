@@ -1,8 +1,11 @@
 import axios from "axios";
 import { CreatedEventType } from "@/types/event";
 
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
-const API_BASE = RAW_API_BASE.endsWith("/") ? RAW_API_BASE : `${RAW_API_BASE}/`;
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === "production" ? "" : "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev");
+if (!RAW_API_BASE && process.env.NODE_ENV === "production") {
+  console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined in production environment.");
+}
+const API_BASE = RAW_API_BASE ? (RAW_API_BASE.endsWith("/") ? RAW_API_BASE : `${RAW_API_BASE}/`) : "/";
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
@@ -31,8 +34,17 @@ apiClient.interceptors.request.use((config) => {
       }
     }
 
-    // Clear storage on logout request
+    // On logout: fire backend call FIRST to revoke Cognito tokens, then clear local state
     if (config.data?.actionItem === "Logout") {
+      try {
+        // Fire-and-forget: attempt backend token revocation before clearing locally
+        await axios.post(API_BASE_URL + '/api/home/logout', config.data, {
+          headers: config.headers as any,
+        });
+      } catch (_) {
+        // Backend failure is non-fatal — still clear local session
+      }
+
       localStorage.removeItem("happnix_pre_auth_token");
       localStorage.removeItem("happnix_access_token");
       localStorage.removeItem("happnix_refresh_token");
@@ -43,10 +55,7 @@ apiClient.interceptors.request.use((config) => {
       localStorage.removeItem("happnix_event_live_states_v4");
       localStorage.removeItem("happnix_event_stats_v4");
 
-      // If a logout call is made to the backend, prevent it from firing since backend auth is removed
-      if (isAuthEndpoint || config.url?.includes("/api/home/logout")) {
-        return Promise.reject(new axios.Cancel("Logout handled locally."));
-      }
+      return Promise.reject(new axios.Cancel("Logout handled — tokens revoked."));
     }
   }
   return config;
@@ -210,17 +219,17 @@ export const processEventMedia = async (eventData: CreatedEventType): Promise<Cr
   }
 
   if (processed.highlights && processed.highlights.length > 0) {
-    const newHighlights = [...processed.highlights];
-    for (let i = 0; i < newHighlights.length; i++) {
-      if (newHighlights[i].startsWith("data:image")) {
-        const file = base64ToFile(newHighlights[i], `highlight_${Date.now()}_${i}.jpg`);
+    const uploadPromises = processed.highlights.map(async (highlight, i) => {
+      if (highlight.startsWith("data:image")) {
+        const file = base64ToFile(highlight, `highlight_${Date.now()}_${i}.jpg`);
         if (file) {
           const url = await uploadMediaToR2(file, processed.id);
-          if (url) newHighlights[i] = url;
+          return url || highlight;
         }
       }
-    }
-    processed.highlights = newHighlights;
+      return highlight;
+    });
+    processed.highlights = await Promise.all(uploadPromises);
   }
 
   return processed;
@@ -229,8 +238,6 @@ export const processEventMedia = async (eventData: CreatedEventType): Promise<Cr
 export const userApi = {
   search: (query: string, limit = 20) => apiClient.get('/api/users/search', { params: { q: query, limit } }),
   publicProfile: (userId: number | string) => apiClient.get(`/api/users/${userId}/profile`),
-  follow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
-  unfollow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
   toggleFollow: (targetUserId: number | string) => apiClient.post('/api/profile/me', { actionItem: 'toggleFollow', targetUserId }),
   getFollowers: (userId: number | string, limit = 20, offset = 0) => apiClient.get('/api/profile/followers', { params: { userId, limit, offset } }),
   getFollowing: (userId: number | string, limit = 20, offset = 0) => apiClient.get('/api/profile/following', { params: { userId, limit, offset } }),

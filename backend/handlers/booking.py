@@ -10,7 +10,6 @@ Actions:
 
 from utils.Response import success_response, error_response
 from utils import utilities as util
-from integration import cognito_auth as cognito
 from integration import rds
 from services import booking_services, event_services
 
@@ -215,31 +214,12 @@ def lambda_handler(event, context):
         if http_method == "OPTIONS":
             return success_response({"success": True, "message": "CORS preflight successful"})
 
-        headers = event.get("headers", {})
-        auth_header = headers.get("Authorization") or headers.get("authorization")
+        auth = util.authenticate_request(event)
+        if not auth.get("success"):
+            return error_response(auth["error"], auth.get("status_code", 401))
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return error_response("Missing or invalid Authorization header.", 401)
-
-        access_token = auth_header.split(" ")[1]
-        cognito_user = cognito.get_user(access_token)
-        if not cognito_user:
-            return error_response("Unauthorized. User may be deleted.", 401)
-
-        username = cognito_user.get("Username")
-        if not username:
-            return error_response("Unauthorized. Invalid Cognito user.", 401)
-
-        # Extract user_id from Cognito attributes
-        user_attrs = cognito_user.get("UserAttributes", [])
-        user_id = None
-        for attr in user_attrs:
-            if attr.get("Name") == "custom:userId":
-                user_id = attr.get("Value")
-                break
-
-        if not user_id:
-            user_id = username
+        user_id = auth["user_id"]
+        username = auth["username"]
 
         # GET → GetMyBookings
         if http_method == "GET":

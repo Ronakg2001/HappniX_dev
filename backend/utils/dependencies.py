@@ -80,3 +80,26 @@ region_code_mapping = {
         "region_flag": "🇦🇺",
     },
 }
+
+# ── Canonical Event Categories ────────────────────────────────────────────────
+# Shared source of truth matching mobile_frontend/services/api.ts
+EVENT_CATEGORIES = [
+    "Fake wedding",
+    "Holi party",
+    "Prom night",
+    "Concert",
+    "Halloween",
+    "Lights out",
+    "New year",
+    "Pool",
+    "Live concerts",
+    "Comedy shows",
+    "Dj nights",
+    "House party",
+    "Club parties",
+    "Open mic nights",
+    "Navratri",
+    "Art and craft exhibitions",
+    "Ladies night",
+]
+

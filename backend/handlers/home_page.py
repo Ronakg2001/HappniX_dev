@@ -39,32 +39,11 @@ def handle_home_feed(event):
     Validates the bearer token against Cognito, verifies the user exists in RDS,
     and returns initial feed data.
     """
-    headers = event.get("headers", {})
-    auth_header = headers.get("Authorization") or headers.get("authorization")
+    auth = util.authenticate_request(event)
+    if not auth.get("success"):
+        return error_response(auth["error"], auth.get("status_code", 401))
     
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return error_response("Missing or invalid Authorization header.", 401)
-    
-    access_token = auth_header.split(" ")[1]
-    
-    # 1. Verify token and user existence in Cognito
-    cognito_user = cognito.get_user(access_token)
-    if not cognito_user:
-        util.log("warning", "handle_home_feed", "Cognito token invalid or user deleted.")
-        return error_response("Unauthorized. User may be deleted.", 401)
-    
-    # Extract username from Cognito response
-    username = cognito_user.get("Username")
-    if not username:
-        return error_response("Unauthorized. Invalid Cognito user data.", 401)
-        
-    # 2. Verify user existence in RDS
-    rds_result = rds.get_user_by_username(username)
-    if not rds_result.get("success"):
-        util.log("warning", "handle_home_feed", "User not found in RDS.", username=username)
-        return error_response("User not found in database. Account may be deleted.", 401)
-        
-    user_data = rds_result.get("data")
+    user_data = auth["user_data"]
     
     # Fetch feed using the hybrid feed generator
     query_params = event.get("queryStringParameters") or {}
@@ -106,16 +85,9 @@ def handle_feed_check(event):
     Lightweight endpoint for polling — only counts if new content exists.
     Returns {has_new: true/false} without rebuilding the entire feed.
     """
-    headers = event.get("headers", {})
-    auth_header = headers.get("Authorization") or headers.get("authorization")
-    
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return error_response("Missing or invalid Authorization header.", 401)
-    
-    access_token = auth_header.split(" ")[1]
-    cognito_user = cognito.get_user(access_token)
-    if not cognito_user:
-        return error_response("Unauthorized.", 401)
+    auth = util.authenticate_request(event)
+    if not auth.get("success"):
+        return error_response(auth["error"], auth.get("status_code", 401))
     
     query_params = event.get("queryStringParameters") or {}
     since = query_params.get("since")
@@ -203,13 +175,9 @@ def handle_public_profile(event, target_user_id):
     
     # Authenticate to see if they are logged in (so we can check follow status)
     if auth_header.startswith("Bearer "):
-        access_token = auth_header.split(" ")[1]
-        cognito_user = cognito.get_user(access_token)
-        if cognito_user:
-            username = cognito_user.get("Username")
-            rds_result = rds.get_user_by_username(username)
-            if rds_result.get("success"):
-                current_user_id = rds_result.get("data", {}).get("userID")
+        auth = util.authenticate_request(event)
+        if auth.get("success"):
+            current_user_id = auth["user_id"]
                 
     # 1. Fetch target user's RDS basic info
     target_rds = rds.get_record("users", userID=target_user_id)

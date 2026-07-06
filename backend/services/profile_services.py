@@ -132,18 +132,23 @@ def delete_user_data(user_id: str, username: str, access_token: str) -> dict:
 
     # 4. Delete from Cognito (and Sign Out)
     if access_token:
-        cognito_auth.global_sign_out(access_token)
+        try:
+            cognito_auth.global_sign_out(access_token)
+        except Exception as exc:
+            util.log("warning", "profile_services.delete_user_data",
+                     f"Cognito sign-out failed (continuing): {exc}", username=username)
     
     try:
         cognito_auth.delete_user(username=username)
         results["details"]["cognito"] = {"success": True}
     except Exception as exc:
         results["details"]["cognito"] = {"success": False, "error": str(exc)}
-        # We don't fail the overall operation if Cognito delete fails, because we already wiped DBs
-        util.log("warning", "profile_services.delete_user_data", f"Cognito delete failed: {exc}", username=username)
+        # Cognito still holds user's phone/email — block re-registration. Mark overall failure.
+        results["success"] = False
+        results["error"] = "Account data deleted but Cognito cleanup failed. Contact support."
+        util.log("error", "profile_services.delete_user_data",
+                 f"CRITICAL: Cognito delete failed after DB wipe: {exc}", username=username, user_id=user_id)
 
-    # Note: Even if some steps fail (like R2 missing files), we consider the action successful
-    # because the user's core auth/DB footprint is gone, enabling them to re-register.
     return results
 
 

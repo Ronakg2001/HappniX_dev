@@ -5,10 +5,24 @@ Follows the CQRS pattern:
   - Writes go to RDS (source of truth) then sync to DynamoDB (read projection).
   - Reads come from DynamoDB for feeds, RDS for detail pages.
 """
+import re
 import uuid
 import hashlib
 from utils import utilities as util
 from integration import rds, dynamo_db
+
+
+# ── Input Sanitization ──────────────────────────────────────────────────────────
+_STRIP_TAGS_RE = re.compile(r'<\s*/?\s*(script|iframe|object|embed|form|style|link|meta|svg|math|base)\b[^>]*>', re.IGNORECASE)
+_STRIP_EVENT_HANDLERS_RE = re.compile(r'\s+on\w+\s*=\s*["\'][^"]*["\']', re.IGNORECASE)
+
+def _sanitize_text(text: str) -> str:
+    """Strip dangerous HTML tags and event handlers from user-supplied text."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    cleaned = _STRIP_TAGS_RE.sub('', text)
+    cleaned = _STRIP_EVENT_HANDLERS_RE.sub('', cleaned)
+    return cleaned.strip()
 
 
 def _generate_event_uid() -> str:
@@ -91,8 +105,8 @@ def _format_event_payload(raw_payload: dict) -> dict:
         lng = location.get("longitude")
 
     return {
-        "title": payload.get("title", "Untitled Event"),
-        "description": payload.get("description", ""),
+        "title": _sanitize_text(payload.get("title", "Untitled Event")),
+        "description": _sanitize_text(payload.get("description", "")),
         "eventCategory": payload.get("category", "General"),
         "tags": payload.get("tags", []),
 

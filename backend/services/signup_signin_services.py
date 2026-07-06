@@ -86,7 +86,7 @@ def execute_user_registration(
         dateOfBirth=dob,
         gender=gender,
         region=region,
-        emailVerified=True,
+        emailVerified=False,
     )
 
     if not rds_result.get("success"):

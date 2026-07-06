@@ -75,8 +75,6 @@ def publish_event(**kwargs):
 def media_upload_url(**kwargs):
     """Generates a presigned URL for the frontend to upload images directly to R2."""
     try:
-        username = kwargs.get("username")
-        
         file_name = kwargs.get("fileName")
         content_type = kwargs.get("contentType")
         event_id = kwargs.get("eventId")

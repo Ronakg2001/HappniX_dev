@@ -47,8 +47,17 @@ def get_connection():
         return None
 
 
-def execute_raw_sql(sql: str) -> dict:
-    """Execute raw SQL statements (for DEV wiping, etc.)."""
+def execute_raw_sql(sql: str, _caller: str = None) -> dict:
+    """
+    Execute raw SQL statements. Restricted to schema initialization only.
+    
+    SECURITY: This function must only be called from AuthSchemaInit.py.
+    The _caller parameter acts as a lightweight guard against accidental misuse.
+    """
+    if _caller != "AuthSchemaInit":
+        util.log("error", "rds.execute_raw_sql", "Unauthorized caller attempted raw SQL execution", caller=_caller)
+        return {"success": False, "error": "execute_raw_sql is restricted to schema initialization."}
+
     conn = get_connection()
     if not conn:
         return {"success": False, "error": "Database connection failed."}
@@ -184,11 +193,14 @@ def insert_record(table_name: str, **kwargs) -> dict:
         pk_str = ", ".join([f'"{k}"' for k in pk])
     else:
         pk_str = f'"{pk}"'
-    sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders}) ON CONFLICT ({pk_str}) DO NOTHING;'
+    sql = f'INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders});'
     
     try:
         with conn.cursor() as cur:
             cur.execute(sql, values)
+            if cur.rowcount == 0:
+                conn.rollback()
+                return {"success": False, "error": "No rows inserted."}
             conn.commit()
         util.log("info", "rds.insert_record", f"Record inserted into {table_name}")
         return {"success": True}
@@ -267,7 +279,11 @@ def update_record(table_name: str, pk_name: str, pk_value: str, updates: dict) -
     for k, v in updates.items():
         if k in columns:
             set_clauses.append(f'"{k}" = %s')
-            values.append(v)
+            # Serialize dicts/lists to JSON for JSONB columns
+            if isinstance(v, (dict, list)):
+                values.append(json.dumps(v))
+            else:
+                values.append(v)
             
     if not set_clauses:
         conn.close()
@@ -455,7 +471,14 @@ def get_following(user_id: str, limit: int = 20, offset: int = 0) -> dict:
 
 
 def _enrich_users_with_dynamo_avatar(users_list: list) -> list:
-    """If profilePictureUrl is missing in an RDS row, fall back to fetching 'avatar' from DynamoDB PROFILE entity."""
+    """
+    If profilePictureUrl is missing in an RDS row, fall back to fetching
+    'avatar' from DynamoDB PROFILE entity.
+    
+    NOTE: This is a read-only enrichment. It does NOT write back to RDS.
+    If RDS data needs syncing, that should be done via a scheduled job,
+    not as a side effect during reads (BK-06).
+    """
     try:
         from integration import dynamo_db
         for u in users_list:
@@ -467,10 +490,6 @@ def _enrich_users_with_dynamo_avatar(users_list: list) -> list:
                         dyn_avatar = res["data"].get("avatar")
                         if dyn_avatar and dyn_avatar not in ["null", "None"]:
                             u["profilePictureUrl"] = dyn_avatar
-                            try:
-                                update_record("users", "userID", user_id, {"profilePictureUrl": dyn_avatar})
-                            except Exception:
-                                pass
     except Exception as exc:
         util.log("warning", "rds._enrich_users_with_dynamo_avatar", f"Enrichment failed (non-fatal): {exc}")
     return users_list
