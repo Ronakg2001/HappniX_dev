@@ -275,6 +275,7 @@ def update_user_attributes(username: str, attributes: dict) -> dict:
         )
         util.log("info", "cognito_auth.update_user_attributes", "Successfully updated attributes", username=username)
         return {"success": True}
+    except Exception as exc:
         util.log("error", "cognito_auth.update_user_attributes", f"Failed to update attributes: {exc}", username=username)
         return {"success": False, "error": str(exc)}
 

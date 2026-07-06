@@ -15,7 +15,7 @@ export const apiClient = axios.create({
 });
 
 // Request interceptor to dynamically inject pre-auth and bearer authentication tokens
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
   if (typeof window !== "undefined") {
     // Inject pre-auth token (OTP/signup flow)
     const preAuthToken = localStorage.getItem("happnix_pre_auth_token");
@@ -38,7 +38,7 @@ apiClient.interceptors.request.use((config) => {
     if (config.data?.actionItem === "Logout") {
       try {
         // Fire-and-forget: attempt backend token revocation before clearing locally
-        await axios.post(API_BASE_URL + '/api/home/logout', config.data, {
+        await axios.post(API_BASE + 'api/home/logout', config.data, {
           headers: config.headers as any,
         });
       } catch (_) {
