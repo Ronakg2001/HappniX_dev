@@ -1,7 +1,7 @@
 import axios from "axios";
 import { CreatedEventType } from "@/types/event";
 
-const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === "production" ? "" : "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev");
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://u9zfrut1t9.execute-api.ap-south-1.amazonaws.com/dev";
 if (!RAW_API_BASE && process.env.NODE_ENV === "production") {
   console.error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not defined in production environment.");
 }
